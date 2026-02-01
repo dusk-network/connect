@@ -1,0 +1,84 @@
+/**
+ * Amount helpers.
+ *
+ * The Dusk protocol uses Lux as the atomic unit:
+ * 1 DUSK = 1e9 Lux.
+ */
+
+export const LUX_DECIMALS = 9;
+export const LUX_SCALE = 10n ** 9n;
+
+/**
+ * Best-effort BigInt conversion.
+ */
+export function safeBigInt(v: unknown, fallback: bigint = 0n): bigint {
+  try {
+    return BigInt(v as any);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Format a Lux bigint string into a human-readable DUSK string.
+ */
+export function formatLuxToDusk(luxStr: string | bigint | number): string {
+  try {
+    const lux = BigInt(luxStr as any);
+    if (lux === 0n) return "0";
+
+    const units = lux / LUX_SCALE;
+    const dec = lux % LUX_SCALE;
+    if (dec === 0n) return units.toString();
+
+    const decStr = dec
+      .toString()
+      .padStart(LUX_DECIMALS, "0")
+      .replace(/0+$/, "");
+
+    return `${units.toString()}.${decStr}`;
+  } catch {
+    return String(luxStr ?? "0");
+  }
+}
+
+/**
+ * Clamp a decimal string to `maxDecimals`, trimming trailing zeroes.
+ */
+export function clampDecimals(numStr: string, maxDecimals: number = 4): string {
+  const s = String(numStr ?? "");
+  if (!s.includes(".")) return s;
+  const [u = "0", d = ""] = s.split(".");
+  const short = d.slice(0, maxDecimals).replace(/0+$/, "");
+  return short ? `${u}.${short}` : u;
+}
+
+/**
+ * Convenience helper: format Lux -> DUSK and clamp.
+ */
+export function formatLuxShort(luxStr: string | bigint | number, maxDecimals: number = 6): string {
+  const full = formatLuxToDusk(luxStr);
+  const clamped = clampDecimals(full, maxDecimals);
+
+  // If clamping would hide a non-zero value (e.g. very small Lux amounts)
+  // we fall back to the full (up to 9 decimals) representation.
+  const lux = safeBigInt(luxStr);
+  if (lux !== 0n && (clamped === "0" || clamped === "0.0")) {
+    return full;
+  }
+
+  return clamped;
+}
+
+/**
+ * Parse a user-entered DUSK decimal string into Lux (atomic units) string.
+ */
+export function parseDuskToLux(duskStr: string): string {
+  const s = String(duskStr ?? "").trim();
+  if (!/^\d+(\.\d+)?$/.test(s)) {
+    throw new Error("Invalid amount. Use a number like 1 or 0.123");
+  }
+  const [u = "0", d = ""] = s.split(".");
+  const dec = (d + "0".repeat(LUX_DECIMALS)).slice(0, LUX_DECIMALS);
+  return (BigInt(u) * LUX_SCALE + BigInt(dec)).toString();
+}

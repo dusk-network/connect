@@ -1,0 +1,27 @@
+{
+  "name": "@mochavi/connect",
+  "version": "0.0.1",
+  "description": "Mochavi Connect: lightweight SDK + optional connect UI for integrating the Dusk Wallet (DuskDS) into dApps.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./ui": {
+      "types": "./dist/ui.d.ts",
+      "import": "./dist/ui.js"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc -p tsconfig.json"
+  }
+}

@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SystemConfig • Mochavi Connect Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="top">
+        <div class="brand">
+          <div class="logo">◎</div>
+          <div>
+            <h1>SystemConfig</h1>
+            <p class="sub">
+              Manage Optimism's <code>SystemConfig</code> (DuskEVM) using <code>createDuskApp()</code> + a local WASM data-driver.
+            </p>
+          </div>
+        </div>
+
+        <mochavi-connect-button></mochavi-connect-button>
+      </header>
+
+      <section class="card">
+        <div class="row between">
+          <h2>Config</h2>
+          <span id="config-hint" class="muted">—</span>
+        </div>
+
+        <div class="grid">
+          <label class="field">
+            <span>Network</span>
+            <select id="input-network">
+              <option value="testnet">testnet</option>
+              <option value="devnet">devnet</option>
+              <option value="mainnet">mainnet</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Node URL</span>
+            <input id="input-node" placeholder="https://devnet.nodes.dusk.network" />
+          </label>
+
+          <label class="field span2">
+            <span>Contract ID (32 bytes)</span>
+            <input id="input-contract" placeholder="0x..." />
+          </label>
+
+          <label class="field span2">
+            <span>Driver URL</span>
+            <input id="input-driver" placeholder="./public/data_driver.wasm?v=..." />
+          </label>
+        </div>
+
+        <div class="row">
+          <button id="btn-apply" class="btn">Apply & reload</button>
+          <span class="muted">
+            Tip: reads are <b>not</b> auto-polled to avoid triggering your node. Use “Refresh”.
+          </span>
+        </div>
+      </section>
+
+      <section class="grid2">
+        <section class="card">
+          <div class="row between">
+            <h2>Overview</h2>
+            <span id="sync-status" class="badge">idle</span>
+          </div>
+
+          <div class="kv">
+            <div><span>paused</span><b id="v-paused">—</b></div>
+            <div><span>gas_limit</span><b id="v-gas-limit">—</b></div>
+            <div><span>basefee_scalar</span><b id="v-basefee-scalar">—</b></div>
+            <div><span>blobbasefee_scalar</span><b id="v-blobbasefee-scalar">—</b></div>
+            <div><span>owner</span><b id="v-owner" class="mono small">—</b></div>
+            <div><span>version</span><b id="v-version" class="mono">—</b></div>
+          </div>
+
+          <div class="row">
+            <button id="btn-refresh-light" class="btn">Refresh (light)</button>
+            <button id="btn-refresh-full" class="btn ghost">Refresh (full)</button>
+          </div>
+
+          <p class="muted small">
+            Light refresh keeps the getter list small (sequential calls).
+            Full refresh loads extra fields (more calls). Use sparingly if your node is sensitive.
+          </p>
+
+          <div id="full-fields" class="kv hidden">
+            <div><span>l2_chain_id</span><b id="v-l2-chain-id">—</b></div>
+            <div><span>batch_inbox</span><b id="v-batch-inbox" class="mono small">—</b></div>
+            <div><span>unsafe_block_signer</span><b id="v-unsafe-signer" class="mono small">—</b></div>
+            <div><span>batcher_hash</span><b id="v-batcher-hash" class="mono small">—</b></div>
+
+            <div><span>minimum_gas_limit</span><b id="v-minimum-gas">—</b></div>
+            <div><span>maximum_gas_limit</span><b id="v-maximum-gas">—</b></div>
+
+            <div><span>min_base_fee</span><b id="v-min-base-fee">—</b></div>
+            <div><span>eip1559_denominator</span><b id="v-eip1559-denom">—</b></div>
+            <div><span>eip1559_elasticity</span><b id="v-eip1559-elast">—</b></div>
+
+            <div><span>operator_fee_scalar</span><b id="v-op-fee-scalar">—</b></div>
+            <div><span>operator_fee_constant</span><b id="v-op-fee-const">—</b></div>
+            <div><span>da_footprint_gas_scalar</span><b id="v-da-scalar">—</b></div>
+
+            <div><span>guardian</span><b id="v-guardian" class="mono small">—</b></div>
+            <div><span>superchain_config</span><b id="v-superchain" class="mono small">—</b></div>
+            <div><span>is_custom_gas_token</span><b id="v-custom-gas">—</b></div>
+          </div>
+
+          <details class="details">
+            <summary>Details: resource_config + addresses</summary>
+            <p class="muted small">
+              These are decoded by the local data-driver and may be large. Use sparingly on sensitive nodes.
+            </p>
+            <p class="muted small">resource_config</p>
+            <pre id="v-resource" class="log"></pre>
+            <p class="muted small">get_addresses</p>
+            <pre id="v-addresses" class="log"></pre>
+          </details>
+        </section>
+
+        <section class="card">
+          <div class="row between">
+            <h2>Write</h2>
+            <span id="tx-status" class="badge">idle</span>
+          </div>
+
+          <p class="muted small">
+            Most setters are <b>owner-only</b>. If you’re not the owner, expect the tx to fail.
+          </p>
+
+          <h3 class="h3">Set gas_limit</h3>
+          <div class="row wrap">
+            <label class="field">
+              <span>gas_limit (u64)</span>
+              <input id="input-gas-limit" placeholder="e.g. 30000000" />
+            </label>
+
+            <button id="btn-set-gas-limit" class="btn">Send</button>
+          </div>
+
+          <hr class="sep" />
+
+          <h3 class="h3">Set Ecotone fee scalars</h3>
+          <div class="row wrap">
+            <label class="field">
+              <span>basefee_scalar (u32)</span>
+              <input id="input-basefee" placeholder="e.g. 100" />
+            </label>
+            <label class="field">
+              <span>blobbasefee_scalar (u32)</span>
+              <input id="input-blobbasefee" placeholder="e.g. 200" />
+            </label>
+
+            <button id="btn-set-ecotone" class="btn">Send</button>
+          </div>
+
+          <hr class="sep" />
+
+          <h3 class="h3">Set batcher address</h3>
+          <div class="row wrap">
+            <label class="field span2">
+              <span>batcher (EVM address, 20 bytes)</span>
+              <input id="input-batcher" placeholder="0x..." />
+            </label>
+            <button id="btn-set-batcher" class="btn">Send</button>
+          </div>
+
+          <h3 class="h3 mt">Set unsafe block signer</h3>
+          <div class="row wrap">
+            <label class="field span2">
+              <span>unsafe_block_signer (EVM address, 20 bytes)</span>
+              <input id="input-unsafe-signer" placeholder="0x..." />
+            </label>
+            <button id="btn-set-unsafe" class="btn">Send</button>
+          </div>
+
+          <details class="details">
+            <summary>Advanced: feature flags</summary>
+            <div class="row wrap mt">
+              <label class="field span2">
+                <span>feature key (bytes32 hex)</span>
+                <input id="input-feature" placeholder="0x... (64 hex chars)" />
+              </label>
+
+              <label class="field">
+                <span>enabled</span>
+                <select id="select-feature-enabled">
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              </label>
+
+              <button id="btn-set-feature" class="btn">Send</button>
+            </div>
+          </details>
+
+          <hr class="sep" />
+
+          <pre id="tx-log" class="log" aria-live="polite"></pre>
+        </section>
+      </section>
+
+      <footer class="foot muted small">
+        If you see <code>Unsupported("fn_name ...")</code>, you’re serving the wrong <code>data_driver.wasm</code>.
+        Add <code>?v=...</code> to bust cache.
+      </footer>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

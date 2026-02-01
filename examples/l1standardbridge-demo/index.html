@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>L1StandardBridge • Dusk Wallet SDK Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="top">
+        <div class="brand">
+          <div class="logo">◎</div>
+          <div>
+            <h1>L1StandardBridge</h1>
+            <p class="sub">
+              Minimal dApp example using <code>createDuskApp()</code> + local WASM data-driver.
+            </p>
+          </div>
+        </div>
+
+        <mochavi-connect-button></mochavi-connect-button>
+      </header>
+
+      <section class="card">
+        <div class="row between">
+          <h2>Config</h2>
+          <span id="config-hint" class="muted">—</span>
+        </div>
+
+        <div class="grid">
+          <label class="field">
+            <span>Network</span>
+            <select id="input-network">
+              <option value="testnet">testnet</option>
+              <option value="devnet">devnet</option>
+              <option value="mainnet">mainnet</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Node URL</span>
+            <input id="input-node" placeholder="https://devnet.nodes.dusk.network" />
+          </label>
+
+          <label class="field span2">
+            <span>Contract ID (32 bytes)</span>
+            <input id="input-contract" placeholder="0x..." />
+          </label>
+
+          <label class="field span2">
+            <span>Driver URL</span>
+            <input id="input-driver" placeholder="./public/data_driver.wasm?v=..." />
+          </label>
+        </div>
+
+        <div class="row">
+          <button id="btn-apply" class="btn">Apply & reload</button>
+          <span class="muted">
+            Tip: reads are <b>not</b> auto-polled to avoid triggering your node. Use “Refresh”.
+          </span>
+        </div>
+      </section>
+
+      <section class="grid2">
+        <section class="card">
+          <div class="row between">
+            <h2>Overview</h2>
+            <span id="sync-status" class="badge">idle</span>
+          </div>
+
+          <div class="kv">
+            <div><span>paused</span><b id="v-paused">—</b></div>
+            <div><span>deposit_fee</span><b id="v-deposit-fee">—</b></div>
+            <div><span>deposit_gas_limit</span><b id="v-deposit-gas">—</b></div>
+            <div><span>owner</span><b id="v-owner" class="mono small">—</b></div>
+            <div><span>version</span><b id="v-version" class="mono">—</b></div>
+          </div>
+
+          <div class="row">
+            <button id="btn-refresh-light" class="btn">Refresh (light)</button>
+            <button id="btn-refresh-full" class="btn ghost">Refresh (full)</button>
+          </div>
+
+          <p class="muted small">
+            Light refresh does a handful of getter calls sequentially.
+            Full refresh loads extra fields (more calls). Use sparingly if your node is sensitive.
+          </p>
+
+          <div id="full-fields" class="kv hidden">
+            <div><span>finalization_period</span><b id="v-finalization">—</b></div>
+            <div><span>min_gas_limit</span><b id="v-min-gas">—</b></div>
+            <div><span>max_data_length</span><b id="v-max-data">—</b></div>
+            <div><span>collected_deposit_fees</span><b id="v-collected">—</b></div>
+            <div><span>nonce</span><b id="v-nonce">—</b></div>
+            <div><span>next_bridge</span><b id="v-next-bridge" class="mono small">—</b></div>
+            <div><span>this_bridge_mapped</span><b id="v-this-bridge-mapped" class="mono small">—</b></div>
+            <div><span>this_messenger_mapped</span><b id="v-this-messenger-mapped" class="mono small">—</b></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="row between">
+            <h2>Write</h2>
+            <span id="tx-status" class="badge">idle</span>
+          </div>
+
+          <div class="row wrap">
+            <button id="btn-pause" class="btn danger">pause()</button>
+            <button id="btn-unpause" class="btn">unpause()</button>
+          </div>
+
+          <hr class="sep" />
+
+          <h3 class="h3">set_u64(...)</h3>
+          <div class="row wrap">
+            <label class="field">
+              <span>field</span>
+              <select id="select-u64">
+                <option value="DepositFee">DepositFee</option>
+                <option value="DepositGasLimit">DepositGasLimit</option>
+                <option value="MinGasLimit">MinGasLimit</option>
+                <option value="FinalizationPeriod">FinalizationPeriod</option>
+                <option value="MaxDataLength">MaxDataLength</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>value (u64)</span>
+              <input id="input-u64" placeholder="e.g. 42" />
+            </label>
+
+            <button id="btn-set-u64" class="btn">Send</button>
+          </div>
+
+          <details class="details">
+            <summary>Advanced: set_evm_address_or_offset(...)</summary>
+
+            <div class="row wrap mt">
+              <label class="field">
+                <span>field</span>
+                <select id="select-evm">
+                  <option value="ThisBridgeMapped">ThisBridgeMapped</option>
+                  <option value="ThisMessengerMapped">ThisMessengerMapped</option>
+                  <option value="OtherBridge">OtherBridge</option>
+                  <option value="OtherMessenger">OtherMessenger</option>
+                  <option value="AliasOffset">AliasOffset</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>value (EVM address, 20 bytes)</span>
+                <input id="input-evm" placeholder="0x..." />
+              </label>
+
+              <button id="btn-set-evm" class="btn">Send</button>
+            </div>
+
+            <p class="muted small">
+              These setters are typically <b>owner-only</b>. If you’re not the owner, expect the tx to fail.
+            </p>
+          </details>
+
+          <hr class="sep" />
+
+          <pre id="tx-log" class="log" aria-live="polite"></pre>
+        </section>
+      </section>
+
+      <footer class="foot muted small">
+        If you see <code>Unsupported("fn_name ...")</code>, you’re serving the wrong <code>data_driver.wasm</code>.
+        Add <code>?v=...</code> to bust cache.
+      </footer>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

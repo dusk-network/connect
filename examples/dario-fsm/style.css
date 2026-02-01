@@ -1,0 +1,474 @@
+:root {
+  /* Mochavi / neobank-ish dark theme (matches wallet + connect UI) */
+  --radius: 14px;
+
+  --bg: #05070c;
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.62);
+
+  --card: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.08);
+
+  --primary: #7aa2ff;
+  --ring: #33d1ff;
+  --danger: #ff4d6d;
+
+  --shadow: 0 14px 40px rgba(0,0,0,0.35);
+  --shadow-soft: 0 10px 30px rgba(0,0,0,0.22);
+
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+* { box-sizing: border-box; }
+
+html { color-scheme: dark; }
+
+/*
+  Ensure the native HTML `hidden` attribute always hides elements.
+  Without this, author styles like `.action { display:flex }` can override
+  the user-agent `[hidden] { display:none }` rule.
+*/
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  /* Keep the page background subtle; the stage already has its own ambience.
+     This avoids the "pattern repeats" look on wide displays. */
+  background:
+    radial-gradient(1100px 640px at 50% -20%, rgba(122,162,255,0.16), transparent 60%),
+    var(--bg);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--sans);
+}
+
+.muted { color: var(--muted); }
+
+/* ----------------------------------
+   Topbar
+----------------------------------- */
+
+.topbar {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(5,7,12,0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background:
+    radial-gradient(14px 14px at 35% 30%, rgba(255,255,255,0.18), transparent 70%),
+    var(--primary);
+  box-shadow: 0 14px 32px rgba(122,162,255,0.25);
+  flex: none;
+}
+.brandText { min-width: 0; }
+.titleRow { display: flex; align-items: center; gap: 10px; }
+
+h1 { margin: 0; font-size: 18px; letter-spacing: 0.2px; }
+.subtitle { margin-top: 2px; font-size: 12px; color: var(--muted); }
+
+.tag {
+  font-size: 11px;
+  color: rgba(255,255,255,0.86);
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+/* ----------------------------------
+   Layout
+----------------------------------- */
+
+.container {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 18px 18px 36px;
+}
+
+.game {
+  display: grid;
+  grid-template-columns: 1.25fr 0.85fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* ----------------------------------
+   Stage
+----------------------------------- */
+
+.stage {
+  position: relative;
+  /* state-aware accent colors (overridden via [data-state]) */
+  --fxA: rgba(122, 162, 255, 0.24);
+  --fxB: rgba(51, 209, 255, 0.18);
+  --fxLine: rgba(122, 162, 255, 0.06);
+
+  border-radius: var(--radius);
+  border: 1px solid rgba(122, 162, 255, 0.16);
+  background:
+    radial-gradient(520px 420px at 30% 25%, var(--fxA), transparent 62%),
+    radial-gradient(520px 420px at 70% 70%, var(--fxB), transparent 62%),
+    linear-gradient(180deg, rgba(39,39,42,0.65), rgba(16,16,16,0.75));
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  min-height: 460px;
+  display: grid;
+  place-items: center;
+}
+
+/* State-specific ambience */
+.stage[data-state="0"] { --fxA: rgba(122, 162, 255, 0.18); --fxB: rgba(51, 209, 255, 0.12); }
+.stage[data-state="1"] { --fxA: rgba(122, 162, 255, 0.32); --fxB: rgba(122, 162, 255, 0.16); }
+.stage[data-state="2"] { --fxA: rgba(51, 209, 255, 0.30); --fxB: rgba(122, 162, 255, 0.12); }
+.stage[data-state="3"] { --fxA: rgba(226, 223, 233, 0.18); --fxB: rgba(122, 162, 255, 0.12); }
+.stage[data-state="4"] { --fxA: rgba(168, 165, 175, 0.16); --fxB: rgba(46, 45, 48, 0.16); }
+
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      var(--fxLine),
+      var(--fxLine) 1px,
+      transparent 1px,
+      transparent 14px
+    );
+  transform: rotate(6deg);
+  pointer-events: none;
+  opacity: 0.55;
+  animation: drift 22s linear infinite;
+}
+
+/* Ground/platform */
+.stage::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 56px;
+  width: min(420px, 78%);
+  height: 22px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background:
+    radial-gradient(closest-side, rgba(242, 240, 235, 0.22), transparent 70%),
+    linear-gradient(180deg, rgba(122, 162, 255, 0.18), rgba(16, 16, 16, 0.0));
+  border: 1px solid rgba(122, 162, 255, 0.14);
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  opacity: 0.9;
+  z-index: 0;
+}
+
+@keyframes drift {
+  from { transform: rotate(6deg) translate3d(0, 0, 0); }
+  to { transform: rotate(6deg) translate3d(140px, 90px, 0); }
+}
+
+.sprite {
+  width: min(440px, 80%);
+  height: auto;
+  position: relative;
+  z-index: 1;
+  opacity: 1;
+  transition: opacity 180ms ease;
+  filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.55));
+  transform-origin: 50% 85%;
+  animation: float 1800ms ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Small state spice without “predicting” anything */
+.stage[data-state="1"] .sprite { filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 20px rgba(122, 162, 255, 0.28)); }
+.stage[data-state="2"] .sprite { filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 22px rgba(51, 209, 255, 0.25)); }
+.stage[data-state="4"] .sprite { filter: grayscale(1) drop-shadow(0 18px 34px rgba(0, 0, 0, 0.55)); animation: none; }
+
+/* One-shot FX (applied only after on-chain sync confirms the new state) */
+.stage[data-fx="spark"],
+.stage[data-fx="ember"],
+.stage[data-fx="wind"],
+.stage[data-fx="revive"] {
+  animation: glowPulse 700ms ease;
+}
+
+.stage[data-fx="hit"] {
+  animation: shake 420ms ease;
+}
+
+@keyframes glowPulse {
+  0% { box-shadow: var(--shadow); }
+  35% { box-shadow: var(--shadow), 0 0 0 6px rgba(122, 162, 255, 0.14), 0 0 60px rgba(122, 162, 255, 0.18); }
+  100% { box-shadow: var(--shadow); }
+}
+
+@keyframes shake {
+  0% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-4px, 0, 0); }
+  40% { transform: translate3d(4px, 0, 0); }
+  60% { transform: translate3d(-3px, 0, 0); }
+  80% { transform: translate3d(3px, 0, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+.hud {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.hudBadge {
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(122, 162, 255, 0.22);
+  background: rgba(16, 16, 16, 0.38);
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  backdrop-filter: blur(6px);
+}
+
+/* ----------------------------------
+   Overlays
+----------------------------------- */
+
+.deadOverlay,
+.pendingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  text-align: center;
+  background: rgba(16,16,16,0.74);
+  backdrop-filter: blur(6px);
+}
+
+.startOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  text-align: center;
+  background:
+    radial-gradient(420px 240px at 50% 35%, rgba(122, 162, 255, 0.20), transparent 60%),
+    rgba(16,16,16,0.72);
+  backdrop-filter: blur(6px);
+}
+
+.startOverlay[hidden] { display: none; }
+
+.startTitle {
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: rgba(242, 240, 235, 0.92);
+}
+
+.startText {
+  margin-top: 8px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: rgba(242, 240, 235, 0.72);
+}
+
+.deadOverlay[hidden],
+.pendingOverlay[hidden] { display: none; }
+
+.deadTitle {
+  font-size: 18px;
+  letter-spacing: 0.9px;
+  margin-bottom: 12px;
+}
+
+.pendingText {
+  margin-top: 10px;
+  color: rgba(242,240,235,0.82);
+  font-size: 13px;
+}
+
+.pendingCard {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(122, 162, 255, 0.18);
+  background: rgba(16, 16, 16, 0.32);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+}
+
+.progress {
+  width: 220px;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(122, 162, 255, 0.18);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.progressBar {
+  height: 100%;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(122, 162, 255, 0.25), rgba(122, 162, 255, 0.85));
+  width: 40%;
+  transform: translateX(-120%);
+  will-change: transform;
+}
+
+/* Indeterminate “loading” bar (no JS needed) */
+.pendingOverlay:not([hidden]) .progressBar {
+  animation: indeterminate 1100ms ease-in-out infinite;
+}
+
+@keyframes indeterminate {
+  0% { transform: translateX(-120%); }
+  50% { transform: translateX(40%); }
+  100% { transform: translateX(240%); }
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 2px solid rgba(122, 162, 255, 0.22);
+  border-top-color: rgba(122, 162, 255, 0.9);
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ----------------------------------
+   Panel
+----------------------------------- */
+
+.panel {
+  border-radius: var(--radius);
+  border: 1px solid rgba(122, 162, 255, 0.16);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(122, 162, 255, 0.18);
+  background: rgba(16,16,16,0.22);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.action::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(260px 120px at 50% 0%, rgba(122, 162, 255, 0.16), transparent 60%);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.action > * { position: relative; z-index: 1; }
+.action:hover::before { opacity: 1; }
+
+.action:hover { transform: translateY(-1px); border-color: rgba(122, 162, 255, 0.45); }
+.action:active { transform: translateY(0px); }
+.action:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.icon { width: 20px; display: inline-flex; justify-content: center; }
+.txt { font-weight: 600; font-size: 13px; letter-spacing: 0.2px; }
+
+.action-primary {
+  border-color: rgba(122, 162, 255, 0.45);
+  background: rgba(122, 162, 255, 0.12);
+}
+
+.action-danger {
+  /* Danger action should look active (not disabled) */
+  border-color: rgba(255, 77, 109, 0.32);
+  background: rgba(16,16,16,0.22);
+}
+
+.action-danger::before {
+  background: radial-gradient(260px 120px at 50% 0%, rgba(255, 77, 109, 0.18), transparent 60%);
+}
+
+.hint {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+/* Buttons used inside overlays */
+.btn {
+  appearance: none;
+  border: 1px solid rgba(122, 162, 255, 0.35);
+  background: rgba(16, 16, 16, 0.25);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.btn:hover { transform: translateY(-1px); border-color: rgba(122, 162, 255, 0.55); }
+.btn:active { transform: translateY(0px); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.btn-big { padding: 12px 18px; font-size: 14px; }
+
+.btn-primary {
+  border-color: rgba(122, 162, 255, 0.65);
+  background: rgba(122, 162, 255, 0.18);
+}
+
+@media (max-width: 920px) {
+  .game { grid-template-columns: 1fr; }
+  .stage { min-height: 380px; }
+}

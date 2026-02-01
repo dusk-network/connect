@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dario – On-chain Game</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true"></div>
+        <div class="brandText">
+          <div class="titleRow">
+            <h1>Dario</h1>
+            <span class="tag">Testnet</span>
+          </div>
+          <div class="subtitle">An on-chain finite state machine</div>
+        </div>
+      </div>
+
+      <div class="topbarRight">
+        <mochavi-connect-button id="connectBtn" network="testnet" variant="solid"></mochavi-connect-button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="game">
+        <div class="stage" aria-label="Dario stage">
+          <img id="darioSprite" class="sprite" src="./assets/dario-regular.svg" alt="Dario" />
+
+          <div class="hud" aria-label="HUD">
+            <div id="hudState" class="hudBadge">—</div>
+            <div id="hudRevives" class="hudBadge">💙 —</div>
+          </div>
+
+          <div id="startOverlay" class="startOverlay" hidden>
+            <div class="startTitle">PRESS START</div>
+            <div class="startText">Connect Wallet to play on Testnet.</div>
+            <button id="startBtn" class="btn btn-primary btn-big" type="button">Connect Wallet</button>
+          </div>
+
+          <div id="pendingOverlay" class="pendingOverlay" hidden>
+            <div class="pendingCard">
+              <div class="spinner" aria-hidden="true"></div>
+              <div id="pendingText" class="pendingText">Waiting for finalization…</div>
+              <div class="progress" aria-hidden="true">
+                <div id="progressBar" class="progressBar"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="deadOverlay" class="deadOverlay" hidden>
+            <div class="deadTitle">GAME OVER</div>
+            <button id="reviveBig" class="btn btn-primary btn-big" type="button" data-event="4">
+              Revive Dario
+            </button>
+          </div>
+        </div>
+
+        <div class="panel" aria-label="Actions">
+          <div class="actions" id="actions">
+            <button class="action" type="button" data-event="0">
+              <span class="icon" aria-hidden="true">☕</span>
+              <span class="txt">Espresso</span>
+            </button>
+            <button class="action" type="button" data-event="1">
+              <span class="icon" aria-hidden="true">🌶️</span>
+              <span class="txt">Chili</span>
+            </button>
+            <button class="action" type="button" data-event="2">
+              <span class="icon" aria-hidden="true">🧣</span>
+              <span class="txt">Cape</span>
+            </button>
+            <button class="action action-danger" type="button" data-event="3">
+              <span class="icon" aria-hidden="true">💥</span>
+              <span class="txt">Damage</span>
+            </button>
+
+            <button class="action action-primary" type="button" data-event="4" hidden>
+              <span class="icon" aria-hidden="true">💙</span>
+              <span class="txt">Revive</span>
+            </button>
+          </div>
+
+          <div id="hint" class="hint muted">—</div>
+        </div>
+      </section>
+
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

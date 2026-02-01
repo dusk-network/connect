@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Counter Contract • Dusk Wallet SDK Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="top">
+        <div class="brand">
+          <div class="logo">◎</div>
+          <div>
+            <h1>Counter Contract</h1>
+            <p class="sub">
+              Simple counter dApp using <code>createDuskApp()</code> + 
+              auto-generated WASM data-driver from <code>#[contract]</code> macro.
+            </p>
+          </div>
+        </div>
+
+        <mochavi-connect-button></mochavi-connect-button>
+      </header>
+
+      <section class="card">
+        <div class="row between">
+          <h2>Config</h2>
+          <span id="config-hint" class="muted">—</span>
+        </div>
+
+        <div class="grid">
+          <label class="field">
+            <span>Network</span>
+            <select id="input-network">
+              <option value="testnet">testnet</option>
+              <option value="devnet">devnet</option>
+              <option value="mainnet">mainnet</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Node URL</span>
+            <input id="input-node" placeholder="https://devnet.nodes.dusk.network" />
+          </label>
+
+          <label class="field span2">
+            <span>Contract ID (32 bytes)</span>
+            <input id="input-contract" placeholder="0x..." />
+          </label>
+
+          <label class="field span2">
+            <span>Driver URL</span>
+            <input id="input-driver" placeholder="./public/data_driver.wasm?v=..." />
+          </label>
+        </div>
+
+        <div class="row">
+          <button id="btn-apply" class="btn">Apply & reload</button>
+        </div>
+      </section>
+
+      <section class="grid2">
+        <section class="card">
+          <div class="row between">
+            <h2>Counter Value</h2>
+            <span id="sync-status" class="badge">idle</span>
+          </div>
+
+          <div class="counter-display">
+            <span id="v-counter" class="counter-value">—</span>
+          </div>
+
+          <div class="row center">
+            <button id="btn-refresh" class="btn">Refresh</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="row between">
+            <h2>Actions</h2>
+            <span id="tx-status" class="badge">idle</span>
+          </div>
+
+          <div class="row wrap center">
+            <button id="btn-increment" class="btn primary large">Increment (+1)</button>
+          </div>
+
+          <hr class="sep" />
+
+          <h3 class="h3">Initialize Counter</h3>
+          <div class="row wrap">
+            <label class="field">
+              <span>Initial Value (u32)</span>
+              <input id="input-init" type="number" placeholder="e.g. 42" min="0" />
+            </label>
+
+            <button id="btn-init" class="btn">Init</button>
+          </div>
+
+          <p class="muted small">
+            Note: <code>init()</code> is typically called during contract deployment.
+            Calling it again will reset the counter.
+          </p>
+
+          <hr class="sep" />
+
+          <pre id="tx-log" class="log" aria-live="polite"></pre>
+        </section>
+      </section>
+
+      <footer class="foot muted small">
+        This demo uses the auto-generated data-driver from the <code>#[contract]</code> macro.
+        If you see <code>Unsupported("fn_name ...")</code>, check your <code>data_driver.wasm</code>.
+      </footer>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

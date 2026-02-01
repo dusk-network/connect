@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dusk Wallet SDK - Schema Explorer</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero-inner">
+        <div class="eyebrow">Mochavi Connect</div>
+        <h1>Contract Schema Explorer</h1>
+        <p>Inspect a data-driver schema and interact with contract methods.</p>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="panel">
+        <div class="panel-row">
+          <label class="label" for="input-network">Network</label>
+          <select id="input-network" class="input">
+            <option value="testnet">Testnet</option>
+            <option value="devnet">Devnet</option>
+            <option value="mainnet">Mainnet</option>
+          </select>
+        </div>
+        <div class="panel-row">
+          <label class="label" for="input-node">Node URL</label>
+          <input id="input-node" class="input" type="text" placeholder="https://testnet.nodes.dusk.network" />
+        </div>
+        <div class="panel-row">
+          <label class="label" for="input-contract">Contract ID</label>
+          <input id="input-contract" class="input" type="text" placeholder="0x..." />
+        </div>
+        <div class="panel-row">
+          <label class="label" for="input-driver">Driver URL</label>
+          <input id="input-driver" class="input" type="text" placeholder="./public/data_driver.wasm" />
+        </div>
+        <div class="panel-actions">
+          <button id="btn-apply" class="btn primary" type="button">Load schema</button>
+          <mochavi-connect-button id="connectBtn"></mochavi-connect-button>
+        </div>
+        <div id="status" class="hint muted">—</div>
+      </section>
+
+      <details class="schemaExplorer" open>
+        <summary class="schemaToggle">🔧 Contract Schema</summary>
+        <div class="schemaContent">
+          <div class="schemaSection">
+            <h3>Contract Info</h3>
+            <div id="contractInfo" class="contractInfo">—</div>
+          </div>
+          <div class="schemaSection">
+            <h3>Methods</h3>
+            <div id="dynamicMethods" class="dynamicMethods">Load a schema to see methods.</div>
+          </div>
+          <div class="schemaSection">
+            <h3>Raw Schema</h3>
+            <pre id="rawSchema" class="rawSchema">—</pre>
+          </div>
+          <div class="schemaSection">
+            <h3>Output Log</h3>
+            <pre id="schemaLog" class="schemaLog"></pre>
+          </div>
+        </div>
+      </details>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

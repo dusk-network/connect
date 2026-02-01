@@ -1,0 +1,357 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+:root {
+  color-scheme: dark;
+  --bg: #0d0f14;
+  --card: #151925;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #eef2ff;
+  --muted: #9aa4b2;
+  --primary: #7aa2ff;
+  --ring: #33d1ff;
+  --danger: #ff4d6d;
+  --radius: 14px;
+  --sans: "Space Grotesk", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  background: radial-gradient(1200px 800px at 10% -20%, rgba(122, 162, 255, 0.15), transparent 60%),
+    radial-gradient(900px 600px at 90% -10%, rgba(51, 209, 255, 0.12), transparent 60%),
+    var(--bg);
+  color: var(--text);
+}
+
+.hero {
+  padding: 40px 24px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.hero-inner {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 8px 0 8px;
+  font-size: 28px;
+  letter-spacing: -0.4px;
+}
+
+.hero p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-row {
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid rgba(122, 162, 255, 0.35);
+  background: rgba(16, 16, 16, 0.25);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.btn:hover { transform: translateY(-1px); border-color: rgba(122, 162, 255, 0.55); }
+
+.btn.primary {
+  border-color: rgba(122, 162, 255, 0.65);
+  background: rgba(122, 162, 255, 0.18);
+}
+
+.hint {
+  font-size: 12px;
+}
+
+.muted { color: var(--muted); }
+
+/* ----------------------------------
+   Schema Explorer
+----------------------------------- */
+
+.schemaExplorer {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.schemaToggle {
+  padding: 14px 18px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--muted);
+  transition: color 120ms ease, background 120ms ease;
+  user-select: none;
+}
+
+.schemaToggle:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.schemaExplorer[open] .schemaToggle {
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.schemaContent {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.schemaSection h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.contractInfo {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.dynamicMethods {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.methodCard {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  transition: border-color 120ms ease;
+}
+
+.methodCard:hover {
+  border-color: rgba(122, 162, 255, 0.25);
+}
+
+.methodHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.methodName {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.methodType {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.methodType.read {
+  background: rgba(51, 209, 255, 0.15);
+  color: var(--ring);
+  border: 1px solid rgba(51, 209, 255, 0.25);
+}
+
+.methodType.write {
+  background: rgba(255, 77, 109, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(255, 77, 109, 0.25);
+}
+
+.methodInputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.methodInputs:empty {
+  display: none;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inputLabel {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 80px;
+}
+
+.inputField {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.inputField:focus {
+  border-color: var(--primary);
+}
+
+.inputField::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.methodActions {
+  display: flex;
+  gap: 8px;
+}
+
+.methodBtn {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.methodBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.methodBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.methodBtn.primary {
+  background: rgba(122, 162, 255, 0.15);
+  border-color: rgba(122, 162, 255, 0.35);
+}
+
+.methodBtn.primary:hover {
+  background: rgba(122, 162, 255, 0.25);
+}
+
+.rawSchema {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: auto;
+  max-height: 300px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--muted);
+  margin: 0;
+}
+
+.schemaLog {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: auto;
+  max-height: 200px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text);
+  margin: 0;
+  min-height: 60px;
+}
+
+@media (max-width: 720px) {
+  .panel-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  mochavi-connect-button {
+    width: 100%;
+  }
+}

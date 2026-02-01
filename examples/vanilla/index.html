@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mochavi Wallet — Connect Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true"></div>
+        <div class="brandText">
+          <div class="titleRow">
+            <h1>Mochavi Wallet</h1>
+            <span class="tag">Demo</span>
+          </div>
+          <div class="subtitle">Minimal connect button integration</div>
+        </div>
+      </div>
+
+      <div class="topbarRight">
+        <mochavi-connect-button
+          id="connectBtn"
+          app-name="Connect Demo"
+          variant="solid"
+        ></mochavi-connect-button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="card" aria-label="Wallet status">
+        <div class="row">
+          <div class="k">Status</div>
+          <div class="v" id="status">—</div>
+        </div>
+        <div class="row">
+          <div class="k">Account</div>
+          <div class="v mono" id="account">—</div>
+        </div>
+        <div class="row">
+          <div class="k">Chain</div>
+          <div class="v mono" id="chainId">—</div>
+        </div>
+      </section>
+
+      <a class="link" href="../dario-fsm/">Play the on-chain Dario demo →</a>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
