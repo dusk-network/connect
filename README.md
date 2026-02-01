@@ -7,13 +7,20 @@ A tiny, framework-agnostic SDK for the **Dusk Wallet injected provider** (`windo
 - Includes an **optional connect modal** (conceptually similar to a very small Reown/AppKit)
 - Includes an optional **WalletConnect-style connect button** (`<mochavi-connect-button />`) for drop-in UI
 
-This SDK targets the wallet provider described in `dusk-provider-api-spec.md`:
+This SDK targets the wallet provider described in the Dusk Wallet repo:
+`docs/provider-api.md`.
 
 - `dusk_requestAccounts`
 - `dusk_accounts`
 - `dusk_chainId`
-- `dusk_switchChain` (SDK falls back to `dusk_switchNetwork` for older wallet versions)
+- `dusk_switchNetwork`
 - `dusk_getPublicBalance`
+- `dusk_estimateGas`
+- `dusk_getCachedGasPrice`
+- `dusk_getShieldedStatus`
+- `dusk_syncShielded`
+- `dusk_setShieldedCheckpointNow`
+- `dusk_getShieldedBalance`
 - `dusk_sendTransaction`
 - `dusk_disconnect`
 - `dusk_getAddresses`

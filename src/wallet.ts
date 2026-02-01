@@ -6,7 +6,12 @@ import type {
   DuskProvider,
   DuskProviderEventMap,
   DuskWalletState,
+  GasPriceResult,
   SendTransactionParams,
+  ShieldedBalance,
+  ShieldedCheckpoint,
+  ShieldedStatus,
+  ShieldedSyncResult,
   SwitchChainParams,
   TxResult,
 } from "./types.js";
@@ -327,19 +332,41 @@ export class DuskWallet {
 
   /** Request the wallet to switch its selected chain (prompts user). */
   async switchChain(params: SwitchChainParams): Promise<null> {
-    const packed = [params];
-    try {
-      return await this.request<null>("dusk_switchChain", packed);
-    } catch (err: any) {
-      if (err?.code === ERROR_CODES.METHOD_NOT_FOUND || err?.code === ERROR_CODES.UNSUPPORTED) {
-        return await this.request<null>("dusk_switchNetwork", packed);
-      }
-      throw err;
-    }
+    return await this.request<null>("dusk_switchNetwork", [params]);
   }
 
   async getPublicBalance(): Promise<BalanceResult> {
     return await this.request<BalanceResult>("dusk_getPublicBalance");
+  }
+
+  /** Fetch current gas price stats from the node mempool. */
+  async getGasPrice(opts?: { maxTransactions?: number }): Promise<GasPriceResult> {
+    return await this.request<GasPriceResult>("dusk_estimateGas", opts ?? {});
+  }
+
+  /** Fetch gas price with wallet-side caching. */
+  async getCachedGasPrice(opts?: { forceRefresh?: boolean }): Promise<GasPriceResult> {
+    return await this.request<GasPriceResult>("dusk_getCachedGasPrice", opts ?? {});
+  }
+
+  /** Get shielded sync status (no network call). */
+  async getShieldedStatus(): Promise<ShieldedStatus> {
+    return await this.request<ShieldedStatus>("dusk_getShieldedStatus");
+  }
+
+  /** Start a shielded sync in the wallet engine. */
+  async syncShielded(opts?: { force?: boolean }): Promise<ShieldedSyncResult> {
+    return await this.request<ShieldedSyncResult>("dusk_syncShielded", opts ?? {});
+  }
+
+  /** Set the shielded checkpoint to current chain tip. */
+  async setShieldedCheckpointNow(opts?: { profileIndex?: number }): Promise<ShieldedCheckpoint> {
+    return await this.request<ShieldedCheckpoint>("dusk_setShieldedCheckpointNow", opts ?? {});
+  }
+
+  /** Fetch shielded balance (total + spendable). */
+  async getShieldedBalance(): Promise<ShieldedBalance> {
+    return await this.request<ShieldedBalance>("dusk_getShieldedBalance");
   }
 
   async getAddresses(): Promise<Address[]> {

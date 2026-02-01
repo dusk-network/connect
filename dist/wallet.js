@@ -248,19 +248,34 @@ export class DuskWallet {
     }
     /** Request the wallet to switch its selected chain (prompts user). */
     async switchChain(params) {
-        const packed = [params];
-        try {
-            return await this.request("dusk_switchChain", packed);
-        }
-        catch (err) {
-            if (err?.code === ERROR_CODES.METHOD_NOT_FOUND || err?.code === ERROR_CODES.UNSUPPORTED) {
-                return await this.request("dusk_switchNetwork", packed);
-            }
-            throw err;
-        }
+        return await this.request("dusk_switchNetwork", [params]);
     }
     async getPublicBalance() {
         return await this.request("dusk_getPublicBalance");
+    }
+    /** Fetch current gas price stats from the node mempool. */
+    async getGasPrice(opts) {
+        return await this.request("dusk_estimateGas", opts ?? {});
+    }
+    /** Fetch gas price with wallet-side caching. */
+    async getCachedGasPrice(opts) {
+        return await this.request("dusk_getCachedGasPrice", opts ?? {});
+    }
+    /** Get shielded sync status (no network call). */
+    async getShieldedStatus() {
+        return await this.request("dusk_getShieldedStatus");
+    }
+    /** Start a shielded sync in the wallet engine. */
+    async syncShielded(opts) {
+        return await this.request("dusk_syncShielded", opts ?? {});
+    }
+    /** Set the shielded checkpoint to current chain tip. */
+    async setShieldedCheckpointNow(opts) {
+        return await this.request("dusk_setShieldedCheckpointNow", opts ?? {});
+    }
+    /** Fetch shielded balance (total + spendable). */
+    async getShieldedBalance() {
+        return await this.request("dusk_getShieldedBalance");
     }
     async getAddresses() {
         const addrs = await this.request("dusk_getAddresses");

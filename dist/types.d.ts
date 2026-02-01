@@ -97,6 +97,37 @@ export type BalanceResult = {
     /** balance in Lux (decimal string) */
     value: LuxString;
 };
+export type GasPriceResult = {
+    /** average gas price in Lux (decimal string) */
+    average: LuxString;
+    /** max gas price in Lux (decimal string) */
+    max: LuxString;
+    /** median gas price in Lux (decimal string) */
+    median: LuxString;
+    /** min gas price in Lux (decimal string) */
+    min: LuxString;
+};
+export type ShieldedStatus = {
+    state: "idle" | "syncing" | "done" | "error";
+    progress: number;
+    notes: number;
+    cursorBookmark: string;
+    cursorBlock: string;
+    lastError: string;
+    updatedAt: number;
+};
+export type ShieldedSyncResult = {
+    started: boolean;
+    status: ShieldedStatus;
+};
+export type ShieldedBalance = {
+    value: LuxString;
+    spendable: LuxString;
+};
+export type ShieldedCheckpoint = {
+    bookmark: string;
+    block: string;
+};
 export type ByteLike = string | number[] | Uint8Array | ArrayBuffer;
 export type SendTransferParams = {
     kind: "transfer";
@@ -128,8 +159,7 @@ export type SendTransactionParams = SendTransferParams | SendContractCallParams;
  * - `{ chainId: "dusk:1" }` for known presets, OR
  * - `{ nodeUrl: "https://..." }` for a custom node.
  *
- * Some wallet versions expose this RPC as `dusk_switchNetwork`, while
- * newer versions may expose it as `dusk_switchChain`.
+ * The wallet exposes this RPC as `dusk_switchNetwork`.
  */
 export type SwitchChainParams = {
     /** Preset chain id like "dusk:1" (mainnet), "dusk:2" (testnet) ... */
@@ -141,7 +171,7 @@ export type SwitchChainParams = {
  * Convenience preset ids understood by the wallet's switch RPC.
  *
  * NOTE: These are Dusk Wallet *presets* (not EVM chain ids). They are only
- * meaningful in the context of `dusk_switchChain` / `dusk_switchNetwork`.
+ * meaningful in the context of `dusk_switchNetwork`.
  */
 export declare const DUSK_CHAIN_PRESETS: {
     readonly local: "dusk:0";

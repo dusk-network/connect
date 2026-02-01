@@ -8,7 +8,7 @@
  * Convenience preset ids understood by the wallet's switch RPC.
  *
  * NOTE: These are Dusk Wallet *presets* (not EVM chain ids). They are only
- * meaningful in the context of `dusk_switchChain` / `dusk_switchNetwork`.
+ * meaningful in the context of `dusk_switchNetwork`.
  */
 export const DUSK_CHAIN_PRESETS = {
     local: "dusk:0",
