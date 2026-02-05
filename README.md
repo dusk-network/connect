@@ -1,11 +1,11 @@
-# Mochavi Connect (dApp integration)
+# Dusk Connect (dApp integration)
 
 A tiny, framework-agnostic SDK for the **Dusk Wallet injected provider** (`window.dusk`).
 
 - **Lightweight** (no runtime deps)
 - **Typed** (TypeScript types for the provider + RPC methods)
 - Includes an **optional connect modal** (conceptually similar to a very small Reown/AppKit)
-- Includes an optional **WalletConnect-style connect button** (`<mochavi-connect-button />`) for drop-in UI
+- Includes an optional **WalletConnect-style connect button** (`<dusk-connect-button />`) for drop-in UI
 
 This SDK targets the wallet provider described in the Dusk Wallet repo:
 `docs/provider-api.md`.
@@ -69,7 +69,7 @@ This demo focuses on inspecting a data-driver schema and invoking methods based 
 ## Install
 
 ```bash
-npm i mochavi-connect
+npm i @dusk-network/connect
 ```
 
 ## Which entrypoint should I use?
@@ -86,7 +86,7 @@ Use this when you only need to interact with the **injected wallet provider** (`
 It’s the smallest surface area and has no opinion about contracts, nodes, or data-drivers.
 
 ```ts
-import { createDuskWallet } from "mochavi-connect";
+import { createDuskWallet } from "@dusk-network/connect";
 
 const wallet = createDuskWallet();
 await wallet.ready();
@@ -108,7 +108,7 @@ Use this when you’re building a **smart contract dApp** and you want one objec
   - `writeContract()`
 
 ```ts
-import { createDuskApp, DUSK_CHAIN_PRESETS } from "mochavi-connect";
+import { createDuskApp, DUSK_CHAIN_PRESETS } from "@dusk-network/connect";
 
 const dusk = createDuskApp({
   nodeUrl: "https://testnet.nodes.dusk.network",
@@ -136,7 +136,7 @@ import {
   parseDuskToLux,
   formatLuxShort,
   ERROR_CODES,
-} from "mochavi-connect";
+} from "@dusk-network/connect";
 
 const wallet = createDuskWallet();
 await wallet.ready();
@@ -175,7 +175,7 @@ await wallet.sendTransfer({
 ## Contract call
 
 ```ts
-import { createDuskWallet } from "mochavi-connect";
+import { createDuskWallet } from "@dusk-network/connect";
 
 const wallet = createDuskWallet();
 await wallet.connect();
@@ -203,10 +203,10 @@ If you want a **single entrypoint** for contract developers:
 use `createDuskApp()`.
 
 ```ts
-import { createDuskApp, DUSK_CHAIN_PRESETS, parseDuskToLux } from "mochavi-connect";
-import { defineMochaviConnectButton } from "mochavi-connect/ui";
+import { createDuskApp, DUSK_CHAIN_PRESETS, parseDuskToLux } from "@dusk-network/connect";
+import { defineDuskConnectButton } from "@dusk-network/connect/ui";
 
-defineMochaviConnectButton();
+defineDuskConnectButton();
 
 const dusk = createDuskApp({
   // for read calls (fallback when wallet hasn't provided a node yet)
@@ -235,7 +235,7 @@ const dusk = createDuskApp({
 await dusk.ready();
 
 // Wire the connect button to the same wallet instance
-document.querySelector("mochavi-connect-button")!.wallet = dusk.wallet;
+document.querySelector("dusk-connect-button")!.wallet = dusk.wallet;
 
 // Read-only calls (node executes, driver decodes locally)
 const state = await dusk.readContract({ contract: "dario", functionName: "current_state" });
@@ -286,7 +286,7 @@ The wallet will show a user approval prompt.
 Chain IDs use CAIP-2 format (`dusk:<id>`).
 
 ```ts
-import { createDuskWallet, DUSK_CHAIN_PRESETS } from "mochavi-connect";
+import { createDuskWallet, DUSK_CHAIN_PRESETS } from "@dusk-network/connect";
 
 const wallet = createDuskWallet();
 await wallet.connect();
@@ -313,7 +313,7 @@ import {
   createDuskWallet,
   ensureChain,
   DUSK_CHAIN_PRESETS,
-} from "mochavi-connect";
+} from "@dusk-network/connect";
 
 const wallet = createDuskWallet();
 await wallet.connect();
@@ -333,9 +333,9 @@ await ensureChain(wallet, { nodeUrl: "https://my.custom.node:9000" }, { strictNo
 If you want a quick, drop-in "connect" flow (Reown/AppKit-style, but tiny):
 
 ```ts
-import { createMochaviConnectKit } from "mochavi-connect/ui";
+import { createDuskConnectKit } from "@dusk-network/connect/ui";
 
-const kit = createMochaviConnectKit({
+const kit = createDuskConnectKit({
   modal: {
     appName: "My dApp",
     installUrl: "https://chrome.google.com/webstore/detail/<YOUR-EXTENSION-ID>",
@@ -355,25 +355,25 @@ kit.subscribe((state) => console.log(state));
 If you want the common “Connect Wallet” button UX, the SDK ships a small web component:
 
 ```html
-<mochavi-connect-button
+<dusk-connect-button
   app-name="My dApp"
   install-url="https://chrome.google.com/webstore/detail/<YOUR-EXTENSION-ID>"
   variant="solid"
-></mochavi-connect-button>
+></dusk-connect-button>
 ```
 
 Then wire it to a wallet instance (so your dApp and the button share the same state):
 
 ```ts
-import { createDuskWallet } from "mochavi-connect";
-import { defineMochaviConnectButton } from "mochavi-connect/ui";
+import { createDuskWallet } from "@dusk-network/connect";
+import { defineDuskConnectButton } from "@dusk-network/connect/ui";
 
-defineMochaviConnectButton();
+defineDuskConnectButton();
 
 const wallet = createDuskWallet();
 await wallet.ready();
 
-const btn = document.querySelector("mochavi-connect-button");
+const btn = document.querySelector("dusk-connect-button");
 if (btn) btn.wallet = wallet;
 ```
 
@@ -407,7 +407,7 @@ You can override them globally (affects modal + button):
 …or scope them to the button only:
 
 ```css
-mochavi-connect-button {
+dusk-connect-button {
   --mconnect-primary: #9b7bff;
 }
 ```

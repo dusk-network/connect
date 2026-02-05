@@ -1,4 +1,4 @@
-# SystemConfig demo (Mochavi Connect / Dusk Wallet SDK)
+# SystemConfig demo (Dusk Connect / Dusk Wallet SDK)
 
 A minimal example page for interacting with Optimism's **SystemConfig** contract (ported to a Dusk contract) using:
 

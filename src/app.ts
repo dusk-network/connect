@@ -229,7 +229,7 @@ function pickTxOverrides(src: any): DuskContractTxOverrides {
  *
  * @example
  * ```ts
- * import { createDuskApp, DUSK_CHAIN_PRESETS } from "mochavi-connect";
+ * import { createDuskApp, DUSK_CHAIN_PRESETS } from "@dusk-network/connect";
  *
  * const dusk = createDuskApp({
  *   nodeUrl: "https://testnet.nodes.dusk.network",

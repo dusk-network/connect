@@ -9,10 +9,10 @@
  * IMPORTANT: reads are NOT polled. Click Refresh to query the node.
  */
 
-import { defineMochaviConnectButton } from "../../dist/ui.js";
+import { defineDuskConnectButton } from "../../dist/ui.js";
 import { createDuskApp, DUSK_CHAIN_PRESETS } from "../../dist/index.js";
 
-defineMochaviConnectButton();
+defineDuskConnectButton();
 
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 
@@ -133,7 +133,7 @@ const dusk = createDuskApp({
 const wallet = dusk.wallet;
 const c = dusk.contract("bridge");
 
-const connectButton = document.querySelector("mochavi-connect-button");
+const connectButton = document.querySelector("dusk-connect-button");
 if (connectButton) connectButton.wallet = wallet;
 
 // ------- UI refs -------

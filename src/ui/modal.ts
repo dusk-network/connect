@@ -3,7 +3,7 @@ import type { DuskWallet } from "../wallet.js";
 import { networkLabel, shortenMiddle, walletStatus, type WalletStatus } from "./shared.js";
 import { MCONNECT_UI_BASE_CSS } from "./styles.js";
 
-export type MochaviConnectModalOptions = {
+export type DuskConnectModalOptions = {
   /** Optional app name shown in the header (e.g. "My dApp") */
   appName?: string;
   /** Where to send the user if the wallet isn't installed */
@@ -12,7 +12,7 @@ export type MochaviConnectModalOptions = {
   closeOnConnect?: boolean;
 };
 
-export type MochaviConnectModal = {
+export type DuskConnectModal = {
   open: () => void;
   close: () => void;
   destroy: () => void;
@@ -63,7 +63,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export function createMochaviConnectModal(wallet: DuskWallet, options: MochaviConnectModalOptions = {}): MochaviConnectModal {
+export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectModalOptions = {}): DuskConnectModal {
   if (typeof window === "undefined") {
     return { open: () => {}, close: () => {}, destroy: () => {}, isOpen: () => false };
   }
@@ -370,7 +370,7 @@ export function createMochaviConnectModal(wallet: DuskWallet, options: MochaviCo
       <div class="mconnect-modal" role="dialog" aria-modal="true">
         <div class="mconnect-header">
           <div class="mconnect-brand">
-            <div class="mconnect-mark">M</div>
+            <div class="mconnect-mark">D</div>
             <div class="mconnect-txt">
               <div class="mconnect-title" id="mconnectTitle">${options.appName ? `Connect ${escapeHtml(options.appName)}` : "Connect Wallet"}</div>
               <div class="mconnect-sub">This dApp will request permission to view your account and approve transactions.</div>

@@ -8,7 +8,7 @@ export const MCONNECT_UI_BASE_CSS = `
   :host, .mconnect-overlay {
     /*
       Namespaced theme tokens to avoid collisions with host dApps.
-      You can override these on :root or on <mochavi-connect-button>.
+      You can override these on :root or on <dusk-connect-button>.
     */
 
     --mconnect-font-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;

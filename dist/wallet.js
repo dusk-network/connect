@@ -350,7 +350,7 @@ export class DuskWallet {
  *
  * @example
  * ```ts
- * import { createDuskWallet } from "mochavi-connect";
+ * import { createDuskWallet } from "@dusk-network/connect";
  *
  * const wallet = createDuskWallet();
  * await wallet.ready();

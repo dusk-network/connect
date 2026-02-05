@@ -39,7 +39,7 @@ async function copyToClipboard(text) {
         return false;
     }
 }
-export function createMochaviConnectModal(wallet, options = {}) {
+export function createDuskConnectModal(wallet, options = {}) {
     if (typeof window === "undefined") {
         return { open: () => { }, close: () => { }, destroy: () => { }, isOpen: () => false };
     }
@@ -341,7 +341,7 @@ export function createMochaviConnectModal(wallet, options = {}) {
       <div class="mconnect-modal" role="dialog" aria-modal="true">
         <div class="mconnect-header">
           <div class="mconnect-brand">
-            <div class="mconnect-mark">M</div>
+            <div class="mconnect-mark">D</div>
             <div class="mconnect-txt">
               <div class="mconnect-title" id="mconnectTitle">${options.appName ? `Connect ${escapeHtml(options.appName)}` : "Connect Wallet"}</div>
               <div class="mconnect-sub">This dApp will request permission to view your account and approve transactions.</div>

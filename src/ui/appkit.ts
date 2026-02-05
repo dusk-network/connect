@@ -1,17 +1,17 @@
 import { createDuskWallet, type DuskWallet, type DuskWalletOptions } from "../wallet.js";
 import type { DuskWalletState } from "../types.js";
-import { createMochaviConnectModal, type MochaviConnectModal, type MochaviConnectModalOptions } from "./modal.js";
+import { createDuskConnectModal, type DuskConnectModal, type DuskConnectModalOptions } from "./modal.js";
 
-export type MochaviConnectKitOptions = {
+export type DuskConnectKitOptions = {
   /** Wallet options (provider detection, refresh, etc.) */
   wallet?: DuskWalletOptions;
   /** Modal UI options */
-  modal?: MochaviConnectModalOptions;
+  modal?: DuskConnectModalOptions;
 };
 
-export type MochaviConnectKit = {
+export type DuskConnectKit = {
   wallet: DuskWallet;
-  modal: MochaviConnectModal;
+  modal: DuskConnectModal;
   open: () => void;
   close: () => void;
   destroy: () => void;
@@ -22,9 +22,9 @@ export type MochaviConnectKit = {
  * A tiny, framework-agnostic "connect kit" (conceptually similar to Reown/AppKit,
  * but for the single injected Dusk Wallet provider).
  */
-export function createMochaviConnectKit(options: MochaviConnectKitOptions = {}): MochaviConnectKit {
+export function createDuskConnectKit(options: DuskConnectKitOptions = {}): DuskConnectKit {
   const wallet = createDuskWallet(options.wallet);
-  const modal = createMochaviConnectModal(wallet, options.modal);
+  const modal = createDuskConnectModal(wallet, options.modal);
 
   return {
     wallet,

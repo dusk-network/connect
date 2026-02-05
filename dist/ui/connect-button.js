@@ -1,5 +1,5 @@
 import { createDuskWallet } from "../wallet.js";
-import { createMochaviConnectModal } from "./modal.js";
+import { createDuskConnectModal } from "./modal.js";
 import { networkLabel, shortenMiddle, walletStatus } from "./shared.js";
 import { MCONNECT_UI_BASE_CSS } from "./styles.js";
 function hashHue(input) {
@@ -12,7 +12,7 @@ function boolAttr(v) {
     return v !== null && v.toLowerCase() !== "false";
 }
 // `networkLabel` is shared with the modal.
-export class MochaviConnectButtonElement extends HTMLElement {
+export class DuskConnectButtonElement extends HTMLElement {
     static get observedAttributes() {
         return [
             "app-name",
@@ -329,7 +329,7 @@ export class MochaviConnectButtonElement extends HTMLElement {
             if (this.hasAttribute("close-on-connect")) {
                 modalOpts.closeOnConnect = boolAttr(this.getAttribute("close-on-connect"));
             }
-            this._modal = createMochaviConnectModal(this._wallet, modalOpts);
+            this._modal = createDuskConnectModal(this._wallet, modalOpts);
             this._ownsModal = true;
         }
     }
@@ -407,7 +407,7 @@ export class MochaviConnectButtonElement extends HTMLElement {
         const defaultBg = "var(--mconnect-avatar-gradient)";
         const setDefault = (text) => {
             this._label.textContent = text;
-            this._avatar.textContent = "M";
+            this._avatar.textContent = "D";
             this._avatar.style.background = defaultBg;
         };
         if (status !== "connected") {
@@ -423,19 +423,19 @@ export class MochaviConnectButtonElement extends HTMLElement {
         this._avatar.style.background = `linear-gradient(135deg, hsl(${hue} 85% 55%), hsl(${hue2} 85% 50%))`;
     }
 }
-export function defineMochaviConnectButton(tagName = "mochavi-connect-button") {
+export function defineDuskConnectButton(tagName = "dusk-connect-button") {
     if (typeof window === "undefined")
         return;
     if (customElements.get(tagName))
         return;
-    customElements.define(tagName, MochaviConnectButtonElement);
+    customElements.define(tagName, DuskConnectButtonElement);
 }
 /**
  * Programmatic helper if you prefer not to write the custom element in HTML.
  */
-export function createMochaviConnectButton(options = {}) {
-    defineMochaviConnectButton();
-    const el = document.createElement("mochavi-connect-button");
+export function createDuskConnectButton(options = {}) {
+    defineDuskConnectButton();
+    const el = document.createElement("dusk-connect-button");
     if (options.appName)
         el.setAttribute("app-name", options.appName);
     if (options.installUrl)
@@ -460,7 +460,7 @@ export function createMochaviConnectButton(options = {}) {
 }
 // Auto-define for convenience in browser contexts.
 try {
-    defineMochaviConnectButton();
+    defineDuskConnectButton();
 }
 catch {
     // ignore

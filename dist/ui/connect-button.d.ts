@@ -1,7 +1,7 @@
 import type { DuskWalletState } from "../types.js";
 import { type DuskWallet, type DuskWalletOptions } from "../wallet.js";
-import { type MochaviConnectModal } from "./modal.js";
-export type MochaviConnectButtonOptions = {
+import { type DuskConnectModal } from "./modal.js";
+export type DuskConnectButtonOptions = {
     /** App name shown in the modal header (e.g. "My dApp"). */
     appName?: string;
     /** Where to send the user if the wallet isn't installed (extension store link). */
@@ -21,9 +21,9 @@ export type MochaviConnectButtonOptions = {
     /** Options used if the button creates its own wallet. */
     walletOptions?: DuskWalletOptions;
     /** Provide a modal instance. If omitted, the button creates its own modal. */
-    modal?: MochaviConnectModal;
+    modal?: DuskConnectModal;
 };
-export declare class MochaviConnectButtonElement extends HTMLElement {
+export declare class DuskConnectButtonElement extends HTMLElement {
     static get observedAttributes(): string[];
     private _shadow;
     private _wallet;
@@ -41,8 +41,8 @@ export declare class MochaviConnectButtonElement extends HTMLElement {
     get state(): DuskWalletState | null;
     get wallet(): DuskWallet | null;
     set wallet(w: DuskWallet | null);
-    get modal(): MochaviConnectModal | null;
-    set modal(m: MochaviConnectModal | null);
+    get modal(): DuskConnectModal | null;
+    set modal(m: DuskConnectModal | null);
     get walletOptions(): DuskWalletOptions | undefined;
     set walletOptions(opts: DuskWalletOptions | undefined);
     open(): void;
@@ -58,9 +58,9 @@ export declare class MochaviConnectButtonElement extends HTMLElement {
     private _setWallet;
     private _update;
 }
-export declare function defineMochaviConnectButton(tagName?: string): void;
+export declare function defineDuskConnectButton(tagName?: string): void;
 /**
  * Programmatic helper if you prefer not to write the custom element in HTML.
  */
-export declare function createMochaviConnectButton(options?: MochaviConnectButtonOptions): MochaviConnectButtonElement;
+export declare function createDuskConnectButton(options?: DuskConnectButtonOptions): DuskConnectButtonElement;
 //# sourceMappingURL=connect-button.d.ts.map

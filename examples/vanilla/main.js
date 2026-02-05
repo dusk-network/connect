@@ -1,7 +1,7 @@
-import { defineMochaviConnectButton } from "../../dist/ui.js";
+import { defineDuskConnectButton } from "../../dist/ui.js";
 import { createDuskWallet } from "../../dist/index.js";
 
-defineMochaviConnectButton();
+defineDuskConnectButton();
 
 const wallet = createDuskWallet();
 
@@ -24,7 +24,7 @@ function render(st) {
   const installed = !!st.installed;
   const connected = !!st.authorized && (st.accounts?.length ?? 0) > 0;
 
-  elStatus.textContent = !installed ? "Install Mochavi Wallet" : connected ? "Connected" : "Not connected";
+  elStatus.textContent = !installed ? "Install Dusk Wallet" : connected ? "Connected" : "Not connected";
   elAccount.textContent = connected ? shorten(st.accounts[0]) : "—";
   elChainId.textContent = st.chainId ?? "—";
 }

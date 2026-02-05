@@ -1,7 +1,7 @@
-import { defineMochaviConnectButton } from "../../dist/ui.js";
+import { defineDuskConnectButton } from "../../dist/ui.js";
 import { createDuskApp, DUSK_CHAIN_PRESETS } from "../../dist/index.js";
 
-defineMochaviConnectButton();
+defineDuskConnectButton();
 
 const $ = (id) => document.getElementById(id);
 

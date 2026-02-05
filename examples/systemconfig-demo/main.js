@@ -13,10 +13,10 @@
  * - Refresh (full) loads extra fields (more calls) and should be used sparingly.
  */
 
-import { defineMochaviConnectButton } from "../../dist/ui.js";
+import { defineDuskConnectButton } from "../../dist/ui.js";
 import { createDuskApp, DUSK_CHAIN_PRESETS } from "../../dist/index.js";
 
-defineMochaviConnectButton();
+defineDuskConnectButton();
 
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 
@@ -216,7 +216,7 @@ const dusk = createDuskApp({
 const wallet = dusk.wallet;
 const c = dusk.contract("sys");
 
-const connectButton = document.querySelector("mochavi-connect-button");
+const connectButton = document.querySelector("dusk-connect-button");
 if (connectButton) connectButton.wallet = wallet;
 
 // ------- UI refs -------
@@ -525,7 +525,7 @@ async function sendTx(fnName, args) {
   setBadge(ui.txBadge, "info", "submitting");
 
   try {
-    /** @type {import("@mochavi/connect").TxHandle} */
+    /** @type {import("\-network/connect").TxHandle} */
     const tx =
       args === undefined
         ? await c.write[fnName](undefined, { amount: "0", deposit: "0" })
