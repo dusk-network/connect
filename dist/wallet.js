@@ -1,4 +1,5 @@
 import { DuskWalletNotInstalledError, DuskWalletDisconnectedError, DuskWalletUnauthorizedError, DuskWalletUserRejectedError, ERROR_CODES, normalizeError, } from "./errors.js";
+import { normalizeContractId0x } from "./internal/contractId.js";
 export function isDuskProvider(value) {
     return (value &&
         typeof value === "object" &&
@@ -280,6 +281,34 @@ export class DuskWallet {
     }
     async sendContractCall(params) {
         return await this.sendTransaction({ kind: "contract_call", ...params });
+    }
+    /**
+     * Prompt the user to add a standard token/NFT contract to the wallet UI.
+     *
+     * NOTE: the wallet requires prior connection permission (dusk_requestAccounts).
+     * This helper can optionally auto-connect first (default: true).
+     */
+    async watchAsset(params, opts = {}) {
+        const autoConnect = opts.autoConnect ?? true;
+        if (autoConnect && !this._state.authorized) {
+            await this.connect();
+        }
+        const typeRaw = String(params?.type ?? "").trim();
+        const type = typeRaw.toUpperCase();
+        const optionsIn = params?.options ?? {};
+        const contractId = normalizeContractId0x(optionsIn.contractId);
+        const out = {
+            type,
+            options: {
+                ...optionsIn,
+                contractId,
+            },
+        };
+        if (type === "DRC721") {
+            const tid = optionsIn.tokenId;
+            out.options.tokenId = typeof tid === "bigint" ? tid.toString() : String(tid ?? "").trim();
+        }
+        return await this.request("dusk_watchAsset", out);
     }
     /** Proxy provider events (typed). Returns an unsubscribe function. */
     on(eventName, handler) {

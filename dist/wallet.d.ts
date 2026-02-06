@@ -1,4 +1,4 @@
-import type { AccountId, BalanceResult, ByteLike, ChainId, DuskProviderCapabilities, DuskProvider, DuskProviderEventMap, DuskWalletState, GasPriceResult, SendTransactionParams, SignAuthParams, SignAuthResult, SignMessageResult, SwitchChainParams, TxResult } from "./types.js";
+import type { AccountId, BalanceResult, ByteLike, ChainId, DuskProviderCapabilities, DuskProvider, DuskProviderEventMap, DuskWalletState, GasPriceResult, SendTransactionParams, SignAuthParams, SignAuthResult, SignMessageResult, SwitchChainParams, WatchAssetParams, TxResult } from "./types.js";
 export type WaitForProviderOptions = {
     /** Max wait time (ms). Default: 2000. */
     timeoutMs?: number;
@@ -77,6 +77,15 @@ export declare class DuskWallet {
     sendContractCall(params: Omit<Extract<SendTransactionParams, {
         kind: "contract_call";
     }>, "kind">): Promise<TxResult>;
+    /**
+     * Prompt the user to add a standard token/NFT contract to the wallet UI.
+     *
+     * NOTE: the wallet requires prior connection permission (dusk_requestAccounts).
+     * This helper can optionally auto-connect first (default: true).
+     */
+    watchAsset(params: WatchAssetParams, opts?: {
+        autoConnect?: boolean;
+    }): Promise<boolean>;
     /** Proxy provider events (typed). Returns an unsubscribe function. */
     on<E extends keyof DuskProviderEventMap>(eventName: E, handler: (payload: DuskProviderEventMap[E]) => void): () => void;
     /** Stop listening and free resources. */

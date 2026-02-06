@@ -18,6 +18,7 @@ This SDK targets the wallet provider described in the Dusk Wallet repo:
 - `dusk_getPublicBalance`
 - `dusk_estimateGas`
 - `dusk_sendTransaction`
+- `dusk_watchAsset`
 - `dusk_signMessage`
 - `dusk_signAuth`
 - `dusk_disconnect`

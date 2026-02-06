@@ -147,6 +147,28 @@ export type SendContractCallParams = {
 
 export type SendTransactionParams = SendTransferParams | SendContractCallParams;
 
+export type WatchAssetParams =
+  | {
+      type: "DRC20";
+      options: {
+        /** 0x-prefixed 32-byte contract id */
+        contractId: string | number[] | Uint8Array;
+        /** Optional image URL hint (may be ignored by the wallet) */
+        image?: string;
+      };
+    }
+  | {
+      type: "DRC721";
+      options: {
+        /** 0x-prefixed 32-byte contract id */
+        contractId: string | number[] | Uint8Array;
+        /** Token id as u64 decimal string */
+        tokenId: string | bigint;
+        /** Optional image URL hint (may be ignored by the wallet) */
+        image?: string;
+      };
+    };
+
 /**
  * Switch the wallet's selected network (aka "chain").
  *
@@ -245,6 +267,7 @@ export type DuskProviderCapabilities = {
     signMessage: boolean;
     signAuth: boolean;
     contractCallPrivacy: boolean;
+    watchAsset?: boolean;
   };
 };
 

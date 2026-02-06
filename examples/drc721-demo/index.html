@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DRC721 Demo | Dusk Connect</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true"></div>
+        <div class="brandText">
+          <div class="titleRow">
+            <h1>DRC721</h1>
+            <span class="tag">Demo</span>
+          </div>
+          <div class="subtitle">NFT ownership, approvals, and watchAsset</div>
+        </div>
+      </div>
+
+      <div class="topbarRight">
+        <dusk-connect-button
+          id="connectBtn"
+          app-name="DRC721 Demo"
+          variant="solid"
+        ></dusk-connect-button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="card" aria-label="Wallet status">
+        <div class="row">
+          <div class="k">Status</div>
+          <div class="v" id="status">—</div>
+        </div>
+        <div class="row">
+          <div class="k">Account</div>
+          <div class="v mono" id="account">—</div>
+        </div>
+        <div class="row">
+          <div class="k">Chain</div>
+          <div class="v mono" id="chainId">—</div>
+        </div>
+        <div class="row">
+          <div class="k">Node</div>
+          <div class="v mono" id="nodeUrl">—</div>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Collection">
+        <h2>Collection</h2>
+
+        <label class="label" for="contractId">Contract ID</label>
+        <input id="contractId" class="input mono" placeholder="0x + 64 hex chars" />
+
+        <div class="btnrow">
+          <button id="btnLoad" class="btn">Load</button>
+          <button id="btnMeta" class="btn">Read metadata</button>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Token">
+        <h2>Token</h2>
+
+        <label class="label" for="tokenId">Token ID</label>
+        <input id="tokenId" class="input mono" placeholder="u64 decimal string (e.g. 1)" />
+
+        <div class="btnrow">
+          <button id="btnOwner" class="btn">owner_of</button>
+          <button id="btnTokenUri" class="btn">token_uri</button>
+          <button id="btnWatch" class="btn">dusk_watchAsset</button>
+        </div>
+
+        <div class="note">
+          For <span class="mono">dusk_watchAsset</span>, the wallet should verify you currently own the token ID.
+        </div>
+      </section>
+
+      <section class="card" aria-label="Approvals">
+        <h2>Approvals</h2>
+
+        <label class="label" for="approved">Approved (approve)</label>
+        <input id="approved" class="input mono" placeholder="base58 public key OR 0x... contract id" />
+
+        <div class="btnrow">
+          <button id="btnApprove" class="btn btn-primary">approve</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <label class="label" for="operator">Operator (set_approval_for_all)</label>
+        <input id="operator" class="input mono" placeholder="base58 public key OR 0x... contract id" />
+
+        <label class="label" for="operatorApproved">Approved for all</label>
+        <select id="operatorApproved" class="input">
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+
+        <div class="btnrow">
+          <button id="btnSetApprovalForAll" class="btn btn-primary">set_approval_for_all</button>
+        </div>
+
+        <div class="note warn">
+          Setting approval for all is high risk. The wallet should show a strong warning.
+        </div>
+      </section>
+
+      <section class="card" aria-label="Transfer">
+        <h2>transfer_from</h2>
+
+        <label class="label" for="from">From</label>
+        <input id="from" class="input mono" placeholder="base58 public key OR 0x... contract id" />
+
+        <label class="label" for="to">To</label>
+        <input id="to" class="input mono" placeholder="base58 public key OR 0x... contract id" />
+
+        <div class="btnrow">
+          <button id="btnTransferFrom" class="btn btn-primary">transfer_from</button>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Output">
+        <h2>Output</h2>
+        <pre id="out" class="out"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
+

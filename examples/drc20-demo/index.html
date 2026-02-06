@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DRC20 Demo | Dusk Connect</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true"></div>
+        <div class="brandText">
+          <div class="titleRow">
+            <h1>DRC20</h1>
+            <span class="tag">Demo</span>
+          </div>
+          <div class="subtitle">Token transfers, approvals, and watchAsset</div>
+        </div>
+      </div>
+
+      <div class="topbarRight">
+        <dusk-connect-button
+          id="connectBtn"
+          app-name="DRC20 Demo"
+          variant="solid"
+        ></dusk-connect-button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="card" aria-label="Wallet status">
+        <div class="row">
+          <div class="k">Status</div>
+          <div class="v" id="status">—</div>
+        </div>
+        <div class="row">
+          <div class="k">Account</div>
+          <div class="v mono" id="account">—</div>
+        </div>
+        <div class="row">
+          <div class="k">Chain</div>
+          <div class="v mono" id="chainId">—</div>
+        </div>
+        <div class="row">
+          <div class="k">Node</div>
+          <div class="v mono" id="nodeUrl">—</div>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Token">
+        <h2>Token</h2>
+
+        <label class="label" for="contractId">Contract ID</label>
+        <input id="contractId" class="input mono" placeholder="0x + 64 hex chars" />
+
+        <div class="btnrow">
+          <button id="btnLoad" class="btn">Load</button>
+          <button id="btnWatch" class="btn">dusk_watchAsset</button>
+          <button id="btnMeta" class="btn">Read metadata</button>
+        </div>
+
+        <div class="note">
+          Amounts below are raw <span class="mono">u64</span> token units. Use token
+          decimals to format human amounts.
+        </div>
+      </section>
+
+      <section class="card" aria-label="Transfer">
+        <h2>Transfer</h2>
+
+        <label class="label" for="to">To</label>
+        <input id="to" class="input mono" placeholder="base58 public key OR 0x... contract id" />
+
+        <label class="label" for="amount">Amount (units)</label>
+        <input id="amount" class="input mono" placeholder="e.g. 1000" />
+
+        <div class="btnrow">
+          <button id="btnTransfer" class="btn btn-primary">Transfer</button>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Approve">
+        <h2>Approve</h2>
+
+        <label class="label" for="spender">Spender</label>
+        <input id="spender" class="input mono" placeholder="base58 public key OR 0x... contract id" />
+
+        <label class="label" for="approveAmount">Allowance (units)</label>
+        <input id="approveAmount" class="input mono" placeholder="e.g. 1000" />
+
+        <div class="btnrow">
+          <button id="btnApprove" class="btn btn-primary">Approve</button>
+          <button id="btnApproveMax" class="btn">Approve MAX</button>
+        </div>
+
+        <div class="note warn">
+          Approve MAX uses <span class="mono">u64::MAX</span> and is dangerous. The wallet should
+          require an extra confirmation for MAX approvals.
+        </div>
+      </section>
+
+      <section class="card" aria-label="Output">
+        <h2>Output</h2>
+        <pre id="out" class="out"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
+

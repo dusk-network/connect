@@ -13,6 +13,7 @@ import type {
   SignAuthResult,
   SignMessageResult,
   SwitchChainParams,
+  WatchAssetParams,
   TxResult,
 } from "./types.js";
 
@@ -25,6 +26,8 @@ import {
   normalizeError,
   type RpcErrorLike,
 } from "./errors.js";
+
+import { normalizeContractId0x } from "./internal/contractId.js";
 
 export type WaitForProviderOptions = {
   /** Max wait time (ms). Default: 2000. */
@@ -377,6 +380,40 @@ export class DuskWallet {
     params: Omit<Extract<SendTransactionParams, { kind: "contract_call" }>, "kind">
   ): Promise<TxResult> {
     return await this.sendTransaction({ kind: "contract_call", ...params });
+  }
+
+  /**
+   * Prompt the user to add a standard token/NFT contract to the wallet UI.
+   *
+   * NOTE: the wallet requires prior connection permission (dusk_requestAccounts).
+   * This helper can optionally auto-connect first (default: true).
+   */
+  async watchAsset(params: WatchAssetParams, opts: { autoConnect?: boolean } = {}): Promise<boolean> {
+    const autoConnect = opts.autoConnect ?? true;
+    if (autoConnect && !this._state.authorized) {
+      await this.connect();
+    }
+
+    const typeRaw = String((params as any)?.type ?? "").trim();
+    const type = typeRaw.toUpperCase();
+    const optionsIn: any = (params as any)?.options ?? {};
+
+    const contractId = normalizeContractId0x(optionsIn.contractId);
+
+    const out: any = {
+      type,
+      options: {
+        ...optionsIn,
+        contractId,
+      },
+    };
+
+    if (type === "DRC721") {
+      const tid = optionsIn.tokenId;
+      out.options.tokenId = typeof tid === "bigint" ? tid.toString() : String(tid ?? "").trim();
+    }
+
+    return await this.request<boolean>("dusk_watchAsset", out);
   }
 
   /** Proxy provider events (typed). Returns an unsubscribe function. */
