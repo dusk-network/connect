@@ -1,4 +1,4 @@
-import type { AccountId, Address, BalanceResult, ChainId, DuskProvider, DuskProviderEventMap, DuskWalletState, GasPriceResult, SendTransactionParams, ShieldedBalance, ShieldedCheckpoint, ShieldedStatus, ShieldedSyncResult, SwitchChainParams, TxResult } from "./types.js";
+import type { AccountId, BalanceResult, ByteLike, ChainId, DuskProviderCapabilities, DuskProvider, DuskProviderEventMap, DuskWalletState, GasPriceResult, SendTransactionParams, SignAuthParams, SignAuthResult, SignMessageResult, SwitchChainParams, TxResult } from "./types.js";
 export type WaitForProviderOptions = {
     /** Max wait time (ms). Default: 2000. */
     timeoutMs?: number;
@@ -67,23 +67,9 @@ export declare class DuskWallet {
     getGasPrice(opts?: {
         maxTransactions?: number;
     }): Promise<GasPriceResult>;
-    /** Fetch gas price with wallet-side caching. */
-    getCachedGasPrice(opts?: {
-        forceRefresh?: boolean;
-    }): Promise<GasPriceResult>;
-    /** Get shielded sync status (no network call). */
-    getShieldedStatus(): Promise<ShieldedStatus>;
-    /** Start a shielded sync in the wallet engine. */
-    syncShielded(opts?: {
-        force?: boolean;
-    }): Promise<ShieldedSyncResult>;
-    /** Set the shielded checkpoint to current chain tip. */
-    setShieldedCheckpointNow(opts?: {
-        profileIndex?: number;
-    }): Promise<ShieldedCheckpoint>;
-    /** Fetch shielded balance (total + spendable). */
-    getShieldedBalance(): Promise<ShieldedBalance>;
-    getAddresses(): Promise<Address[]>;
+    getCapabilities(): Promise<DuskProviderCapabilities>;
+    signMessage(message: ByteLike): Promise<SignMessageResult>;
+    signAuth(params: SignAuthParams): Promise<SignAuthResult>;
     sendTransaction(params: SendTransactionParams): Promise<TxResult>;
     sendTransfer(params: Omit<Extract<SendTransactionParams, {
         kind: "transfer";

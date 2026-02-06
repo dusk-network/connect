@@ -28,8 +28,8 @@ export type Gas =
 export type TxResult = {
   /** tx hash string (as produced by the protocol driver) */
   hash: string;
-  /** nonce as decimal string */
-  nonce: string;
+  /** nonce as decimal string (only present for public/Moonlight txs) */
+  nonce?: string;
 };
 
 /**
@@ -116,47 +116,25 @@ export type GasPriceResult = {
   min: LuxString;
 };
 
-export type ShieldedStatus = {
-  state: "idle" | "syncing" | "done" | "error";
-  progress: number;
-  notes: number;
-  cursorBookmark: string;
-  cursorBlock: string;
-  lastError: string;
-  updatedAt: number;
-};
-
-export type ShieldedSyncResult = {
-  started: boolean;
-  status: ShieldedStatus;
-};
-
-export type ShieldedBalance = {
-  value: LuxString;
-  spendable: LuxString;
-};
-
-export type ShieldedCheckpoint = {
-  bookmark: string;
-  block: string;
-};
-
 export type ByteLike = string | number[] | Uint8Array | ArrayBuffer;
 
 export type SendTransferParams = {
   kind: "transfer";
-  to: AccountId;
+  to: AccountId | Address;
   amount: LuxString;
   memo?: string;
   gas?: Gas;
 };
 
+export type PrivacyMode = "public" | "shielded";
+
 export type SendContractCallParams = {
   kind: "contract_call";
+  /** Choose Moonlight (public) or Phoenix (shielded) transaction model. Default: "public". */
+  privacy?: PrivacyMode;
   contractId: string | number[] | Uint8Array; // must be 32 bytes
   fnName: string;
   fnArgs: ByteLike;
-  to?: AccountId;
   amount?: LuxString;
   deposit?: LuxString;
   gas?: Gas;
@@ -248,6 +226,28 @@ export type DuskNodeChangedPayload = {
   networkName: string;
 };
 
+export type DuskProviderCapabilities = {
+  provider: string;
+  walletVersion: string;
+  chainId: ChainId;
+  nodeUrl: string;
+  networkName: string;
+  methods: string[];
+  txKinds: string[];
+  limits: {
+    maxFnArgsBytes: number;
+    maxFnNameChars: number;
+    maxMemoBytes: number;
+  };
+  features: {
+    shieldedRead: boolean;
+    shieldedRecipients: boolean;
+    signMessage: boolean;
+    signAuth: boolean;
+    contractCallPrivacy: boolean;
+  };
+};
+
 export type DuskProviderEventMap = {
   connect: { chainId: ChainId };
   disconnect: { code: number; message: string };
@@ -269,6 +269,36 @@ export type DuskWalletState = {
   selectedAddress: AccountId | null;
   /** Last `duskNodeChanged` payload (if any) */
   node: DuskNodeChangedPayload | null;
+  /** Provider capability snapshot (if supported by the wallet) */
+  capabilities: DuskProviderCapabilities | null;
   /** epoch ms */
   lastUpdated: number;
+};
+
+export type SignMessageResult = {
+  account: AccountId;
+  origin: string;
+  chainId: ChainId;
+  messageHash: string; // 0x...
+  messageLen: number;
+  signature: string; // 0x...
+  payload: string; // 0x...
+};
+
+export type SignAuthParams = {
+  nonce: string;
+  statement?: string;
+  expiresAt?: string;
+};
+
+export type SignAuthResult = {
+  account: AccountId;
+  origin: string;
+  chainId: ChainId;
+  nonce: string;
+  issuedAt: string;
+  expiresAt: string;
+  message: string;
+  signature: string; // 0x...
+  payload: string; // 0x...
 };

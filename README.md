@@ -10,20 +10,17 @@ A tiny, framework-agnostic SDK for the **Dusk Wallet injected provider** (`windo
 This SDK targets the wallet provider described in the Dusk Wallet repo:
 `docs/provider-api.md`.
 
+- `dusk_getCapabilities`
 - `dusk_requestAccounts`
 - `dusk_accounts`
 - `dusk_chainId`
 - `dusk_switchNetwork`
 - `dusk_getPublicBalance`
 - `dusk_estimateGas`
-- `dusk_getCachedGasPrice`
-- `dusk_getShieldedStatus`
-- `dusk_syncShielded`
-- `dusk_setShieldedCheckpointNow`
-- `dusk_getShieldedBalance`
 - `dusk_sendTransaction`
+- `dusk_signMessage`
+- `dusk_signAuth`
 - `dusk_disconnect`
-- `dusk_getAddresses`
 
 ## Vanilla demo
 

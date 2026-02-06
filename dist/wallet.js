@@ -45,6 +45,7 @@ const initialState = (installed) => ({
     chainId: null,
     selectedAddress: null,
     node: null,
+    capabilities: null,
     lastUpdated: Date.now(),
 });
 const cloneState = (st) => ({ ...st, accounts: [...st.accounts] });
@@ -214,12 +215,17 @@ export class DuskWallet {
             this._patch({ installed: false });
             return this.state;
         }
-        const [chainId, accounts] = await Promise.all([
+        const [caps, chainId, accounts] = await Promise.all([
+            this.request("dusk_getCapabilities").catch(() => null),
             this.request("dusk_chainId").catch(() => p.chainId ?? null),
             this.request("dusk_accounts").catch(() => []),
         ]);
         const nextChainId = typeof chainId === "string" ? chainId : p.chainId ?? null;
-        this._patch({ chainId: nextChainId, authorized: Boolean(p.isAuthorized) }, { notify: false });
+        this._patch({
+            chainId: nextChainId,
+            capabilities: caps,
+            authorized: Boolean(p.isAuthorized),
+        }, { notify: false });
         this._setAccounts(accounts, { notify: false });
         this._notify();
         return this.state;
@@ -257,29 +263,14 @@ export class DuskWallet {
     async getGasPrice(opts) {
         return await this.request("dusk_estimateGas", opts ?? {});
     }
-    /** Fetch gas price with wallet-side caching. */
-    async getCachedGasPrice(opts) {
-        return await this.request("dusk_getCachedGasPrice", opts ?? {});
+    async getCapabilities() {
+        return await this.request("dusk_getCapabilities");
     }
-    /** Get shielded sync status (no network call). */
-    async getShieldedStatus() {
-        return await this.request("dusk_getShieldedStatus");
+    async signMessage(message) {
+        return await this.request("dusk_signMessage", { message });
     }
-    /** Start a shielded sync in the wallet engine. */
-    async syncShielded(opts) {
-        return await this.request("dusk_syncShielded", opts ?? {});
-    }
-    /** Set the shielded checkpoint to current chain tip. */
-    async setShieldedCheckpointNow(opts) {
-        return await this.request("dusk_setShieldedCheckpointNow", opts ?? {});
-    }
-    /** Fetch shielded balance (total + spendable). */
-    async getShieldedBalance() {
-        return await this.request("dusk_getShieldedBalance");
-    }
-    async getAddresses() {
-        const addrs = await this.request("dusk_getAddresses");
-        return Array.isArray(addrs) ? addrs : [];
+    async signAuth(params) {
+        return await this.request("dusk_signAuth", params);
     }
     async sendTransaction(params) {
         return await this.request("dusk_sendTransaction", params);

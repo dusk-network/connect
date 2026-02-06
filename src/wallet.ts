@@ -1,17 +1,17 @@
 import type {
   AccountId,
-  Address,
   BalanceResult,
+  ByteLike,
   ChainId,
+  DuskProviderCapabilities,
   DuskProvider,
   DuskProviderEventMap,
   DuskWalletState,
   GasPriceResult,
   SendTransactionParams,
-  ShieldedBalance,
-  ShieldedCheckpoint,
-  ShieldedStatus,
-  ShieldedSyncResult,
+  SignAuthParams,
+  SignAuthResult,
+  SignMessageResult,
   SwitchChainParams,
   TxResult,
 } from "./types.js";
@@ -99,6 +99,7 @@ const initialState = (installed: boolean): DuskWalletState => ({
   chainId: null,
   selectedAddress: null,
   node: null,
+  capabilities: null,
   lastUpdated: Date.now(),
 });
 
@@ -289,13 +290,21 @@ export class DuskWallet {
       return this.state;
     }
 
-    const [chainId, accounts] = await Promise.all([
+    const [caps, chainId, accounts] = await Promise.all([
+      this.request<DuskProviderCapabilities>("dusk_getCapabilities").catch(() => null),
       this.request<ChainId>("dusk_chainId").catch(() => p.chainId ?? null),
       this.request<AccountId[]>("dusk_accounts").catch(() => []),
     ]);
 
     const nextChainId = typeof chainId === "string" ? chainId : p.chainId ?? null;
-    this._patch({ chainId: nextChainId, authorized: Boolean(p.isAuthorized) }, { notify: false });
+    this._patch(
+      {
+        chainId: nextChainId,
+        capabilities: caps,
+        authorized: Boolean(p.isAuthorized),
+      },
+      { notify: false }
+    );
     this._setAccounts(accounts, { notify: false });
     this._notify();
 
@@ -344,34 +353,16 @@ export class DuskWallet {
     return await this.request<GasPriceResult>("dusk_estimateGas", opts ?? {});
   }
 
-  /** Fetch gas price with wallet-side caching. */
-  async getCachedGasPrice(opts?: { forceRefresh?: boolean }): Promise<GasPriceResult> {
-    return await this.request<GasPriceResult>("dusk_getCachedGasPrice", opts ?? {});
+  async getCapabilities(): Promise<DuskProviderCapabilities> {
+    return await this.request<DuskProviderCapabilities>("dusk_getCapabilities");
   }
 
-  /** Get shielded sync status (no network call). */
-  async getShieldedStatus(): Promise<ShieldedStatus> {
-    return await this.request<ShieldedStatus>("dusk_getShieldedStatus");
+  async signMessage(message: ByteLike): Promise<SignMessageResult> {
+    return await this.request<SignMessageResult>("dusk_signMessage", { message });
   }
 
-  /** Start a shielded sync in the wallet engine. */
-  async syncShielded(opts?: { force?: boolean }): Promise<ShieldedSyncResult> {
-    return await this.request<ShieldedSyncResult>("dusk_syncShielded", opts ?? {});
-  }
-
-  /** Set the shielded checkpoint to current chain tip. */
-  async setShieldedCheckpointNow(opts?: { profileIndex?: number }): Promise<ShieldedCheckpoint> {
-    return await this.request<ShieldedCheckpoint>("dusk_setShieldedCheckpointNow", opts ?? {});
-  }
-
-  /** Fetch shielded balance (total + spendable). */
-  async getShieldedBalance(): Promise<ShieldedBalance> {
-    return await this.request<ShieldedBalance>("dusk_getShieldedBalance");
-  }
-
-  async getAddresses(): Promise<Address[]> {
-    const addrs = await this.request<Address[]>("dusk_getAddresses");
-    return Array.isArray(addrs) ? addrs : [];
+  async signAuth(params: SignAuthParams): Promise<SignAuthResult> {
+    return await this.request<SignAuthResult>("dusk_signAuth", params);
   }
 
   async sendTransaction(params: SendTransactionParams): Promise<TxResult> {
