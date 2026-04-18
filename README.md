@@ -7,8 +7,8 @@ A tiny, framework-agnostic SDK for the **Dusk Wallet injected provider** (`windo
 - Includes an **optional connect modal** (conceptually similar to a very small Reown/AppKit)
 - Includes an optional **WalletConnect-style connect button** (`<dusk-connect-button />`) for drop-in UI
 
-This SDK targets the wallet provider described in the Dusk Wallet repo:
-`docs/provider-api.md`.
+This SDK targets the wallet provider described in the
+[Dusk Wallet provider API](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md).
 
 - `dusk_getCapabilities`
 - `dusk_requestAccounts`
