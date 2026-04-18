@@ -22,7 +22,8 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && tsc -p tsconfig.json"
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

@@ -19,6 +19,8 @@ public/data_driver.wasm
 
 ```bash
 cd dusk-wallet-sdk
+npm install
+npm run build
 
 # option A (Python)
 python3 -m http.server 5173

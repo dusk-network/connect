@@ -15,11 +15,13 @@ A minimal example page for interacting with the **StandardBridge** contract usin
 public/data_driver.wasm
 ```
 
-2) Install + run:
+2) Build the SDK and serve the repo root:
 
 ```bash
+cd ~/projects/dusk-wallet-sdk
 npm i
-npm run dev
+npm run build
+python3 -m http.server 5173
 ```
 
 3) Open the page and set config (or pass query params).

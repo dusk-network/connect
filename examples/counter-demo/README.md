@@ -29,6 +29,8 @@ A simple dApp demonstrating the **Counter Contract** using the `#[contract]` mac
 
    ```bash
    cd ~/projects/dusk-wallet-sdk
+   npm install
+   npm run build
    npx http-server -c-1 .
    ```
 

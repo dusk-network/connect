@@ -26,14 +26,18 @@ This SDK targets the wallet provider described in the
 ## Vanilla demo
 
 A no-bundler demo lives at `examples/vanilla/` and imports the SDK directly from `dist/`.
-
-Run a static server from the SDK root:
+From a fresh checkout, build the SDK once before serving the repo locally:
 
 ```bash
+npm install
+npm run build
 python3 -m http.server 5173
 ```
 
 Then open `http://localhost:5173/examples/vanilla/`.
+
+All example pages in `examples/` load the built SDK from `dist/`, so the same
+`npm run build` step applies before serving any of them from the repository.
 
 ## Dario FSM demo
 
@@ -446,3 +450,4 @@ npm run build
 ```
 
 Produces ESM + types in `dist/`.
+`npm pack` and `npm publish` run this automatically via `prepack`.
