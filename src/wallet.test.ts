@@ -1,63 +1,133 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ERROR_CODES, DuskWalletUnauthorizedError } from "./errors.js";
 import {
-  DuskWallet,
-  createDuskWallet,
-  getDuskProvider,
-  isDuskProvider,
-  waitForDuskProvider,
-} from "./wallet.js";
-import { createMockProvider, makeNodeChangedPayload } from "./test/mocks.js";
+  DUSK_ANNOUNCE_PROVIDER_EVENT,
+  DUSK_REQUEST_PROVIDER_EVENT,
+  makeDuskAnnounceProviderEvent,
+  requestDuskProviders,
+  waitForDuskProviders,
+} from "./discovery.js";
+import {
+  ERROR_CODES,
+  DuskWalletProviderSelectionError,
+  DuskWalletUnauthorizedError,
+} from "./errors.js";
+import { DuskWallet, createDuskWallet } from "./wallet.js";
+import { createMockProvider, createMockProviderInfo, makeNodeChangedPayload } from "./test/mocks.js";
 
 describe("wallet", () => {
   beforeEach(() => {
     vi.useRealTimers();
-    delete (window as any).dusk;
+    window.localStorage.clear();
   });
 
-  it("detects valid injected providers", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("collects providers announced over the discovery API", async () => {
     const provider = createMockProvider();
-    expect(isDuskProvider(provider)).toBe(true);
-    expect(isDuskProvider({ isDusk: true })).toBe(false);
+    const info = createMockProviderInfo({
+      uuid: "wallet.one",
+      name: "Wallet One",
+      rdns: "network.dusk.wallet.one",
+    });
 
-    (window as any).dusk = provider;
-    expect(getDuskProvider()).toBe(provider);
+    const onRequest = () => {
+      window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider }));
+    };
+
+    window.addEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
+
+    await expect(requestDuskProviders({ timeoutMs: 0 })).resolves.toEqual([{ info, provider }]);
+
+    window.removeEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
   });
 
-  it("waits briefly for provider injection", async () => {
+  it("waits briefly for provider discovery", async () => {
     vi.useFakeTimers();
-    const promise = waitForDuskProvider({ timeoutMs: 100, intervalMs: 10 });
 
-    vi.advanceTimersByTime(40);
-    (window as any).dusk = createMockProvider();
-    vi.advanceTimersByTime(10);
+    const provider = createMockProvider();
+    const info = createMockProviderInfo({ uuid: "wallet.delayed", name: "Delayed Wallet" });
 
-    await expect(promise).resolves.toBe((window as any).dusk);
+    const onRequest = () => {
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent(DUSK_ANNOUNCE_PROVIDER_EVENT, { detail: { info, provider } }));
+      }, 40);
+    };
+
+    window.addEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
+
+    const promise = waitForDuskProviders({ timeoutMs: 100, intervalMs: 10 });
+    vi.advanceTimersByTime(50);
+
+    await expect(promise).resolves.toEqual([{ info, provider }]);
+
+    window.removeEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
   });
 
-  it("refreshes state from the provider on ready", async () => {
+  it("auto-selects the only discovered wallet and refreshes state on ready", async () => {
     const provider = createMockProvider({
       authorized: true,
       accounts: ["dusk1alpha"],
       chainId: "dusk:3",
     });
+    const info = createMockProviderInfo({ uuid: "wallet.primary", name: "Primary Wallet" });
 
-    const wallet = createDuskWallet({
-      provider,
-      waitForProvider: false,
-    });
+    const onRequest = () => {
+      window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider }));
+    };
 
+    window.addEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
+
+    const wallet = createDuskWallet();
     await wallet.ready();
 
     expect(wallet.state.installed).toBe(true);
+    expect(wallet.state.providerId).toBe("wallet.primary");
+    expect(wallet.state.providerInfo?.name).toBe("Primary Wallet");
+    expect(wallet.state.availableProviders.map((item) => item.uuid)).toEqual(["wallet.primary"]);
     expect(wallet.state.authorized).toBe(true);
     expect(wallet.state.accounts).toEqual(["dusk1alpha"]);
     expect(wallet.state.selectedAddress).toBe("dusk1alpha");
     expect(wallet.state.chainId).toBe("dusk:3");
     expect(wallet.state.capabilities?.provider).toBe("dusk-wallet");
+
+    window.removeEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
+  });
+
+  it("requires selecting a provider when multiple wallets are discovered", async () => {
+    const primary = createMockProvider({ accounts: ["dusk1primary"] });
+    const secondary = createMockProvider({ accounts: ["dusk1secondary"] });
+    const primaryInfo = createMockProviderInfo({ uuid: "wallet.primary", name: "Primary Wallet" });
+    const secondaryInfo = createMockProviderInfo({ uuid: "wallet.secondary", name: "Secondary Wallet" });
+
+    const onRequest = () => {
+      window.dispatchEvent(makeDuskAnnounceProviderEvent({ info: primaryInfo, provider: primary }));
+      window.dispatchEvent(makeDuskAnnounceProviderEvent({ info: secondaryInfo, provider: secondary }));
+    };
+
+    window.addEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
+
+    const wallet = createDuskWallet();
+    await wallet.ready();
+
+    expect(wallet.state.installed).toBe(true);
+    expect(wallet.state.availableProviders.map((item) => item.uuid)).toEqual([
+      "wallet.primary",
+      "wallet.secondary",
+    ]);
+    expect(wallet.state.providerId).toBeNull();
+    await expect(wallet.connect()).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
+
+    await wallet.selectProvider("wallet.secondary");
+    await expect(wallet.connect()).resolves.toEqual(["dusk1secondary"]);
+    expect(wallet.state.providerId).toBe("wallet.secondary");
+    expect(wallet.state.providerInfo?.name).toBe("Secondary Wallet");
+
+    window.removeEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
   });
 
   it("translates provider rpc errors into wallet-specific errors", async () => {
@@ -128,7 +198,7 @@ describe("wallet", () => {
     provider.setChainId("dusk:1");
     provider.setAccounts(["dusk1next"]);
     provider.emit("duskNodeChanged", makeNodeChangedPayload({ chainId: "dusk:1", networkName: "Mainnet" }));
-    provider.emit("disconnect", { code: ERROR_CODES.DISCONNECTED });
+    provider.emit("disconnect", { code: ERROR_CODES.DISCONNECTED, message: "Disconnected" });
 
     expect(wallet.state.chainId).toBe("dusk:1");
     expect(wallet.state.node?.networkName).toBe("Mainnet");

@@ -3,9 +3,11 @@ import type {
   BalanceResult,
   ByteLike,
   ChainId,
-  DuskProviderCapabilities,
   DuskProvider,
+  DuskProviderCapabilities,
+  DuskProviderDetail,
   DuskProviderEventMap,
+  DuskProviderInfo,
   DuskWalletState,
   GasPriceResult,
   SendTransactionParams,
@@ -18,8 +20,10 @@ import type {
 } from "./types.js";
 
 import {
-  DuskWalletNotInstalledError,
   DuskWalletDisconnectedError,
+  DuskWalletNotInstalledError,
+  DuskWalletProviderNotFoundError,
+  DuskWalletProviderSelectionError,
   DuskWalletUnauthorizedError,
   DuskWalletUserRejectedError,
   ERROR_CODES,
@@ -27,76 +31,55 @@ import {
   type RpcErrorLike,
 } from "./errors.js";
 
+import {
+  DUSK_SELECTED_PROVIDER_STORAGE_KEY,
+  isDuskProvider,
+  requestDuskProviders,
+  subscribeDuskProviders,
+  waitForDuskProviders,
+  type RequestDuskProvidersOptions,
+  type WaitForDuskProvidersOptions,
+} from "./discovery.js";
+
 import { normalizeContractId0x } from "./internal/contractId.js";
 
-export type WaitForProviderOptions = {
-  /** Max wait time (ms). Default: 2000. */
-  timeoutMs?: number;
-  /** Poll interval (ms). Default: 50. */
-  intervalMs?: number;
-};
-
-export function isDuskProvider(value: any): value is DuskProvider {
-  return (
-    value &&
-    typeof value === "object" &&
-    (value as any).isDusk === true &&
-    typeof (value as any).request === "function" &&
-    typeof (value as any).on === "function"
-  );
-}
-
-/** Return the injected provider (`window.dusk`) if present. */
-export function getDuskProvider(): DuskProvider | null {
-  if (typeof window === "undefined") return null;
-  const p = (window as any).dusk;
-  return isDuskProvider(p) ? p : null;
-}
-
-/** Wait briefly for provider injection (`window.dusk`). */
-export async function waitForDuskProvider(opts: WaitForProviderOptions = {}): Promise<DuskProvider | null> {
-  const timeoutMs = opts.timeoutMs ?? 2_000;
-  const intervalMs = opts.intervalMs ?? 50;
-
-  const immediate = getDuskProvider();
-  if (immediate) return immediate;
-  if (typeof window === "undefined") return null;
-
-  return await new Promise((resolve) => {
-    const t0 = Date.now();
-    const timer = window.setInterval(() => {
-      const p = getDuskProvider();
-      if (p) {
-        window.clearInterval(timer);
-        resolve(p);
-        return;
-      }
-      if (Date.now() - t0 >= timeoutMs) {
-        window.clearInterval(timer);
-        resolve(null);
-      }
-    }, intervalMs);
-  });
-}
+export type WaitForProviderOptions = WaitForDuskProvidersOptions;
 
 export type DuskWalletOptions = {
-  /** Provide a provider explicitly (useful for tests). Defaults to `window.dusk`. */
+  /** Provide a provider explicitly (useful for tests or custom integrations). */
   provider?: DuskProvider | null;
 
-  /** If no provider is found synchronously, poll briefly for injection. Default: true. */
+  /** Metadata for an explicitly provided provider. */
+  providerInfo?: DuskProviderInfo | null;
+
+  /** Preferred wallet id to auto-select when multiple providers are discovered. */
+  preferredProviderId?: string | null;
+
+  /** If no provider is selected synchronously, wait briefly for discovery. Default: true. */
   waitForProvider?: boolean;
 
-  /** Provider polling options (only used if `waitForProvider !== false`). */
+  /** Discovery polling options (only used if `waitForProvider !== false`). */
   providerWaitOptions?: WaitForProviderOptions;
 
   /** Immediately fetch `dusk_chainId` and `dusk_accounts` on init. Default: true. */
   autoRefresh?: boolean;
+
+  /** Persist and restore the last selected provider. Default: true. */
+  rememberLastUsedProvider?: boolean;
+
+  /** localStorage key used for provider persistence. */
+  providerStorageKey?: string;
 };
 
 export type DuskWalletSubscriber = (state: DuskWalletState) => void;
 
+const EMPTY_PROVIDERS: DuskProviderInfo[] = [];
+
 const initialState = (installed: boolean): DuskWalletState => ({
   installed,
+  providerId: null,
+  providerInfo: null,
+  availableProviders: EMPTY_PROVIDERS,
   authorized: false,
   accounts: [],
   chainId: null,
@@ -106,18 +89,50 @@ const initialState = (installed: boolean): DuskWalletState => ({
   lastUpdated: Date.now(),
 });
 
-const cloneState = (st: DuskWalletState): DuskWalletState => ({ ...st, accounts: [...st.accounts] });
+function cloneProviderInfo(info: DuskProviderInfo): DuskProviderInfo {
+  return {
+    uuid: info.uuid,
+    name: info.name,
+    icon: info.icon,
+    rdns: info.rdns,
+  };
+}
 
-const shallowArrayEq = (a: readonly unknown[], b: readonly unknown[]) => {
+function cloneState(st: DuskWalletState): DuskWalletState {
+  return {
+    ...st,
+    providerInfo: st.providerInfo ? cloneProviderInfo(st.providerInfo) : null,
+    availableProviders: st.availableProviders.map(cloneProviderInfo),
+    accounts: [...st.accounts],
+    node: st.node ? { ...st.node } : null,
+  };
+}
+
+function shallowArrayEq(a: readonly unknown[], b: readonly unknown[]) {
   if (a === b) return true;
-  if (a.length != b.length) return false;
+  if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return false;
   }
   return true;
-};
+}
 
-const translateProviderError = (err: unknown): RpcErrorLike => {
+function providerInfoEq(a: DuskProviderInfo | null, b: DuskProviderInfo | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.uuid === b.uuid && a.name === b.name && a.icon === b.icon && a.rdns === b.rdns;
+}
+
+function providerInfoArrayEq(a: readonly DuskProviderInfo[], b: readonly DuskProviderInfo[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!providerInfoEq(a[i] ?? null, b[i] ?? null)) return false;
+  }
+  return true;
+}
+
+function translateProviderError(err: unknown): RpcErrorLike {
   const e = normalizeError(err);
   switch (e.code) {
     case ERROR_CODES.UNSUPPORTED:
@@ -131,16 +146,25 @@ const translateProviderError = (err: unknown): RpcErrorLike => {
     default:
       return e;
   }
-};
+}
 
-/** Wrapper around the injected provider with a small reactive state store. */
+/**
+ * Wrapper around a discovered Dusk provider with a small reactive state store.
+ */
 export class DuskWallet {
   private _provider: DuskProvider | null = null;
   private _state: DuskWalletState = initialState(false);
   private _subs = new Set<DuskWalletSubscriber>();
+  private _providers = new Map<string, DuskProviderDetail>();
   private _bound = false;
   private _destroyed = false;
   private _readyPromise: Promise<void>;
+  private _stopDiscovery: (() => void) | null = null;
+  private _explicitProvider = false;
+  private _rememberLastUsed = true;
+  private _providerStorageKey = DUSK_SELECTED_PROVIDER_STORAGE_KEY;
+  private _preferredProviderId: string | null = null;
+  private _readySettled = false;
 
   private _accountsFrom(value: unknown): AccountId[] {
     return Array.isArray(value) ? (value as AccountId[]) : [];
@@ -163,7 +187,7 @@ export class DuskWallet {
   private _hydrateFromProvider(p: DuskProvider, opts: { notify?: boolean } = {}) {
     this._patch(
       {
-        installed: true,
+        installed: this._providers.size > 0 || Boolean(this._provider),
         chainId: p.chainId ?? this._state.chainId,
         selectedAddress: p.selectedAddress ?? this._state.selectedAddress,
         authorized: Boolean(p.isAuthorized),
@@ -206,13 +230,39 @@ export class DuskWallet {
   ];
 
   constructor(opts: DuskWalletOptions = {}) {
-    this._provider = opts.provider ?? getDuskProvider();
-    this._state = initialState(Boolean(this._provider));
+    this._explicitProvider = Boolean(opts.provider);
+    this._rememberLastUsed = opts.rememberLastUsedProvider !== false;
+    this._providerStorageKey = opts.providerStorageKey || DUSK_SELECTED_PROVIDER_STORAGE_KEY;
+    this._preferredProviderId =
+      (opts.preferredProviderId && String(opts.preferredProviderId).trim()) ||
+      (this._rememberLastUsed ? this._readStoredProviderId() : null);
+
+    this._state = initialState(false);
+    this._stopDiscovery = subscribeDuskProviders((detail) => {
+      this._registerDiscoveredProvider(detail, { notify: false });
+      if (this._readySettled && !this._provider && !this._explicitProvider) {
+        this._autoSelectDiscoveredProvider({ notify: false });
+      }
+      this._notify();
+    });
+
+    if (opts.provider && isDuskProvider(opts.provider)) {
+      this._provider = opts.provider;
+      this._registerExplicitProvider(opts.provider, opts.providerInfo ?? null, { notify: false, persist: false });
+    }
 
     this._readyPromise = (async () => {
-      if (!this._provider && opts.waitForProvider !== false) {
-        this._provider = await waitForDuskProvider(opts.providerWaitOptions);
-        this._patch({ installed: Boolean(this._provider) }, { notify: false });
+      if (!this._provider) {
+        const details =
+          opts.waitForProvider !== false
+            ? await waitForDuskProviders(opts.providerWaitOptions)
+            : await requestDuskProviders({ timeoutMs: 0 });
+
+        for (const detail of details) {
+          this._registerDiscoveredProvider(detail, { notify: false });
+        }
+
+        this._autoSelectDiscoveredProvider({ notify: false });
       }
 
       if (this._provider) {
@@ -221,45 +271,244 @@ export class DuskWallet {
         if (opts.autoRefresh !== false) {
           await this.refresh().catch(() => {});
         }
+      } else {
+        this._syncAvailableProviders({ notify: false });
       }
 
+      this._readySettled = true;
       this._notify();
     })();
   }
 
-  private _getProvider(): DuskProvider | null {
-    const p = this._provider ?? getDuskProvider();
-    if (!p) return null;
+  private _availableProviderInfos(): DuskProviderInfo[] {
+    return [...this._providers.values()]
+      .map((detail) => cloneProviderInfo(detail.info))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
 
-    if (!this._provider) {
-      this._provider = p;
-      this._hydrateFromProvider(p, { notify: false });
-      this._bindProviderEvents();
+  private _syncAvailableProviders(opts: { notify?: boolean } = {}) {
+    const availableProviders = this._availableProviderInfos();
+    const installed = availableProviders.length > 0 || Boolean(this._provider);
+    const changed =
+      installed !== this._state.installed || !providerInfoArrayEq(this._state.availableProviders, availableProviders);
+    if (!changed) return;
+    this._patch({ installed, availableProviders }, opts);
+  }
+
+  private _registerExplicitProvider(
+    provider: DuskProvider,
+    providerInfo: DuskProviderInfo | null,
+    opts: { notify?: boolean; persist?: boolean } = {}
+  ) {
+    if (providerInfo?.uuid) {
+      this._providers.set(providerInfo.uuid, { info: cloneProviderInfo(providerInfo), provider });
+      this._applySelectedProvider({ info: providerInfo, provider }, opts);
+      this._syncAvailableProviders({ notify: false });
+      return;
     }
 
-    return p;
+    this._provider = provider;
+    this._patch(
+      {
+        installed: true,
+        providerId: null,
+        providerInfo: null,
+        availableProviders: this._availableProviderInfos(),
+        authorized: false,
+        accounts: [],
+        selectedAddress: provider.selectedAddress ?? null,
+        chainId: provider.chainId ?? null,
+        node: null,
+        capabilities: null,
+      },
+      { notify: false }
+    );
+    this._hydrateFromProvider(provider, { notify: false });
+    this._syncAvailableProviders({ notify: false });
+    if (opts.notify !== false) this._notify();
+  }
+
+  private _registerDiscoveredProvider(detail: DuskProviderDetail, opts: { notify?: boolean } = {}): boolean {
+    const info = cloneProviderInfo(detail.info);
+    const current = this._providers.get(info.uuid);
+    const same = current && current.provider === detail.provider && providerInfoEq(current.info, info);
+    if (same) return false;
+
+    this._providers.set(info.uuid, { info, provider: detail.provider });
+    this._syncAvailableProviders({ notify: false });
+
+    if (this._state.providerId === info.uuid && this._provider !== detail.provider) {
+      this._applySelectedProvider({ info, provider: detail.provider }, { notify: false, persist: false });
+    }
+
+    if (opts.notify !== false) this._notify();
+    return true;
+  }
+
+  private _readStoredProviderId(): string | null {
+    if (!this._rememberLastUsed || typeof localStorage === "undefined") return null;
+    try {
+      const value = localStorage.getItem(this._providerStorageKey);
+      const trimmed = typeof value === "string" ? value.trim() : "";
+      return trimmed || null;
+    } catch {
+      return null;
+    }
+  }
+
+  private _writeStoredProviderId(providerId: string | null) {
+    if (!this._rememberLastUsed || typeof localStorage === "undefined") return;
+    try {
+      if (providerId) localStorage.setItem(this._providerStorageKey, providerId);
+      else localStorage.removeItem(this._providerStorageKey);
+    } catch {
+      // ignore
+    }
+  }
+
+  private _applySelectedProvider(
+    detail: DuskProviderDetail | null,
+    opts: { notify?: boolean; persist?: boolean } = {}
+  ) {
+    const nextProvider = detail?.provider ?? null;
+    const nextInfo = detail ? cloneProviderInfo(detail.info) : null;
+    const nextProviderId = nextInfo?.uuid ?? null;
+    const sameProvider = this._provider === nextProvider;
+    const sameInfo = providerInfoEq(this._state.providerInfo, nextInfo);
+
+    if (!sameProvider) {
+      this._unbindProviderEvents();
+      this._provider = nextProvider;
+      if (this._provider) this._bindProviderEvents();
+    }
+
+    this._patch(
+      {
+        installed: this._providers.size > 0 || Boolean(nextProvider),
+        providerId: nextProviderId,
+        providerInfo: nextInfo,
+        authorized: false,
+        accounts: [],
+        selectedAddress: nextProvider?.selectedAddress ?? null,
+        chainId: nextProvider?.chainId ?? null,
+        node: null,
+        capabilities: null,
+        availableProviders: this._availableProviderInfos(),
+      },
+      { notify: false }
+    );
+
+    if (nextProvider) {
+      this._hydrateFromProvider(nextProvider, { notify: false });
+    }
+
+    if (opts.persist !== false) {
+      this._preferredProviderId = nextProviderId;
+      this._writeStoredProviderId(nextProviderId);
+    }
+
+    if (opts.notify !== false && (!sameProvider || !sameInfo)) {
+      this._notify();
+    }
+  }
+
+  private _autoSelectDiscoveredProvider(opts: { notify?: boolean } = {}) {
+    if (this._explicitProvider || this._provider) return;
+
+    if (this._preferredProviderId) {
+      const preferred = this._providers.get(this._preferredProviderId);
+      if (preferred) {
+        const applyOpts: { notify?: boolean; persist?: boolean } = { persist: false };
+        if (opts.notify !== undefined) applyOpts.notify = opts.notify;
+        this._applySelectedProvider(preferred, applyOpts);
+        return;
+      }
+    }
+
+    if (this._providers.size === 1) {
+      const only = [...this._providers.values()][0] ?? null;
+      if (only) {
+        const applyOpts: { notify?: boolean; persist?: boolean } = { persist: false };
+        if (opts.notify !== undefined) applyOpts.notify = opts.notify;
+        this._applySelectedProvider(only, applyOpts);
+      }
+    }
+  }
+
+  private _getProvider(): DuskProvider | null {
+    if (!this._provider) {
+      this._autoSelectDiscoveredProvider({ notify: false });
+    }
+    return this._provider;
   }
 
   private _requireProvider(): DuskProvider {
     const p = this._getProvider();
-    if (!p) throw new DuskWalletNotInstalledError();
-    return p;
+    if (p) return p;
+    if (this._state.availableProviders.length > 0) {
+      throw new DuskWalletProviderSelectionError();
+    }
+    throw new DuskWalletNotInstalledError();
   }
 
-  /** Resolves once initial provider detection/refresh finished. */
+  /** Resolves once initial provider discovery/refresh finished. */
   async ready(): Promise<this> {
     await this._readyPromise;
     return this;
   }
 
-  /** The injected provider, if present. */
+  /** The currently selected provider, if any. */
   get provider(): DuskProvider | null {
     return this._provider;
+  }
+
+  /** Metadata for the currently selected provider, if any. */
+  get providerInfo(): DuskProviderInfo | null {
+    return this._state.providerInfo ? cloneProviderInfo(this._state.providerInfo) : null;
+  }
+
+  /** All discovered wallet providers. */
+  get providers(): DuskProviderInfo[] {
+    return this._state.availableProviders.map(cloneProviderInfo);
   }
 
   /** Current reactive state (copy). */
   get state(): DuskWalletState {
     return cloneState(this._state);
+  }
+
+  /** Actively request wallet announcements and update the discovered provider list. */
+  async discoverProviders(options: RequestDuskProvidersOptions = {}): Promise<DuskProviderInfo[]> {
+    const details = await requestDuskProviders(options);
+    for (const detail of details) {
+      this._registerDiscoveredProvider(detail, { notify: false });
+    }
+    if (!this._provider && !this._explicitProvider) {
+      this._autoSelectDiscoveredProvider({ notify: false });
+    }
+    this._notify();
+    return this.providers;
+  }
+
+  /** Select one of the discovered providers by id. */
+  async selectProvider(providerId: string): Promise<DuskWalletState> {
+    const id = String(providerId || "").trim();
+    if (!id) throw new DuskWalletProviderNotFoundError();
+
+    let detail = this._providers.get(id);
+    if (!detail) {
+      await this.discoverProviders({ timeoutMs: 50 });
+      detail = this._providers.get(id);
+    }
+
+    if (!detail) throw new DuskWalletProviderNotFoundError(`Unknown Dusk wallet provider: ${id}`);
+
+    this._applySelectedProvider(detail, { notify: false });
+    if (this._provider) {
+      await this.refresh().catch(() => {});
+    }
+    this._notify();
+    return this.state;
   }
 
   /** Subscribe to state updates. Returns an unsubscribe function. */
@@ -289,7 +538,21 @@ export class DuskWallet {
   async refresh(): Promise<DuskWalletState> {
     const p = this._getProvider();
     if (!p) {
-      this._patch({ installed: false });
+      this._syncAvailableProviders({ notify: false });
+      this._patch(
+        {
+          providerId: null,
+          providerInfo: null,
+          authorized: false,
+          accounts: [],
+          selectedAddress: null,
+          chainId: null,
+          node: null,
+          capabilities: null,
+        },
+        { notify: false }
+      );
+      this._notify();
       return this.state;
     }
 
@@ -431,6 +694,8 @@ export class DuskWallet {
   destroy(): void {
     if (this._destroyed) return;
     this._destroyed = true;
+    this._stopDiscovery?.();
+    this._stopDiscovery = null;
     this._unbindProviderEvents();
     this._subs.clear();
   }
@@ -468,22 +733,8 @@ export class DuskWallet {
 /**
  * Create a {@link DuskWallet} instance.
  *
- * Use this when you only need access to the injected provider (`window.dusk`):
- * connect, read accounts/chain, balances, and send transactions.
- *
- * If you later need contract-friendly helpers (readContract / writeContract),
- * you can pass this same wallet instance into `createDuskApp({ wallet, ... })`.
- *
- * @example
- * ```ts
- * import { createDuskWallet } from "@dusk-network/connect";
- *
- * const wallet = createDuskWallet();
- * await wallet.ready();
- *
- * await wallet.connect();
- * console.log(wallet.state.accounts);
- * ```
+ * Use this when you only need wallet discovery, connection state, balances,
+ * and transaction sending.
  */
 export function createDuskWallet(opts?: DuskWalletOptions): DuskWallet {
   return new DuskWallet(opts);

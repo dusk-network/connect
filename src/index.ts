@@ -9,6 +9,7 @@ export * from "./types.js";
 export * from "./errors.js";
 export * from "./amount.js";
 
+export * from "./discovery.js";
 export * from "./wallet.js";
 export * from "./app.js";
 

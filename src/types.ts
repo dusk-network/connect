@@ -1,8 +1,8 @@
 /**
- * Types for the Dusk Wallet injected provider API.
+ * Types for the Dusk wallet discovery + provider API.
  *
- * The wallet injects `window.dusk` with an EIP-1193-like interface.
- * All RPC methods are Dusk-prefixed (`dusk_*`).
+ * Wallets are discovered through Dusk-specific window events and expose
+ * an EIP-1193-like provider object. All RPC methods are Dusk-prefixed (`dusk_*`).
  */
 
 export type AccountId = string; // base58 public account identifier
@@ -205,6 +205,17 @@ export type DuskRpcRequest = {
   params?: unknown;
 };
 
+export type DuskProviderInfo = {
+  /** Stable wallet id (UUID recommended). */
+  uuid: string;
+  /** Human-friendly wallet name shown in pickers. */
+  name: string;
+  /** Icon URL/data URI shown in pickers. */
+  icon: string;
+  /** Reverse-DNS identifier, e.g. "network.dusk.wallet". */
+  rdns: string;
+};
+
 export interface DuskProvider {
   /** true if this object is the Dusk Wallet provider */
   readonly isDusk: true;
@@ -241,6 +252,11 @@ export interface DuskProvider {
   /** True after a successful connection approval for the current origin */
   readonly isAuthorized: boolean;
 }
+
+export type DuskProviderDetail = {
+  info: DuskProviderInfo;
+  provider: DuskProvider;
+};
 
 export type DuskNodeChangedPayload = {
   chainId: ChainId;
@@ -280,8 +296,14 @@ export type DuskProviderEventMap = {
 };
 
 export type DuskWalletState = {
-  /** Whether `window.dusk` is present */
+  /** Whether at least one Dusk wallet provider has been discovered */
   installed: boolean;
+  /** Selected wallet id, if any */
+  providerId: string | null;
+  /** Selected wallet metadata, if any */
+  providerInfo: DuskProviderInfo | null;
+  /** All discovered wallet providers */
+  availableProviders: DuskProviderInfo[];
   /** Whether the origin is authorized/connected */
   authorized: boolean;
   /** Exposed accounts for this origin */

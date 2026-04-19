@@ -68,6 +68,20 @@ export class DuskWalletDisconnectedError extends DuskSdkError {
   }
 }
 
+export class DuskWalletProviderSelectionError extends DuskSdkError {
+  constructor(message = "Select a Dusk wallet provider before making requests") {
+    super(message, { code: ERROR_CODES.UNSUPPORTED });
+    this.name = "DuskWalletProviderSelectionError";
+  }
+}
+
+export class DuskWalletProviderNotFoundError extends DuskSdkError {
+  constructor(message = "Requested Dusk wallet provider is not available") {
+    super(message, { code: ERROR_CODES.UNSUPPORTED });
+    this.name = "DuskWalletProviderNotFoundError";
+  }
+}
+
 export function isRpcErrorLike(err: unknown): err is RpcErrorLike {
   return (
     typeof err === "object" &&

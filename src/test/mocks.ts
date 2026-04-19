@@ -5,6 +5,7 @@ import type {
   ChainId,
   DuskNodeChangedPayload,
   DuskProvider,
+  DuskProviderInfo,
   DuskProviderCapabilities,
   DuskProviderEventMap,
   DuskWalletState,
@@ -103,7 +104,7 @@ export function createMockProvider(
             networkName: "Testnet",
             methods: ["dusk_requestAccounts", "dusk_accounts", "dusk_chainId"],
             txKinds: ["transfer", "contract_call"],
-            limits: { maxFnArgsBytes: 65536 },
+            limits: { maxFnArgsBytes: 65536, maxFnNameChars: 64, maxMemoBytes: 512 },
             ...opts.capabilities,
           } satisfies DuskProviderCapabilities;
         case "dusk_chainId":
@@ -165,9 +166,22 @@ export function createMockProvider(
   return provider as MockDuskProvider;
 }
 
+export function createMockProviderInfo(
+  patch: Partial<DuskProviderInfo> = {}
+): DuskProviderInfo {
+  return {
+    uuid: "wallet.dusk.extension",
+    name: "Dusk Wallet",
+    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E",
+    rdns: "network.dusk.wallet",
+    ...patch,
+  };
+}
+
 export type MockUiWallet = {
   readonly state: DuskWalletState;
   subscribe: ReturnType<typeof vi.fn>;
+  selectProvider: ReturnType<typeof vi.fn>;
   connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
   ready: ReturnType<typeof vi.fn>;
@@ -178,8 +192,16 @@ export type MockUiWallet = {
 export function createMockUiWallet(
   initial: Partial<DuskWalletState> = {}
 ): MockUiWallet {
+  const availableProviders = initial.availableProviders ?? (initial.installed === false ? [] : [createMockProviderInfo()]);
+  const providerInfo =
+    "providerInfo" in initial ? (initial.providerInfo ?? null) : (availableProviders[0] ?? null);
+  const providerId = "providerId" in initial ? (initial.providerId ?? null) : (providerInfo?.uuid ?? null);
+
   let state: DuskWalletState = {
-    installed: true,
+    installed: initial.installed ?? availableProviders.length > 0,
+    providerId,
+    providerInfo,
+    availableProviders: availableProviders.map((provider) => ({ ...provider })),
     authorized: false,
     accounts: [],
     chainId: "dusk:2",
@@ -194,6 +216,8 @@ export function createMockUiWallet(
 
   const snapshot = (): DuskWalletState => ({
     ...state,
+    providerInfo: state.providerInfo ? { ...state.providerInfo } : null,
+    availableProviders: state.availableProviders.map((provider) => ({ ...provider })),
     accounts: [...state.accounts],
     node: state.node ? { ...state.node } : null,
   });
@@ -211,6 +235,22 @@ export function createMockUiWallet(
       subs.add(fn);
       fn(snapshot());
       return () => subs.delete(fn);
+    }),
+    selectProvider: vi.fn(async (nextProviderId: string) => {
+      const next = state.availableProviders.find((provider) => provider.uuid === nextProviderId) ?? null;
+      if (!next) throw new Error(`Unknown provider: ${nextProviderId}`);
+      state = {
+        ...state,
+        installed: true,
+        providerId: next.uuid,
+        providerInfo: { ...next },
+        authorized: false,
+        accounts: [],
+        selectedAddress: null,
+        lastUpdated: Date.now(),
+      };
+      notify();
+      return snapshot();
     }),
     connect: vi.fn(async () => {
       state = {
@@ -240,6 +280,16 @@ export function createMockUiWallet(
       state = {
         ...state,
         ...partial,
+        providerInfo:
+          partial.providerInfo === undefined
+            ? state.providerInfo
+            : partial.providerInfo
+              ? { ...partial.providerInfo }
+              : null,
+        availableProviders:
+          partial.availableProviders === undefined
+            ? state.availableProviders.map((provider) => ({ ...provider }))
+            : partial.availableProviders.map((provider) => ({ ...provider })),
         accounts: partial.accounts ? [...partial.accounts] : [...state.accounts],
         node: partial.node === undefined ? state.node : partial.node,
         lastUpdated: Date.now(),
