@@ -3,6 +3,7 @@ import type { DuskProvider, DuskProviderDetail, DuskProviderInfo } from "./types
 export const DUSK_REQUEST_PROVIDER_EVENT = "dusk:requestProvider";
 export const DUSK_ANNOUNCE_PROVIDER_EVENT = "dusk:announceProvider";
 export const DUSK_SELECTED_PROVIDER_STORAGE_KEY = "dusk.connect.selectedProvider";
+export const DUSK_PROVIDER_INFO_FIELDS = ["uuid", "name", "icon", "rdns"] as const;
 
 export type RequestDuskProvidersOptions = {
   /** How long to collect announcement events after dispatching the request event. Default: 40ms. */
