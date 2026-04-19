@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dusk Discovery Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true"></div>
+        <div class="brandText">
+          <div class="titleRow">
+            <h1>Dusk Discovery</h1>
+            <span class="tag">Mock Wallets</span>
+          </div>
+          <div class="subtitle">Reference demo for multi-wallet discovery and explicit provider selection</div>
+        </div>
+      </div>
+
+      <div class="topbarRight">
+        <dusk-connect-button
+          id="connectBtn"
+          app-name="Discovery Demo"
+          variant="solid"
+        ></dusk-connect-button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel hero">
+        <p class="eyebrow">Protocol</p>
+        <h2>Two mock wallets announce themselves through the discovery events</h2>
+        <p class="lede">
+          This page behaves like a dApp. It dispatches <code>dusk:requestProvider</code>,
+          receives <code>dusk:announceProvider</code>, and forces explicit wallet selection
+          before connecting.
+        </p>
+
+        <div class="actions">
+          <button class="action action-primary" id="btnDiscover" type="button">Rediscover Wallets</button>
+          <button class="action" id="btnConnect" type="button">Connect Selected Wallet</button>
+          <button class="action" id="btnDisconnect" type="button">Disconnect</button>
+          <button class="action" id="btnBalance" type="button">Read Balance</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="sectionHead">
+          <p class="eyebrow">Wallets</p>
+          <h2>Discovered Providers</h2>
+        </div>
+
+        <div class="providerList" id="providerList"></div>
+      </section>
+
+      <section class="grid">
+        <section class="panel">
+          <div class="sectionHead">
+            <p class="eyebrow">Session</p>
+            <h2>Selected Wallet State</h2>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <span class="label">Status</span>
+              <span class="value" id="status">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Selected Wallet</span>
+              <span class="value" id="selectedWallet">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Provider ID</span>
+              <span class="value mono" id="providerId">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Account</span>
+              <span class="value mono" id="account">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Chain</span>
+              <span class="value mono" id="chainId">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Balance</span>
+              <span class="value mono" id="balance">—</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="sectionHead">
+            <p class="eyebrow">Events</p>
+            <h2>Trace</h2>
+          </div>
+
+          <pre class="log" id="log"></pre>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

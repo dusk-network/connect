@@ -121,6 +121,28 @@ h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
 .k { color: var(--muted-foreground); font-size: 12px; }
 .v { font-size: 13px; }
 
+.row-select {
+  align-items: center;
+}
+
+.picker {
+  width: min(360px, 100%);
+  appearance: none;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--foreground);
+  font: inherit;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-soft);
+}
+
+.picker:focus-visible {
+  outline: none;
+  border-color: rgba(122,162,255,0.48);
+  box-shadow: 0 0 0 4px rgba(122,162,255,0.12);
+}
+
 .link {
   display: inline-block;
   margin-top: 18px;

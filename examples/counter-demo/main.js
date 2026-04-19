@@ -1,7 +1,7 @@
 /**
  * Counter Contract demo (browser dApp)
  * ------------------------------------------------------------
- * - Uses Dusk Wallet extension (window.dusk)
+ * - Uses Dusk wallet discovery + explicit provider selection
  * - Uses createDuskApp() + auto-generated WASM data-driver
  * - Reads via contract.call.*
  * - Writes via contract.write.* with tx.onStatus + tx.wait

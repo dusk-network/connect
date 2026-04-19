@@ -1,7 +1,7 @@
 /**
  * L1StandardBridge demo (browser dApp)
  * ------------------------------------------------------------
- * - Uses Dusk Wallet extension (window.dusk)
+ * - Uses Dusk wallet discovery + explicit provider selection
  * - Uses createDuskApp() + a local WASM data-driver for encode/decode
  * - Reads via contract.call.*
  * - Writes via contract.write.* with tx.onStatus + tx.wait

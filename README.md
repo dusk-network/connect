@@ -9,6 +9,7 @@ A tiny, framework-agnostic SDK for **Dusk wallet discovery + dApp integration**.
 
 This SDK targets the wallet provider described in the
 [Dusk Wallet provider API](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md).
+The discovery protocol itself is specified in [docs/wallet-discovery.md](./docs/wallet-discovery.md).
 
 Wallet discovery is **event-based**, not singleton-based:
 
@@ -42,8 +43,24 @@ python3 -m http.server 5173
 
 Then open `http://localhost:5173/examples/vanilla/`.
 
+A mock multi-wallet discovery demo lives at `examples/discovery-demo/` and is useful when you want to inspect provider selection behavior without installing multiple wallets.
+
 All example pages in `examples/` load the built SDK from `dist/`, so the same
 `npm run build` step applies before serving any of them from the repository.
+
+## Discovery demo
+
+An isolated discovery reference page lives at `examples/discovery-demo/`.
+
+Open it via:
+
+- `http://localhost:5173/examples/discovery-demo/`
+
+This demo shows:
+
+- how wallets announce themselves with `dusk:announceProvider`
+- how a dApp re-requests discovery with `dusk:requestProvider`
+- how explicit provider selection works when more than one wallet is available
 
 ## Dario FSM demo
 

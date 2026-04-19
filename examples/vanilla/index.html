@@ -35,6 +35,20 @@
           <div class="v" id="status">—</div>
         </div>
         <div class="row">
+          <div class="k">Discovered Wallets</div>
+          <div class="v" id="walletCount">—</div>
+        </div>
+        <div class="row">
+          <div class="k">Selected Wallet</div>
+          <div class="v" id="providerName">—</div>
+        </div>
+        <div class="row row-select">
+          <label class="k" for="providerSelect">Wallet Picker</label>
+          <select class="picker" id="providerSelect">
+            <option value="">Choose wallet</option>
+          </select>
+        </div>
+        <div class="row">
           <div class="k">Account</div>
           <div class="v mono" id="account">—</div>
         </div>
@@ -45,6 +59,7 @@
       </section>
 
       <a class="link" href="../dario-fsm/">Play the on-chain Dario demo →</a>
+      <a class="link" href="../discovery-demo/">Open the mock multi-wallet discovery demo →</a>
     </main>
 
     <script type="module" src="./main.js"></script>
