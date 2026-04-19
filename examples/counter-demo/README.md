@@ -7,7 +7,7 @@ A simple dApp demonstrating the **Counter Contract** using the `#[contract]` mac
 1. **Build the contract and data-driver:**
 
    ```bash
-   cd ~/projects/my-first-contract
+   cd /path/to/my-first-contract
    make build    # builds both contract and data-driver WASM
    make tree     # shows output files
    ```
@@ -19,8 +19,8 @@ A simple dApp demonstrating the **Counter Contract** using the `#[contract]` mac
 2. **Copy the data-driver WASM:**
 
    ```bash
-   cp ~/projects/my-first-contract/target/stripped/counter_data_driver.wasm \
-      ~/projects/dusk-wallet-sdk/examples/counter-demo/public/data_driver.wasm
+   cp /path/to/my-first-contract/target/stripped/counter_data_driver.wasm \
+      /path/to/connect/examples/counter-demo/public/data_driver.wasm
    ```
 
 3. **Deploy the contract** (via Rusk CLI or other deployment method) and note the contract ID.
@@ -28,7 +28,7 @@ A simple dApp demonstrating the **Counter Contract** using the `#[contract]` mac
 4. **Serve the demo:**
 
    ```bash
-   cd ~/projects/dusk-wallet-sdk
+   cd /path/to/connect
    npm install
    npm run build
    npx http-server -c-1 .

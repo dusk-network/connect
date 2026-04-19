@@ -198,7 +198,7 @@ async function sendTx(fnName, args) {
   setBadge(ui.txBadge, "info", "submitting");
 
   try {
-    /** @type {import("@dusk-network/dusk-wallet-sdk").TxHandle} */
+    /** @type {import("@dusk-network/connect").TxHandle} */
     const tx =
       args === undefined
         ? await c.write[fnName](undefined, { amount: "0", deposit: "0" })

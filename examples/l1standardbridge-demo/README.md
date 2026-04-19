@@ -1,4 +1,4 @@
-# L1StandardBridge demo (Dusk Wallet SDK)
+# L1StandardBridge demo (Dusk Connect)
 
 A minimal example page for interacting with the **StandardBridge** contract using:
 
@@ -18,7 +18,7 @@ public/data_driver.wasm
 2) Build the SDK and serve the repo root:
 
 ```bash
-cd ~/projects/dusk-wallet-sdk
+cd /path/to/connect
 npm i
 npm run build
 python3 -m http.server 5173

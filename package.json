@@ -2,9 +2,18 @@
   "name": "@dusk-network/connect",
   "version": "0.0.1",
   "description": "Dusk Connect: lightweight SDK + optional connect UI for integrating the Dusk Wallet injected provider into dApps.",
+  "author": "Dusk Network",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dusk-network/connect.git"
+  },
+  "homepage": "https://github.com/dusk-network/connect",
+  "bugs": {
+    "url": "https://github.com/dusk-network/connect/issues"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

@@ -1,4 +1,4 @@
-# SystemConfig demo (Dusk Connect / Dusk Wallet SDK)
+# SystemConfig demo (Dusk Connect)
 
 A minimal example page for interacting with Optimism's **SystemConfig** contract (ported to a Dusk contract) using:
 
@@ -18,7 +18,7 @@ public/data_driver.wasm
 2) Serve the SDK root with any static server:
 
 ```bash
-cd dusk-wallet-sdk
+cd /path/to/connect
 npm install
 npm run build
 
