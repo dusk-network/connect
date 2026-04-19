@@ -161,6 +161,7 @@ export class DuskConnectButtonElement extends HTMLElement {
   connectedCallback(): void {
     this._renderShell();
     this._ensureWalletAndModal();
+    this._update(this._wallet?.state ?? this._latest);
   }
 
   disconnectedCallback(): void {
