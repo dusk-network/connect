@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dusk Reference Wallet</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Wallet Implementer Reference</p>
+        <h1>Minimal injected wallet + dApp handshake</h1>
+        <p class="lede">
+          This page injects a tiny Dusk wallet implementation through the raw browser discovery
+          events, then consumes it through <code>createDuskWallet()</code>.
+        </p>
+        <p class="lede">
+          It is meant to show wallet authors the smallest useful integration shape:
+          announce, connect, react to provider events, and keep metadata stable.
+        </p>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <div class="panelHead">
+            <div>
+              <p class="eyebrow">Wallet Side</p>
+              <h2>Reference Wallet</h2>
+            </div>
+            <button id="btnAnnounce" class="button secondary" type="button">Announce</button>
+          </div>
+
+          <dl class="facts">
+            <div>
+              <dt>Name</dt>
+              <dd id="walletName">-</dd>
+            </div>
+            <div>
+              <dt>UUID</dt>
+              <dd id="walletUuid" class="mono">-</dd>
+            </div>
+            <div>
+              <dt>RDNS</dt>
+              <dd id="walletRdns" class="mono">-</dd>
+            </div>
+            <div>
+              <dt>Authorized</dt>
+              <dd id="walletAuthorized">-</dd>
+            </div>
+            <div>
+              <dt>Selected Account</dt>
+              <dd id="walletAccount" class="mono">-</dd>
+            </div>
+            <div>
+              <dt>Chain</dt>
+              <dd id="walletChain" class="mono">-</dd>
+            </div>
+          </dl>
+
+          <div class="actions">
+            <button id="btnRotateAccount" class="button" type="button">Rotate Account</button>
+            <button id="btnSwitchChain" class="button" type="button">Switch Chain</button>
+            <button id="btnDisconnectWallet" class="button secondary" type="button">
+              Disconnect
+            </button>
+          </div>
+
+          <pre class="codeBlock"><code>window.addEventListener("dusk:requestProvider", announce)
+window.dispatchEvent(new CustomEvent("dusk:announceProvider", {
+  detail: { info, provider }
+}))</code></pre>
+        </section>
+
+        <section class="panel">
+          <div class="panelHead">
+            <div>
+              <p class="eyebrow">dApp Side</p>
+              <h2>`createDuskWallet()` Consumer</h2>
+            </div>
+          </div>
+
+          <dl class="facts">
+            <div>
+              <dt>Status</dt>
+              <dd id="sdkStatus">-</dd>
+            </div>
+            <div>
+              <dt>Selected Provider</dt>
+              <dd id="sdkProvider" class="mono">-</dd>
+            </div>
+            <div>
+              <dt>Account</dt>
+              <dd id="sdkAccount" class="mono">-</dd>
+            </div>
+            <div>
+              <dt>Chain</dt>
+              <dd id="sdkChain" class="mono">-</dd>
+            </div>
+            <div>
+              <dt>Balance</dt>
+              <dd id="sdkBalance">-</dd>
+            </div>
+          </dl>
+
+          <div class="actions">
+            <button id="btnDiscover" class="button secondary" type="button">Rediscover</button>
+            <button id="btnConnect" class="button" type="button">Connect</button>
+            <button id="btnBalance" class="button secondary" type="button">Read Balance</button>
+            <button id="btnDisconnect" class="button secondary" type="button">Disconnect</button>
+          </div>
+
+          <div class="providerCard">
+            <div class="providerTitle">Discovered Provider</div>
+            <div id="providerSummary" class="providerSummary mono">-</div>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="panelHead">
+          <div>
+            <p class="eyebrow">Event Log</p>
+            <h2>Discovery + provider activity</h2>
+          </div>
+        </div>
+        <pre id="log" class="log">Reference wallet example ready.</pre>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+  </html>

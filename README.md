@@ -10,6 +10,8 @@ A tiny, framework-agnostic SDK for **Dusk wallet discovery + dApp integration**.
 This SDK targets the wallet provider described in the
 [Dusk Wallet provider API](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md).
 The discovery protocol itself is specified in [docs/wallet-discovery.md](./docs/wallet-discovery.md).
+If you're implementing a wallet, start with
+[docs/wallet-implementer.md](./docs/wallet-implementer.md).
 
 Wallet discovery is **event-based**, not singleton-based:
 
@@ -44,6 +46,9 @@ python3 -m http.server 5173
 Then open `http://localhost:5173/examples/vanilla/`.
 
 A mock multi-wallet discovery demo lives at `examples/discovery-demo/` and is useful when you want to inspect provider selection behavior without installing multiple wallets.
+A wallet-author reference page lives at `examples/reference-wallet/` and is useful when
+you want to see the smallest useful injected-wallet implementation talking to
+`createDuskWallet()`.
 
 All example pages in `examples/` load the built SDK from `dist/`, so the same
 `npm run build` step applies before serving any of them from the repository.
@@ -61,6 +66,16 @@ This demo shows:
 - how wallets announce themselves with `dusk:announceProvider`
 - how a dApp re-requests discovery with `dusk:requestProvider`
 - how explicit provider selection works when more than one wallet is available
+
+## Wallet implementer reference
+
+If you're building a wallet instead of a dApp:
+
+- read [docs/wallet-implementer.md](./docs/wallet-implementer.md)
+- open `http://localhost:5173/examples/reference-wallet/`
+
+The reference page shows a minimal wallet injection built on the raw browser
+events and a dApp consuming it through `createDuskWallet()`.
 
 ## Dario FSM demo
 

@@ -2,6 +2,9 @@
 
 This document defines the canonical browser discovery flow for Dusk wallets.
 
+If you want an implementer-oriented walkthrough with a minimal provider fixture,
+see [wallet-implementer.md](./wallet-implementer.md).
+
 The goal is simple:
 
 - allow multiple Dusk wallets to coexist on the same page
