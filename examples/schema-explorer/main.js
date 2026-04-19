@@ -60,6 +60,15 @@ function schemaLog(msg) {
   elSchemaLog.textContent = `[${now}] ${msg}\n` + elSchemaLog.textContent;
 }
 
+function appendInfoRow(container, label, value) {
+  const row = document.createElement("div");
+  const strong = document.createElement("strong");
+  strong.textContent = `${label}:`;
+  row.appendChild(strong);
+  row.appendChild(document.createTextNode(` ${value}`));
+  container.appendChild(row);
+}
+
 function inferInputType(typeInfo) {
   const typeStr = typeof typeInfo === "string" ? typeInfo : JSON.stringify(typeInfo);
   const lower = typeStr.toLowerCase();
@@ -143,10 +152,13 @@ function createMethodCard(methodName, methodInfo, contract, wallet) {
 
   const header = document.createElement("div");
   header.className = "methodHeader";
-  header.innerHTML = `
-    <span class="methodName">${methodName}</span>
-    <span class="methodType ${isRead ? "read" : "write"}">${isRead ? "read" : "write"}</span>
-  `;
+  const methodNameEl = document.createElement("span");
+  methodNameEl.className = "methodName";
+  methodNameEl.textContent = methodName;
+  const methodTypeEl = document.createElement("span");
+  methodTypeEl.className = `methodType ${isRead ? "read" : "write"}`;
+  methodTypeEl.textContent = isRead ? "read" : "write";
+  header.append(methodNameEl, methodTypeEl);
   card.appendChild(header);
 
   const inputsContainer = document.createElement("div");
@@ -271,10 +283,9 @@ function createMethodCard(methodName, methodInfo, contract, wallet) {
 
 function initSchemaExplorer({ schema, version, contractId, contract, wallet }) {
   if (elContractInfo) {
-    elContractInfo.innerHTML = `
-      <div><strong>Contract:</strong> ${contractId || "—"}</div>
-      <div><strong>Version:</strong> ${version || "unknown"}</div>
-    `;
+    elContractInfo.replaceChildren();
+    appendInfoRow(elContractInfo, "Contract", contractId || "—");
+    appendInfoRow(elContractInfo, "Version", version || "unknown");
   }
 
   if (elRawSchema) {
@@ -301,7 +312,10 @@ function initSchemaExplorer({ schema, version, contractId, contract, wallet }) {
     }
 
     if (Object.keys(methods).length === 0) {
-      elDynamicMethods.innerHTML = `<div class="muted">No methods detected in schema. Check the raw schema below.</div>`;
+      const emptyState = document.createElement("div");
+      emptyState.className = "muted";
+      emptyState.textContent = "No methods detected in schema. Check the raw schema below.";
+      elDynamicMethods.replaceChildren(emptyState);
       return;
     }
 
