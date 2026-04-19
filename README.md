@@ -76,6 +76,9 @@ If you're building a wallet instead of a dApp:
 
 The reference page shows a minimal wallet injection built on the raw browser
 events and a dApp consuming it through `createDuskWallet()`.
+If you want to test a wallet implementation from another repository, use
+`@dusk-network/connect/testing` from a jsdom test as described in
+[`docs/wallet-implementer.md`](./docs/wallet-implementer.md).
 
 ## Dario FSM demo
 

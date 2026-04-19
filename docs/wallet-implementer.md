@@ -217,12 +217,56 @@ If you want something runnable instead of a prose guide, this repository now
 includes:
 
 - `examples/reference-wallet/`
+- `@dusk-network/connect/testing`
 - `src/test/referenceWallet.ts`
 - `src/wallet-implementer.integration.test.ts`
 
 The example page demonstrates a minimal wallet injection talking to a dApp that
 uses `createDuskWallet()`. The test fixture and integration test show the same
 pattern in executable form.
+
+## Drop-In Vitest Harness
+
+If you want a small certification-style test in another wallet repository, use
+the `@dusk-network/connect/testing` entrypoint from a jsdom test:
+
+```ts
+// @vitest-environment jsdom
+import { describe, expect, it } from "vitest";
+import { runWalletConformance } from "@dusk-network/connect/testing";
+
+import { installInjectedWallet } from "../src/injected/installWallet";
+
+describe("wallet injection", () => {
+  it("passes the basic Dusk conformance pass", async () => {
+    const report = await runWalletConformance({
+      installWallet: () => installInjectedWallet(window),
+      expectedProvider: {
+        uuid: "com.example.wallet",
+        name: "Example Wallet",
+        rdns: "com.example.wallet",
+      },
+      expectedChainId: "dusk:2",
+      switchChain: {
+        params: { chainId: "dusk:3" },
+        expectedChainId: "dusk:3",
+      },
+    });
+
+    expect(report.connectedAccounts.length).toBeGreaterThan(0);
+    expect(report.capabilities.methods).toContain("dusk_requestAccounts");
+  });
+});
+```
+
+What the helper checks:
+
+- the wallet is discoverable through `dusk:requestProvider` / `dusk:announceProvider`
+- a provider is selected and matches the expected metadata
+- `dusk_requestAccounts` returns at least one account
+- `dusk_getCapabilities` exposes a sane minimum surface
+- `dusk_getPublicBalance` returns the expected shape
+- optional `dusk_switchNetwork` behavior updates wallet state and emits node info
 
 ## Conformance Snippet
 
