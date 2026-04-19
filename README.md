@@ -1,14 +1,20 @@
 # Dusk Connect (dApp integration)
 
-A tiny, framework-agnostic SDK for the **Dusk Wallet injected provider** (`window.dusk`).
+A tiny, framework-agnostic SDK for **Dusk wallet discovery + dApp integration**.
 
 - **Lightweight** (no runtime deps)
 - **Typed** (TypeScript types for the provider + RPC methods)
 - Includes an **optional connect modal** (conceptually similar to a very small Reown/AppKit)
-- Includes an optional **WalletConnect-style connect button** (`<dusk-connect-button />`) for drop-in UI
+- Includes an optional **connect button** (`<dusk-connect-button />`) for drop-in UI
 
 This SDK targets the wallet provider described in the
 [Dusk Wallet provider API](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md).
+
+Wallet discovery is **event-based**, not singleton-based:
+
+- dApps listen for `dusk:announceProvider`
+- dApps request discovery via `dusk:requestProvider`
+- wallets expose an EIP-1193-like provider object through those events
 
 - `dusk_getCapabilities`
 - `dusk_requestAccounts`
@@ -78,7 +84,7 @@ npm i @dusk-network/connect
 
 ### `createDuskWallet()` / `DuskWallet`
 
-Use this when you only need to interact with the **injected wallet provider** (`window.dusk`):
+Use this when you only need wallet discovery + provider access:
 
 - connect / disconnect
 - read accounts + chain
@@ -92,6 +98,10 @@ import { createDuskWallet } from "@dusk-network/connect";
 
 const wallet = createDuskWallet();
 await wallet.ready();
+
+if (wallet.state.availableProviders.length > 1 && !wallet.state.providerId) {
+  await wallet.selectProvider(wallet.state.availableProviders[0]!.uuid);
+}
 
 await wallet.connect();
 console.log(wallet.state.accounts);
@@ -150,6 +160,11 @@ wallet.subscribe((state) => {
 
 if (!wallet.state.installed) {
   // show "Install Dusk Wallet" UI
+}
+
+if (wallet.state.availableProviders.length > 1 && !wallet.state.providerId) {
+  // or show your own wallet picker UI
+  await wallet.selectProvider(wallet.state.availableProviders[0]!.uuid);
 }
 
 // Prompt connection (opens wallet approval)

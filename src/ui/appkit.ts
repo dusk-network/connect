@@ -20,7 +20,7 @@ export type DuskConnectKit = {
 
 /**
  * A tiny, framework-agnostic "connect kit" (conceptually similar to Reown/AppKit,
- * but for the single injected Dusk Wallet provider).
+ * but for Dusk wallet discovery + provider selection).
  */
 export function createDuskConnectKit(options: DuskConnectKitOptions = {}): DuskConnectKit {
   const wallet = createDuskWallet(options.wallet);

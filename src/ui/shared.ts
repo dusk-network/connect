@@ -4,9 +4,9 @@ import type { DuskWalletState } from "../types.js";
 export type WalletStatus = "missing" | "disconnected" | "locked" | "connected";
 
 /**
- * Compute a simple wallet status from the injected wallet state.
+ * Compute a simple wallet status from the discovered wallet state.
  *
- * - missing: wallet not installed/injected
+ * - missing: no compatible wallet discovered
  * - disconnected: installed but not authorized
  * - locked: authorized but no accounts exposed
  * - connected: authorized with at least one account

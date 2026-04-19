@@ -1,4 +1,4 @@
-import type { DuskWalletState } from "../types.js";
+import type { DuskProviderInfo, DuskWalletState } from "../types.js";
 import type { DuskWallet } from "../wallet.js";
 import { networkLabel, shortenMiddle, walletStatus, type WalletStatus } from "./shared.js";
 import { MCONNECT_UI_BASE_CSS } from "./styles.js";
@@ -6,7 +6,7 @@ import { MCONNECT_UI_BASE_CSS } from "./styles.js";
 export type DuskConnectModalOptions = {
   /** Optional app name shown in the header (e.g. "My dApp") */
   appName?: string;
-  /** Where to send the user if the wallet isn't installed */
+  /** Where to send the user if no wallet is installed */
   installUrl?: string;
   /** Close the modal automatically after a successful connect. Default: true */
   closeOnConnect?: boolean;
@@ -35,8 +35,6 @@ const PRIMARY_TEXT: Record<Status, string> = {
   connected: "Disconnect",
 };
 
-// Shared: walletStatus, networkLabel, shortenMiddle
-
 async function copyToClipboard(text: string): Promise<boolean> {
   try {
     await navigator.clipboard?.writeText?.(text);
@@ -45,7 +43,6 @@ async function copyToClipboard(text: string): Promise<boolean> {
     // ignore
   }
 
-  // Fallback
   try {
     const ta = document.createElement("textarea");
     ta.value = text;
@@ -63,6 +60,23 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+function walletLabel(st: DuskWalletState): string {
+  return st.providerInfo?.name || "Choose wallet";
+}
+
+function providerInitial(provider: DuskProviderInfo): string {
+  const initial = String(provider.name || "").trim().charAt(0);
+  return initial ? initial.toUpperCase() : "D";
+}
+
+function renderProviderIcon(provider: DuskProviderInfo): string {
+  const icon = String(provider.icon || "").trim();
+  if (!icon) {
+    return `<span class="mconnect-provider-fallback">${escapeHtml(providerInitial(provider))}</span>`;
+  }
+  return `<img class="mconnect-provider-icon" src="${escapeHtml(icon)}" alt="" />`;
+}
+
 export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectModalOptions = {}): DuskConnectModal {
   if (typeof window === "undefined") {
     return { open: () => {}, close: () => {}, destroy: () => {}, isOpen: () => false };
@@ -75,12 +89,13 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
   let open = false;
   let lastStatus: Status | null = null;
 
-  // Cached nodes
   let $title: HTMLElement | null = null;
   let $status: HTMLElement | null = null;
+  let $wallet: HTMLElement | null = null;
   let $account: HTMLElement | null = null;
   let $network: HTMLElement | null = null;
   let $copy: HTMLButtonElement | null = null;
+  let $providers: HTMLElement | null = null;
   let $primary: HTMLButtonElement | null = null;
   let $hint: HTMLElement | null = null;
 
@@ -100,7 +115,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     }
 
     .mconnect-modal {
-      width: min(440px, calc(100vw - 32px));
+      width: min(480px, calc(100vw - 32px));
       border-radius: calc(var(--mconnect-radius) + 10px);
       border: 1px solid var(--mconnect-border);
       box-shadow: var(--mconnect-shadow);
@@ -214,7 +229,6 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
         0 14px 34px rgba(0,0,0,0.22);
     }
 
-    /* "Data rows" (Account/Network): subtle glow on hover/focus without looking like inputs */
     .mconnect-row-data {
       transition: border-color 160ms ease, box-shadow 160ms ease;
     }
@@ -226,15 +240,6 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
         0 14px 34px rgba(0,0,0,0.22),
         0 0 0 3px rgba(51, 209, 255, 0.16),
         0 0 28px rgba(122, 162, 255, 0.10);
-    }
-
-    .mconnect-row-data:focus-within {
-      border-color: rgba(51, 209, 255, 0.28);
-      box-shadow:
-        0 1px 0 rgba(255,255,255,0.06) inset,
-        0 14px 34px rgba(0,0,0,0.22),
-        var(--mconnect-shadow-focus),
-        0 0 30px rgba(51, 209, 255, 0.10);
     }
 
     .mconnect-lab {
@@ -288,6 +293,118 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     .mconnect-copy:focus-visible {
       outline: none;
       box-shadow: var(--mconnect-shadow-focus);
+    }
+
+    .mconnect-section {
+      display: grid;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .mconnect-section-label {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      opacity: 0.75;
+      text-transform: uppercase;
+    }
+
+    .mconnect-provider-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .mconnect-provider {
+      appearance: none;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 12px;
+      border-radius: calc(var(--mconnect-radius) + 4px);
+      border: 1px solid var(--mconnect-border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.18));
+      color: inherit;
+      cursor: pointer;
+      transition: transform 90ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+    .mconnect-provider:hover {
+      transform: translateY(-1px);
+      border-color: rgba(51, 209, 255, 0.22);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,0.06) inset,
+        0 14px 34px rgba(0,0,0,0.22),
+        0 0 0 3px rgba(51, 209, 255, 0.16);
+    }
+
+    .mconnect-provider[data-selected="true"] {
+      border-color: rgba(122, 162, 255, 0.42);
+      background:
+        radial-gradient(220px 120px at 0% 0%, rgba(122,162,255,0.14), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.18));
+      box-shadow:
+        0 1px 0 rgba(255,255,255,0.06) inset,
+        0 14px 34px rgba(0,0,0,0.22),
+        0 0 0 3px rgba(122, 162, 255, 0.14);
+    }
+
+    .mconnect-provider-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .mconnect-provider-icon,
+    .mconnect-provider-fallback {
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      object-fit: cover;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .mconnect-provider-fallback {
+      font-weight: 900;
+    }
+
+    .mconnect-provider-copy {
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+      text-align: left;
+    }
+
+    .mconnect-provider-name {
+      font-size: 12.5px;
+      font-weight: 850;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mconnect-provider-rdns {
+      font-size: 11px;
+      opacity: 0.68;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mconnect-provider-tag {
+      font-size: 10.5px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      opacity: 0.72;
     }
 
     .mconnect-actions {
@@ -359,6 +476,42 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     }
   `;
 
+  const renderProviders = (st: DuskWalletState) => {
+    if (!$providers) return;
+
+    const providers = st.availableProviders ?? [];
+    if (providers.length === 0) {
+      $providers.innerHTML = "";
+      $providers.hidden = true;
+      return;
+    }
+
+    $providers.hidden = false;
+    $providers.innerHTML = providers
+      .map((provider) => {
+        const selected = provider.uuid === st.providerId;
+        return `
+          <button
+            class="mconnect-provider"
+            type="button"
+            data-action="select-provider"
+            data-provider-id="${escapeHtml(provider.uuid)}"
+            data-selected="${selected ? "true" : "false"}"
+          >
+            <span class="mconnect-provider-main">
+              ${renderProviderIcon(provider)}
+              <span class="mconnect-provider-copy">
+                <span class="mconnect-provider-name">${escapeHtml(provider.name)}</span>
+                <span class="mconnect-provider-rdns">${escapeHtml(provider.rdns)}</span>
+              </span>
+            </span>
+            <span class="mconnect-provider-tag">${selected ? "Selected" : "Available"}</span>
+          </button>
+        `;
+      })
+      .join("");
+  };
+
   const ensureDom = () => {
     if (root) return;
 
@@ -373,18 +526,23 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
             <div class="mconnect-mark">D</div>
             <div class="mconnect-txt">
               <div class="mconnect-title" id="mconnectTitle">${options.appName ? `Connect ${escapeHtml(options.appName)}` : "Connect Wallet"}</div>
-              <div class="mconnect-sub">This dApp will request permission to view your account and approve transactions.</div>
+              <div class="mconnect-sub">Choose a Dusk wallet, then approve access for this site.</div>
             </div>
           </div>
           <button class="mconnect-icon-btn" type="button" data-action="close" aria-label="Close">✕</button>
         </div>
         <div class="mconnect-body">
           <div class="mconnect-row mconnect-row-data"><div class="mconnect-lab">Status</div><div class="mconnect-val" id="dwcStatus">—</div></div>
+          <div class="mconnect-row mconnect-row-data"><div class="mconnect-lab">Wallet</div><div class="mconnect-val"><span id="dwcWallet">—</span></div></div>
           <div class="mconnect-row mconnect-row-data">
             <div class="mconnect-lab">Account</div>
             <div class="mconnect-val"><span id="dwcAccount">—</span><button class="mconnect-copy" id="dwcCopy" type="button" data-action="copy" hidden>Copy</button></div>
           </div>
           <div class="mconnect-row mconnect-row-data"><div class="mconnect-lab">Network</div><div class="mconnect-val" id="dwcNetwork">—</div></div>
+          <div class="mconnect-section">
+            <div class="mconnect-section-label">Wallets</div>
+            <div class="mconnect-provider-list" id="dwcProviders" hidden></div>
+          </div>
           <div class="mconnect-actions">
             <button class="mconnect-btn mconnect-btn-primary" id="dwcPrimary" type="button" data-action="primary">—</button>
           </div>
@@ -395,9 +553,11 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
 
     $title = root.querySelector("#mconnectTitle");
     $status = root.querySelector("#dwcStatus");
+    $wallet = root.querySelector("#dwcWallet");
     $account = root.querySelector("#dwcAccount");
     $network = root.querySelector("#dwcNetwork");
     $copy = root.querySelector("#dwcCopy");
+    $providers = root.querySelector("#dwcProviders");
     $primary = root.querySelector("#dwcPrimary");
     $hint = root.querySelector("#dwcHint");
 
@@ -405,7 +565,6 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
-      // click outside the modal closes
       if (target === root) {
         close();
         return;
@@ -431,18 +590,27 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
         return;
       }
 
+      if (action === "select-provider") {
+        const providerId = btn.getAttribute("data-provider-id") || "";
+        if (!providerId) return;
+        await wallet.selectProvider(providerId);
+        return;
+      }
+
       if (action === "primary") {
         if (status === "missing") {
           if (options.installUrl) window.open(options.installUrl, "_blank", "noopener,noreferrer");
           return;
         }
 
+        const needsSelection = st.availableProviders.length > 0 && !st.providerId;
+        if (needsSelection) return;
+
         if (status === "connected") {
           await wallet.disconnect();
           return;
         }
 
-        // disconnected/locked
         await wallet.connect();
       }
     });
@@ -458,7 +626,6 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
   const toast = (msg: string) => {
     if (!$hint) return;
     $hint.textContent = msg;
-    // clear after a bit
     window.setTimeout(() => {
       if ($hint) $hint.textContent = "";
     }, 1200);
@@ -468,34 +635,45 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     const status = walletStatus(st);
     const acct = st.accounts?.[0] || "";
     const net = networkLabel(st);
+    const needsSelection = st.availableProviders.length > 0 && !st.providerId;
 
     if ($title) {
       const app = (options.appName || "").trim();
-      $title.textContent =
-        status === "connected"
-          ? app
-            ? `Connected to ${app}`
-            : "Wallet"
-          : app
-            ? `Connect ${app}`
-            : "Connect Wallet";
+      if (status === "connected") {
+        $title.textContent = app ? `Connected to ${app}` : "Wallet";
+      } else if (needsSelection) {
+        $title.textContent = app ? `Choose a wallet for ${app}` : "Choose Wallet";
+      } else {
+        $title.textContent = app ? `Connect ${app}` : "Connect Wallet";
+      }
     }
 
     if ($status) {
-      $status.textContent = STATUS_TEXT[status];
+      $status.textContent = needsSelection ? "Choose wallet" : STATUS_TEXT[status];
     }
 
+    if ($wallet) $wallet.textContent = walletLabel(st);
     if ($account) $account.textContent = acct ? shortenMiddle(acct, 10, 8) : "—";
     if ($network) $network.textContent = net || "—";
     if ($copy) $copy.hidden = !acct;
 
+    renderProviders(st);
+
     if ($primary) {
       $primary.classList.toggle("mconnect-btn-destructive", status === "connected");
       $primary.classList.toggle("mconnect-btn-primary", status !== "connected");
-      $primary.textContent = PRIMARY_TEXT[status];
+      $primary.textContent = needsSelection ? "Select Wallet" : PRIMARY_TEXT[status];
+      $primary.disabled = needsSelection;
     }
 
-    // Auto-close when we transition into connected.
+    if ($hint) {
+      if (needsSelection) {
+        $hint.textContent = "Choose which Dusk wallet this site should use.";
+      } else if (!st.installed && options.installUrl) {
+        $hint.textContent = "Install a compatible Dusk wallet to continue.";
+      }
+    }
+
     if (open && closeOnConnect && lastStatus && lastStatus !== "connected" && status === "connected") {
       close();
     }
@@ -528,8 +706,9 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     }
     unsub = null;
     root = null;
-    $title = $status = $account = $network = $hint = null;
+    $title = $status = $wallet = $account = $network = $hint = null;
     $copy = $primary = null;
+    $providers = null;
   };
 
   return {
