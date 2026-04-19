@@ -6,6 +6,15 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "keywords": [
+    "dusk",
+    "wallet",
+    "dapp",
+    "provider",
+    "connect",
+    "eip-1193",
+    "web3"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dusk-network/connect.git"
@@ -29,6 +38,9 @@
     "README.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc -p tsconfig.json",
