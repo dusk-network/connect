@@ -4,6 +4,7 @@ import {
   DuskSdkError,
   DuskWalletDisconnectedError,
   DuskWalletNotInstalledError,
+  DuskWalletUnsupportedMethodError,
   DuskWalletUnauthorizedError,
   DuskWalletUserRejectedError,
   ERROR_CODES,
@@ -22,6 +23,7 @@ describe("error helpers", () => {
 
   it("provides wallet-specific error subclasses", () => {
     expect(new DuskWalletNotInstalledError().code).toBe(ERROR_CODES.UNSUPPORTED);
+    expect(new DuskWalletUnsupportedMethodError().code).toBe(ERROR_CODES.UNSUPPORTED);
     expect(new DuskWalletUnauthorizedError().code).toBe(ERROR_CODES.UNAUTHORIZED);
     expect(new DuskWalletUserRejectedError().code).toBe(ERROR_CODES.USER_REJECTED);
     expect(new DuskWalletDisconnectedError().code).toBe(ERROR_CODES.DISCONNECTED);

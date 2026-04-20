@@ -77,6 +77,7 @@ export type ReferenceWalletProvider = DuskProvider & {
   setAuthorized(next: boolean): void;
   setNetwork(next: DuskNodeChangedPayload): void;
   setBalance(next: BalanceResult): void;
+  revokePermissions(): void;
 };
 
 export type InstallReferenceWalletOptions = {
@@ -88,8 +89,24 @@ export type InstallReferenceWalletOptions = {
   balance?: BalanceResult;
   gas?: GasPriceResult;
   announceOnStart?: boolean;
+  unsupportedMethods?: string[];
+  requestOverrides?: Partial<Record<string, ReferenceWalletRequestOverride>>;
   target?: Window;
 };
+
+export type ReferenceWalletRequestContext = {
+  info: DuskProviderInfo;
+  method: string;
+  params: unknown;
+  accounts: AccountId[];
+  authorized: boolean;
+  node: DuskNodeChangedPayload;
+  capabilities: DuskProviderCapabilities;
+};
+
+export type ReferenceWalletRequestOverride = (
+  context: ReferenceWalletRequestContext
+) => unknown | Promise<unknown>;
 
 export type ReferenceWalletFixture = {
   info: DuskProviderInfo;
@@ -111,6 +128,7 @@ export function installReferenceWallet(
   let authorized = false;
   let balance = { ...DEFAULT_BALANCE, ...(options.balance ?? {}) };
   let gas = { ...DEFAULT_GAS, ...(options.gas ?? {}) };
+  const unsupportedMethods = new Set(options.unsupportedMethods ?? []);
 
   const preset = PRESET_NETWORKS[options.chainId ?? "dusk:2"] ?? PRESET_NETWORKS["dusk:2"];
   let node: DuskNodeChangedPayload = {
@@ -165,7 +183,7 @@ export function installReferenceWallet(
       "dusk_signMessage",
       "dusk_signAuth",
       "dusk_disconnect",
-    ],
+    ].filter((method) => !unsupportedMethods.has(method)),
     txKinds: ["transfer", "contract_call"],
     limits: {
       maxFnArgsBytes: 65536,
@@ -199,6 +217,23 @@ export function installReferenceWallet(
       return authorized;
     },
     async request({ method, params }: { method: string; params?: unknown }) {
+      const override = options.requestOverrides?.[method];
+      if (override) {
+        return await override({
+          info: { ...info },
+          method,
+          params,
+          accounts: [...accounts],
+          authorized,
+          node: { ...node },
+          capabilities: capabilities(),
+        });
+      }
+
+      if (unsupportedMethods.has(method)) {
+        throw Object.assign(new Error(`Unsupported method: ${method}`), { code: 4200 });
+      }
+
       switch (method) {
         case "dusk_getCapabilities":
           return capabilities();
@@ -352,6 +387,10 @@ export function installReferenceWallet(
     },
     setBalance(next: BalanceResult) {
       balance = { ...next };
+    },
+    revokePermissions() {
+      authorized = false;
+      emit("accountsChanged", []);
     },
   } satisfies Partial<ReferenceWalletProvider>;
 

@@ -25,6 +25,7 @@ import {
   DuskWalletProviderNotFoundError,
   DuskWalletProviderSelectionError,
   DuskWalletUnauthorizedError,
+  DuskWalletUnsupportedMethodError,
   DuskWalletUserRejectedError,
   ERROR_CODES,
   normalizeError,
@@ -136,7 +137,7 @@ function translateProviderError(err: unknown): RpcErrorLike {
   const e = normalizeError(err);
   switch (e.code) {
     case ERROR_CODES.UNSUPPORTED:
-      return new DuskWalletNotInstalledError(e.message);
+      return new DuskWalletUnsupportedMethodError(e.message);
     case ERROR_CODES.DISCONNECTED:
       return new DuskWalletDisconnectedError(e.message);
     case ERROR_CODES.UNAUTHORIZED:
@@ -174,9 +175,11 @@ export class DuskWallet {
     const next = this._accountsFrom(value);
     const selectedAddress = next[0] ?? null;
     const sameAccounts = shallowArrayEq(this._state.accounts, next);
-    if (sameAccounts && this._state.selectedAddress === selectedAddress) return;
-    const notify = opts.notify ?? !sameAccounts;
-    this._patch({ accounts: next, selectedAddress }, { notify });
+    const nextAuthorized = next.length > 0;
+    const sameAuthorization = this._state.authorized === nextAuthorized;
+    if (sameAccounts && this._state.selectedAddress === selectedAddress && sameAuthorization) return;
+    const notify = opts.notify ?? (!sameAccounts || !sameAuthorization);
+    this._patch({ accounts: next, selectedAddress, authorized: nextAuthorized }, { notify });
   }
 
   private _setDisconnected() {

@@ -47,6 +47,13 @@ export class DuskWalletNotInstalledError extends DuskSdkError {
   }
 }
 
+export class DuskWalletUnsupportedMethodError extends DuskSdkError {
+  constructor(message = "Dusk Wallet does not support this method") {
+    super(message, { code: ERROR_CODES.UNSUPPORTED });
+    this.name = "DuskWalletUnsupportedMethodError";
+  }
+}
+
 export class DuskWalletUnauthorizedError extends DuskSdkError {
   constructor(message = "Dusk Wallet is locked or the site is not connected") {
     super(message, { code: ERROR_CODES.UNAUTHORIZED });

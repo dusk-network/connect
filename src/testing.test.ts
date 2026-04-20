@@ -2,6 +2,15 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import {
+  DUSK_ANNOUNCE_PROVIDER_EVENT,
+  DUSK_REQUEST_PROVIDER_EVENT,
+} from "./discovery.js";
+import {
+  DuskWalletUnsupportedMethodError,
+  DuskWalletUserRejectedError,
+  ERROR_CODES,
+} from "./errors.js";
 import { installReferenceWallet } from "./test/referenceWallet.js";
 import { runWalletConformance } from "./testing.js";
 
@@ -80,5 +89,90 @@ describe("testing helpers", () => {
     ).rejects.toThrow(
       'Wallet conformance failed: expected provider id "com.example.wallet" but found "dev.reference.wallet"'
     );
+  });
+
+  it("ignores malformed provider announcements and keeps the valid wallet selectable", async () => {
+    const report = await runWalletConformance({
+      installWallet: (target) => {
+        const onRequest = () => {
+          target.dispatchEvent(
+            new CustomEvent(DUSK_ANNOUNCE_PROVIDER_EVENT, {
+              detail: {
+                info: {
+                  uuid: " ",
+                  name: "",
+                  icon: "",
+                  rdns: " ",
+                },
+                provider: {},
+              },
+            })
+          );
+        };
+
+        target.addEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
+        const fixture = installReferenceWallet({
+          info: {
+            uuid: "com.example.wallet",
+            name: "Example Wallet",
+            rdns: "com.example.wallet",
+          },
+        });
+
+        return {
+          cleanup() {
+            target.removeEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
+            fixture.cleanup();
+          },
+        };
+      },
+      expectedProvider: {
+        uuid: "com.example.wallet",
+      },
+    });
+
+    expect(report.initialState.availableProviders.map((item) => item.uuid)).toEqual([
+      "com.example.wallet",
+    ]);
+  });
+
+  it("surfaces a user rejection during connect", async () => {
+    await expect(
+      runWalletConformance({
+        installWallet: () =>
+          installReferenceWallet({
+            requestOverrides: {
+              dusk_requestAccounts: async () => {
+                throw Object.assign(new Error("User rejected connection"), {
+                  code: ERROR_CODES.USER_REJECTED,
+                });
+              },
+            },
+          }),
+      })
+    ).rejects.toBeInstanceOf(DuskWalletUserRejectedError);
+  });
+
+  it("surfaces an unsupported switchNetwork request", async () => {
+    await expect(
+      runWalletConformance({
+        installWallet: () =>
+          installReferenceWallet({
+            info: {
+              uuid: "com.example.wallet",
+              name: "Example Wallet",
+              rdns: "com.example.wallet",
+            },
+            unsupportedMethods: ["dusk_switchNetwork"],
+          }),
+        expectedProvider: {
+          uuid: "com.example.wallet",
+        },
+        requestBalance: false,
+        switchChain: {
+          params: { chainId: "dusk:3" },
+        },
+      })
+    ).rejects.toBeInstanceOf(DuskWalletUnsupportedMethodError);
   });
 });

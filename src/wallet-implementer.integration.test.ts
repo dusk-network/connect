@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { installReferenceWallet } from "./test/referenceWallet.js";
 import { runWalletConformance } from "./testing.js";
+import { createDuskWallet } from "./wallet.js";
 
 describe("integration: wallet implementer reference", () => {
   beforeEach(() => {
@@ -73,7 +74,7 @@ describe("integration: wallet implementer reference", () => {
     });
 
     const onAccountsChanged = vi.fn();
-    const wallet = (await import("./wallet.js")).createDuskWallet({
+    const wallet = createDuskWallet({
       preferredProviderId: "com.example.wallet",
     });
     wallet.on("accountsChanged", onAccountsChanged);
@@ -92,6 +93,43 @@ describe("integration: wallet implementer reference", () => {
     expect(onAccountsChanged).toHaveBeenCalledWith([
       "dusk1updatedwalletaccount111111111111111111111111111",
     ]);
+
+    wallet.destroy();
+    fixture.cleanup();
+  });
+
+  it("treats account revocation and disconnect events as disconnected state", async () => {
+    const fixture = installReferenceWallet({
+      info: {
+        uuid: "com.example.wallet",
+        name: "Example Wallet",
+        rdns: "com.example.wallet",
+      },
+      accounts: ["dusk1examplewalletaccount1111111111111111111111111111"],
+      chainId: "dusk:2",
+    });
+
+    const onAccountsChanged = vi.fn();
+    const wallet = createDuskWallet({
+      preferredProviderId: "com.example.wallet",
+    });
+    wallet.on("accountsChanged", onAccountsChanged);
+    await wallet.ready();
+    await wallet.connect();
+
+    fixture.provider.revokePermissions();
+
+    expect(wallet.state.authorized).toBe(false);
+    expect(wallet.state.accounts).toEqual([]);
+    expect(wallet.state.selectedAddress).toBeNull();
+    expect(onAccountsChanged).toHaveBeenLastCalledWith([]);
+
+    await wallet.connect();
+    fixture.provider.emit("disconnect", { code: 4900, message: "Disconnected" });
+
+    expect(wallet.state.authorized).toBe(false);
+    expect(wallet.state.accounts).toEqual([]);
+    expect(wallet.state.selectedAddress).toBeNull();
 
     wallet.destroy();
     fixture.cleanup();
