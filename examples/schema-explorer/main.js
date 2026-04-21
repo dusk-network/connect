@@ -21,7 +21,7 @@ const elSchemaLog = $("schemaLog");
 const DEFAULTS = {
   network: "testnet",
   nodeUrl: "https://testnet.nodes.dusk.network",
-  driverUrl: "./public/data_driver.wasm?v=" + Date.now(),
+  driverUrl: "../drc20-demo/data_driver.wasm?v=" + Date.now(),
   contractId: "0x" + "".padStart(64, "0"),
 };
 
