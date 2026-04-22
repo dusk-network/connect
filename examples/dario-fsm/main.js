@@ -8,8 +8,8 @@ defineDuskConnectButton();
 // -------------------------------------------
 
 const CONTRACT_ID =
-  "0x4084feea63382d816a7faace85c2c24abd84ea04bff95bfdbd357450640e0c60";
-const DEFAULT_TESTNET_NODE = "https://devnet.nodes.dusk.network";
+  "0x97d19bfc66f4964e2e0473b38aa7ea02973ce533ffd2b05662a907661839b426";
+const DEFAULT_TESTNET_NODE = "https://testnet.nodes.dusk.network";
 
 // Cache-busting helps during local dev when browsers cache WASM aggressively.
 const DRIVER_URL = "./data_driver.wasm?v=" + Date.now();
@@ -36,7 +36,7 @@ const ACTION_META = {
 
 const dusk = createDuskApp({
   nodeUrl: DEFAULT_TESTNET_NODE,
-  chain: { chainId: DUSK_CHAIN_PRESETS.devnet },
+  chain: { chainId: DUSK_CHAIN_PRESETS.testnet },
   autoConnect: true,
   contracts: {
     dario: {
