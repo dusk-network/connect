@@ -1,6 +1,6 @@
 # Dusk Connect (dApp integration)
 
-![Dusk Wallet extension design](./dusk-wallet-screenshots.png)
+![Dusk Connect design](./dusk-connect.png)
 
 A tiny, framework-agnostic SDK for **Dusk wallet discovery + dApp integration**.
 
