@@ -1,22 +1,4 @@
-:root {
-  --bg: #09111d;
-  --panel: rgba(10, 18, 34, 0.78);
-  --panel-strong: rgba(255, 255, 255, 0.05);
-  --fg: rgba(242, 246, 255, 0.94);
-  --muted: rgba(215, 226, 255, 0.66);
-  --border: rgba(143, 176, 255, 0.18);
-  --primary: #6fd2ff;
-  --primary-2: #7aa2ff;
-  --accent: #9bf0c3;
-  --danger: #ff7f88;
-  --shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
-  --sans: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
-  --mono: "IBM Plex Mono", "SFMono-Regular", monospace;
-}
-
-* {
-  box-sizing: border-box;
-}
+@import "../dusk-theme.css";
 
 html,
 body {
@@ -24,47 +6,41 @@ body {
 }
 
 body {
-  margin: 0;
-  font-family: var(--sans);
   color: var(--fg);
-  background:
-    radial-gradient(780px 360px at 10% -10%, rgba(122, 162, 255, 0.25), transparent 60%),
-    radial-gradient(680px 320px at 100% 0%, rgba(111, 210, 255, 0.22), transparent 60%),
-    radial-gradient(820px 460px at 50% 120%, rgba(155, 240, 195, 0.12), transparent 55%),
-    linear-gradient(180deg, #040812, #09111d 48%, #07111b);
-}
-
-code,
-.mono {
-  font-family: var(--mono);
 }
 
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 18px 22px;
+  gap: 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
-  background: rgba(4, 8, 18, 0.72);
-  backdrop-filter: blur(12px);
+  background: var(--rail-bg);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
 }
 
 .mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 14px;
-  background:
-    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.28), transparent 45%),
-    linear-gradient(135deg, var(--primary-2), var(--primary));
-  box-shadow: 0 18px 32px rgba(111, 210, 255, 0.22);
+  width: 26px;
+  height: 26px;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  color: var(--foreground);
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+}
+
+.mark::before {
+  width: 20px;
+  height: 20px;
 }
 
 .brandText {
@@ -75,6 +51,7 @@ code,
   display: flex;
   align-items: baseline;
   gap: 12px;
+  min-width: 0;
 }
 
 h1,
@@ -84,24 +61,66 @@ p {
 }
 
 h1 {
-  font-size: 20px;
-  letter-spacing: 0.02em;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0;
 }
 
 .subtitle {
-  margin-top: 4px;
+  margin-top: 5px;
+  max-width: 230px;
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.25;
 }
 
-.tag {
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.05);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+.appMenu {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+
+.appMenuItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    background 160ms var(--ease),
+    color 160ms var(--ease),
+    transform 140ms var(--ease);
+}
+
+.appMenuItem::before {
+  content: attr(data-icon);
+  width: 16px;
+  color: currentColor;
+  font-family: var(--mono);
+  font-size: 14px;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.appMenuItem:hover,
+.appMenuItem.active {
+  color: var(--foreground);
+}
+
+.appMenuItem:hover {
+  background: var(--surface-highlight);
+}
+
+.appMenuItem.active {
+  background: var(--surface-highlight-strong);
 }
 
 .layout {
@@ -109,6 +128,7 @@ h1 {
   margin: 28px auto 56px;
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .grid {
@@ -119,35 +139,29 @@ h1 {
 
 .panel {
   border: 1px solid var(--border);
-  border-radius: 22px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)),
-    var(--panel);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
   box-shadow: var(--shadow);
   padding: 20px;
+  min-width: 0;
 }
 
 .hero {
   position: relative;
   overflow: hidden;
+  min-height: 0;
 }
 
 .hero::after {
-  content: "";
-  position: absolute;
-  inset: auto -120px -120px auto;
-  width: 260px;
-  height: 260px;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(111, 210, 255, 0.22), transparent 70%);
-  pointer-events: none;
+  content: none;
 }
 
 .eyebrow {
+  font-family: var(--mono);
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--accent);
+  letter-spacing: 0.18em;
+  color: var(--muted);
   margin-bottom: 10px;
 }
 
@@ -157,15 +171,19 @@ h1 {
 
 .sectionHead h2,
 .hero h2 {
-  font-size: 24px;
-  line-height: 1.1;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .lede {
-  margin-top: 10px;
-  max-width: 760px;
+  margin-top: 8px;
+  max-width: 620px;
   color: var(--muted);
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .actions {
@@ -173,31 +191,32 @@ h1 {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 18px;
+  min-width: 0;
 }
 
 .action {
   appearance: none;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: rgba(255,255,255,0.04);
+  border-radius: var(--radius-sm);
+  background: var(--panel2);
   color: var(--fg);
   padding: 10px 14px;
   font: inherit;
   cursor: pointer;
-  transition: transform 120ms ease, border-color 160ms ease, background 160ms ease;
+  transition: transform 120ms var(--ease), border-color 160ms var(--ease), background 160ms var(--ease);
 }
 
 .action:hover {
   transform: translateY(-1px);
-  border-color: rgba(111, 210, 255, 0.42);
-  background: rgba(255,255,255,0.07);
+  border-color: rgba(242, 240, 235, 0.20);
+  background: var(--dusk-jet);
 }
 
 .action-primary {
-  background: linear-gradient(135deg, var(--primary-2), var(--primary));
-  color: #07101c;
-  border-color: rgba(255,255,255,0.2);
-  font-weight: 700;
+  background: var(--control-primary-bg);
+  color: var(--control-primary-fg);
+  border-color: transparent;
+  font-weight: 500;
 }
 
 .providerList {
@@ -210,15 +229,16 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px;
-  border-radius: 18px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--panel-strong);
+  min-width: 0;
 }
 
 .providerCard[data-selected="true"] {
-  border-color: rgba(111, 210, 255, 0.44);
-  box-shadow: 0 0 0 4px rgba(111, 210, 255, 0.10);
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
 }
 
 .providerMain {
@@ -231,10 +251,34 @@ h1 {
 .providerIcon {
   width: 40px;
   height: 40px;
-  border-radius: 14px;
-  object-fit: cover;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  background: var(--provider-icon-bg);
+  border: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+.providerIconInitial {
+  color: var(--provider-icon-fg);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: inset 4px 0 0 var(--provider-accent);
+}
+
+.providerIconDusk {
+  color: var(--provider-dusk-icon-fg);
+}
+
+.providerIconDusk::before {
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: block;
+  background: currentColor;
+  -webkit-mask: var(--dusk-logo-mark) center / contain no-repeat;
+  mask: var(--dusk-logo-mark) center / contain no-repeat;
 }
 
 .providerCopy {
@@ -243,7 +287,7 @@ h1 {
 
 .providerName {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .providerMeta {
@@ -258,16 +302,17 @@ h1 {
 .providerUse {
   appearance: none;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--fg);
   padding: 9px 12px;
   font: inherit;
   cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .providerUse:hover {
-  border-color: rgba(122, 162, 255, 0.44);
+  border-color: var(--primary);
 }
 
 .stats {
@@ -280,7 +325,8 @@ h1 {
   justify-content: space-between;
   gap: 16px;
   padding: 12px 0;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid var(--border);
+  min-width: 0;
 }
 
 .stat:first-child {
@@ -296,6 +342,8 @@ h1 {
 .value {
   font-size: 13px;
   text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .log {
@@ -304,11 +352,72 @@ h1 {
   overflow: auto;
   margin: 0;
   padding: 14px;
-  border-radius: 18px;
-  background: rgba(3, 7, 16, 0.78);
-  border: 1px solid rgba(255,255,255,0.06);
-  color: rgba(216, 231, 255, 0.88);
+  border-radius: var(--radius);
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--foreground);
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (min-width: 1040px) {
+  body {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    display: grid;
+    grid-template-rows: 104px auto 1fr auto;
+    height: 100vh;
+    align-self: start;
+    align-items: stretch;
+    gap: 0;
+    padding: 28px 18px;
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
+  }
+
+  .brand {
+    align-items: flex-start;
+  }
+
+  .titleRow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 18px;
+  }
+
+  .appMenu {
+    grid-row: 2;
+    flex-direction: column;
+    margin-top: 0;
+  }
+
+  .appMenuItem {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .topbarRight {
+    display: grid;
+    grid-row: 4;
+    align-self: end;
+  }
+
+  .layout {
+    width: min(1100px, calc(100vw - 320px));
+    margin: 32px auto 56px;
+  }
+
+  .hero {
+    padding: 20px;
+  }
 }
 
 @media (max-width: 860px) {
@@ -327,6 +436,29 @@ h1 {
   }
 
   .providerUse {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    padding: 16px;
+  }
+
+  .brand {
+    width: 100%;
+  }
+
+  .titleRow {
+    flex-wrap: wrap;
+  }
+
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .action {
     width: 100%;
   }
 }

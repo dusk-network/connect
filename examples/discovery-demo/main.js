@@ -7,22 +7,29 @@ import { defineDuskConnectButton } from "../../dist/ui.js";
 
 defineDuskConnectButton();
 
-function svgIcon(letter, colorA, colorB) {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-      <defs>
-        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-          <stop stop-color="${colorA}" />
-          <stop offset="1" stop-color="${colorB}" />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="18" fill="#07111d" />
-      <rect x="8" y="8" width="48" height="48" rx="14" fill="url(#g)" />
-      <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#07111d">${letter}</text>
-    </svg>
-  `;
+function isDuskProvider(provider) {
+  const name = String(provider?.name || "").trim().toLowerCase();
+  const rdns = String(provider?.rdns || "").trim().toLowerCase();
+  return name === "dusk wallet" || rdns === "network.dusk.wallet" || rdns.endsWith(".dusk.wallet");
+}
 
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+function providerInitial(provider) {
+  const initial = String(provider?.name || "Wallet").trim().charAt(0).toUpperCase();
+  return /^[A-Z0-9]$/.test(initial) ? initial : "W";
+}
+
+function providerAccent(provider) {
+  const rdns = String(provider?.rdns || "").toLowerCase();
+  if (rdns.includes("harbor")) return "#6FBF8E";
+  return "#71B1FF";
+}
+
+function providerIcon(provider) {
+  if (isDuskProvider(provider)) {
+    return `<span class="providerIcon providerIconDusk" aria-hidden="true"></span>`;
+  }
+
+  return `<span class="providerIcon providerIconInitial" style="--provider-accent: ${providerAccent(provider)}" aria-hidden="true">${providerInitial(provider)}</span>`;
 }
 
 function createMockProvider({ info, account, chainId, networkName, balance }) {
@@ -169,7 +176,7 @@ createMockProvider({
   info: {
     uuid: "demo.aurora.wallet",
     name: "Aurora Wallet",
-    icon: svgIcon("A", "#7aa2ff", "#6fd2ff"),
+    icon: "",
     rdns: "demo.aurora.wallet",
   },
   account: "dusk1aurora9k4m7z5a6k9x4d3c2b1v8f7n6m5q4p3",
@@ -182,7 +189,7 @@ createMockProvider({
   info: {
     uuid: "demo.harbor.wallet",
     name: "Harbor Wallet",
-    icon: svgIcon("H", "#9bf0c3", "#6fd2ff"),
+    icon: "",
     rdns: "demo.harbor.wallet",
   },
   account: "dusk1harbor7m4w8y2n5r6s9t1u3v5x7z2b4c6d8e0",
@@ -233,7 +240,7 @@ function renderProviders(state) {
       (provider) => `
         <article class="providerCard" data-selected="${provider.uuid === state.providerId}">
           <div class="providerMain">
-            <img class="providerIcon" src="${provider.icon}" alt="" />
+            ${providerIcon(provider)}
             <div class="providerCopy">
               <div class="providerName">${provider.name}</div>
               <div class="providerMeta mono">${provider.uuid}</div>

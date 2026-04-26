@@ -14,11 +14,17 @@
         <div class="brandText">
           <div class="titleRow">
             <h1>Dario</h1>
-            <span class="tag">Testnet</span>
           </div>
           <div class="subtitle">An on-chain finite state machine</div>
         </div>
       </div>
+
+
+      <nav class="appMenu" aria-label="Examples">
+        <a class="appMenuItem" href="../vanilla/" data-icon="◐">Connect</a>
+        <a class="appMenuItem" href="../discovery-demo/" data-icon="⎔">Discovery</a>
+        <a class="appMenuItem active" href="../dario-fsm/" data-icon="▲">Dario</a>
+      </nav>
 
       <div class="topbarRight">
         <dusk-connect-button id="connectBtn" network="testnet" variant="solid"></dusk-connect-button>
@@ -27,39 +33,43 @@
 
     <main class="container">
       <section class="game">
-        <div class="stage" aria-label="Dario stage">
-          <img id="darioSprite" class="sprite" src="./assets/dario-regular.svg" alt="Dario" />
+        <section class="gameColumn">
+          <p class="eyebrow">Game</p>
+          <div class="stage" aria-label="Dario stage">
+            <img id="darioSprite" class="sprite" src="./assets/dario-regular.svg" alt="Dario" />
 
-          <div class="hud" aria-label="HUD">
-            <div id="hudState" class="hudBadge">—</div>
-            <div id="hudRevives" class="hudBadge">💙 —</div>
-          </div>
+            <div class="hud" aria-label="HUD">
+              <div id="hudState" class="hudBadge">—</div>
+              <div id="hudRevives" class="hudBadge">💙 —</div>
+            </div>
 
-          <div id="startOverlay" class="startOverlay" hidden>
-            <div class="startTitle">PRESS START</div>
-            <div class="startText">Connect Wallet to play on Testnet.</div>
-            <button id="startBtn" class="btn btn-primary btn-big" type="button">Connect Wallet</button>
-          </div>
+            <div id="startOverlay" class="startOverlay" hidden>
+              <div class="startTitle">PRESS START</div>
+              <div class="startText">Connect Wallet to play on Testnet.</div>
+              <button id="startBtn" class="btn btn-primary btn-big" type="button">Connect Wallet</button>
+            </div>
 
-          <div id="pendingOverlay" class="pendingOverlay" hidden>
-            <div class="pendingCard">
-              <div class="spinner" aria-hidden="true"></div>
-              <div id="pendingText" class="pendingText">Waiting for finalization…</div>
-              <div class="progress" aria-hidden="true">
-                <div id="progressBar" class="progressBar"></div>
+            <div id="pendingOverlay" class="pendingOverlay" hidden>
+              <div class="pendingCard">
+                <div class="spinner" aria-hidden="true"></div>
+                <div id="pendingText" class="pendingText">Waiting for finalization…</div>
+                <div class="progress" aria-hidden="true">
+                  <div id="progressBar" class="progressBar"></div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div id="deadOverlay" class="deadOverlay" hidden>
-            <div class="deadTitle">GAME OVER</div>
-            <button id="reviveBig" class="btn btn-primary btn-big" type="button" data-event="4">
-              Revive Dario
-            </button>
+            <div id="deadOverlay" class="deadOverlay" hidden>
+              <div class="deadTitle">GAME OVER</div>
+              <button id="reviveBig" class="btn btn-primary btn-big" type="button" data-event="4">
+                Revive Dario
+              </button>
+            </div>
           </div>
-        </div>
+        </section>
 
         <div class="panel" aria-label="Actions">
+          <p class="eyebrow">Actions</p>
           <div class="actions" id="actions">
             <button class="action" type="button" data-event="0">
               <span class="icon" aria-hidden="true">☕</span>

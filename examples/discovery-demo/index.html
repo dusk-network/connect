@@ -13,11 +13,17 @@
         <div class="brandText">
           <div class="titleRow">
             <h1>Dusk Discovery</h1>
-            <span class="tag">Mock Wallets</span>
           </div>
-          <div class="subtitle">Reference demo for multi-wallet discovery and explicit provider selection</div>
+          <div class="subtitle">Multi-wallet provider discovery</div>
         </div>
       </div>
+
+
+      <nav class="appMenu" aria-label="Examples">
+        <a class="appMenuItem" href="../vanilla/" data-icon="◐">Connect</a>
+        <a class="appMenuItem active" href="../discovery-demo/" data-icon="⎔">Discovery</a>
+        <a class="appMenuItem" href="../dario-fsm/" data-icon="▲">Dario</a>
+      </nav>
 
       <div class="topbarRight">
         <dusk-connect-button
@@ -31,11 +37,10 @@
     <main class="layout">
       <section class="panel hero">
         <p class="eyebrow">Protocol</p>
-        <h2>Two mock wallets announce themselves through the discovery events</h2>
+        <h2>Provider Discovery</h2>
         <p class="lede">
-          This page behaves like a dApp. It dispatches <code>dusk:requestProvider</code>,
-          receives <code>dusk:announceProvider</code>, and forces explicit wallet selection
-          before connecting.
+          Dispatch <code>dusk:requestProvider</code>, receive provider announcements,
+          then select the wallet before connecting.
         </p>
 
         <div class="actions">
@@ -49,7 +54,6 @@
       <section class="panel">
         <div class="sectionHead">
           <p class="eyebrow">Wallets</p>
-          <h2>Discovered Providers</h2>
         </div>
 
         <div class="providerList" id="providerList"></div>
@@ -59,7 +63,6 @@
         <section class="panel">
           <div class="sectionHead">
             <p class="eyebrow">Session</p>
-            <h2>Selected Wallet State</h2>
           </div>
 
           <div class="stats">
@@ -93,7 +96,6 @@
         <section class="panel">
           <div class="sectionHead">
             <p class="eyebrow">Events</p>
-            <h2>Trace</h2>
           </div>
 
           <pre class="log" id="log"></pre>

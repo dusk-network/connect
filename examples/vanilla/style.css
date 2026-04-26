@@ -1,44 +1,6 @@
-:root {
-  /* Dusk / neobank-ish dark theme */
-  --radius: 14px;
-
-  --background: #05070c;
-  --foreground: rgba(255,255,255,0.92);
-
-  --card: rgba(255,255,255,0.04);
-  --card-foreground: rgba(255,255,255,0.92);
-
-  --primary: #7aa2ff;
-  --primary-foreground: rgba(255,255,255,0.94);
-
-  --muted-foreground: rgba(255,255,255,0.62);
-
-  --border: rgba(255,255,255,0.08);
-
-  --shadow: 0 14px 40px rgba(0,0,0,0.35);
-  --shadow-soft: 0 10px 30px rgba(0,0,0,0.22);
-
-  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-}
-
-* { box-sizing: border-box; }
+@import "../dusk-theme.css";
 
 html, body { height: 100%; }
-html { color-scheme: dark; }
-
-body {
-  margin: 0;
-  font-family: var(--sans);
-  background:
-    radial-gradient(900px 520px at 20% -10%, rgba(122,162,255,0.20), transparent 60%),
-    radial-gradient(720px 460px at 80% 0%, rgba(51,209,255,0.16), transparent 60%),
-    radial-gradient(900px 720px at 50% 120%, rgba(122,162,255,0.08), transparent 55%),
-    var(--background);
-  color: var(--foreground);
-}
-
-.mono { font-family: var(--mono); }
 
 /* ----------------------------------
    Header
@@ -51,39 +13,92 @@ body {
   gap: 16px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
-  background: rgba(5,7,12,0.72);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--rail-bg);
 }
 
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .mark {
-  width: 32px;
-  height: 32px;
-  border-radius: 12px;
+  width: 26px;
+  height: 26px;
+  border-radius: 0;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255,255,255,0.10);
-  background:
-    radial-gradient(14px 14px at 35% 30%, rgba(255,255,255,0.18), transparent 70%),
-    var(--primary);
-  box-shadow: 0 14px 32px rgba(122,162,255,0.25);
-  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  flex: 0 0 26px;
+}
+
+.mark::before {
+  width: 20px;
+  height: 20px;
 }
 
 .brandText { min-width: 0; }
 .titleRow { display: flex; align-items: baseline; gap: 10px; }
 
-h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
-.subtitle { font-size: 12px; color: var(--muted-foreground); margin-top: 2px; }
+h1 {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0;
+  letter-spacing: 0;
+}
 
-.tag {
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.04);
-  color: rgba(255,255,255,0.86);
+.subtitle {
+  max-width: 210px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--muted-foreground);
+  margin-top: 5px;
+}
+
+.appMenu {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+
+.appMenuItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    background 160ms var(--ease),
+    color 160ms var(--ease),
+    transform 140ms var(--ease);
+}
+
+.appMenuItem::before {
+  content: attr(data-icon);
+  width: 16px;
+  color: currentColor;
+  font-family: var(--mono);
+  font-size: 14px;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.appMenuItem:hover,
+.appMenuItem.active {
+  color: var(--foreground);
+}
+
+.appMenuItem:hover {
+  background: var(--surface-highlight);
+}
+
+.appMenuItem.active {
+  background: var(--surface-highlight-strong);
 }
 
 /* ----------------------------------
@@ -98,13 +113,20 @@ h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
 
 .card {
   border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 10px);
-  background:
-    radial-gradient(700px 260px at 10% -10%, rgba(122,162,255,0.14), transparent 60%),
-    radial-gradient(520px 220px at 95% 10%, rgba(51,209,255,0.10), transparent 55%),
-    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.18));
+  border-radius: var(--radius-lg);
+  background: var(--card);
   box-shadow: var(--shadow);
   padding: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
 }
 
 .row {
@@ -113,7 +135,7 @@ h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
   justify-content: space-between;
   gap: 16px;
   padding: 12px 4px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid var(--border);
 }
 .row:first-child { border-top: 0; padding-top: 0; }
 .row:last-child { padding-bottom: 0; }
@@ -128,9 +150,9 @@ h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
 .picker {
   width: min(360px, 100%);
   appearance: none;
-  border-radius: 12px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.04);
+  background: var(--panel2);
   color: var(--foreground);
   font: inherit;
   padding: 10px 12px;
@@ -139,8 +161,8 @@ h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
 
 .picker:focus-visible {
   outline: none;
-  border-color: rgba(122,162,255,0.48);
-  box-shadow: 0 0 0 4px rgba(122,162,255,0.12);
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
 }
 
 .link {
@@ -148,6 +170,60 @@ h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
   margin-top: 18px;
   color: var(--primary);
   text-decoration: none;
-  font-weight: 650;
+  font-weight: 500;
 }
 .link:hover { text-decoration: underline; }
+
+@media (min-width: 1040px) {
+  body {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    display: grid;
+    grid-template-rows: 104px auto 1fr auto;
+    height: 100vh;
+    align-self: start;
+    align-items: stretch;
+    gap: 0;
+    padding: 28px 18px;
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
+  }
+
+  .brand {
+    align-items: flex-start;
+  }
+
+  .titleRow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 18px;
+  }
+
+  .appMenu {
+    grid-row: 2;
+    flex-direction: column;
+    margin-top: 0;
+  }
+
+  .appMenuItem {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .topbarRight {
+    grid-row: 4;
+    align-self: end;
+  }
+
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+}
