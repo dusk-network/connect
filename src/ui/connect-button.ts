@@ -2,7 +2,7 @@ import type { DuskWalletState } from "../types.js";
 import { createDuskWallet, type DuskWallet, type DuskWalletOptions } from "../wallet.js";
 import { createDuskConnectModal, type DuskConnectModal } from "./modal.js";
 import { networkLabel, shortenMiddle, walletStatus } from "./shared.js";
-import { MCONNECT_UI_BASE_CSS } from "./styles.js";
+import { DCONNECT_UI_BASE_CSS } from "./styles.js";
 
 export type DuskConnectButtonOptions = {
   /** App name shown in the modal header (e.g. "My dApp"). */
@@ -13,12 +13,14 @@ export type DuskConnectButtonOptions = {
   closeOnConnect?: boolean;
   /** Hide the small network badge on the right side of the button. */
   hideNetwork?: boolean;
-  /** Override the default label when disconnected. Default: "Connect Wallet" */
+  /** Override the default label when disconnected. Default: "Connect wallet" */
   connectText?: string;
-  /** Override the default label when locked. Default: "Unlock Wallet" */
+  /** Override the default label when locked. Default: "Unlock wallet" */
   lockedText?: string;
-  /** Override the default label when missing. Default: "Install Wallet" */
+  /** Override the default label when missing. Default: "Install wallet" */
   installText?: string;
+  /** Force a UI theme. Default: auto (follows prefers-color-scheme). */
+  theme?: "auto" | "dark" | "light";
   /** Provide a wallet instance. If omitted, the button creates its own wallet. */
   wallet?: DuskWallet;
   /** Options used if the button creates its own wallet. */
@@ -28,12 +30,6 @@ export type DuskConnectButtonOptions = {
 };
 
 type Status = ReturnType<typeof walletStatus>;
-
-function hashHue(input: string): number {
-  let h = 0;
-  for (let i = 0; i < input.length; i++) h = (h * 31 + input.charCodeAt(i)) >>> 0;
-  return h % 360;
-}
 
 function boolAttr(v: string | null): boolean {
   return v !== null && v.toLowerCase() !== "false";
@@ -51,6 +47,7 @@ export class DuskConnectButtonElement extends HTMLElement {
       "connect-text",
       "locked-text",
       "install-text",
+      "theme",
       "size",
       "variant",
     ];
@@ -193,7 +190,7 @@ export class DuskConnectButtonElement extends HTMLElement {
     if (this._btn) return;
 
     const css = `
-      ${MCONNECT_UI_BASE_CSS}
+      ${DCONNECT_UI_BASE_CSS}
 
       :host {
         display: inline-block;
@@ -204,32 +201,38 @@ export class DuskConnectButtonElement extends HTMLElement {
         display: inline-flex;
         align-items: center;
         gap: 10px;
+        max-width: 100%;
+        min-width: 0;
         cursor: pointer;
         user-select: none;
         white-space: nowrap;
         -webkit-tap-highlight-color: transparent;
 
-        border-radius: var(--mconnect-radius-pill);
+        border-radius: var(--dconnect-radius);
         padding: 10px 14px;
-        font-family: var(--mconnect-font-sans);
-        font-weight: 850;
-        font-size: 12.5px;
+        font-family: var(--dconnect-font-sans);
+        font-weight: 500;
+        font-size: 13px;
         line-height: 1;
+        letter-spacing: 0;
 
-        border: 1px solid var(--mconnect-button-border);
-        background: var(--mconnect-button-bg);
-        color: var(--mconnect-foreground);
+        border: 1px solid var(--dconnect-button-border);
+        background: var(--dconnect-button-bg);
+        color: var(--dconnect-foreground);
+        box-shadow: 0 0 0 rgba(0, 0, 0, 0);
 
         transition:
-          transform 90ms ease,
-          background 160ms ease,
-          border-color 160ms ease,
-          box-shadow 160ms ease;
+          transform var(--dconnect-dur-fast) var(--dconnect-ease),
+          background var(--dconnect-dur-base) var(--dconnect-ease),
+          border-color var(--dconnect-dur-base) var(--dconnect-ease),
+          box-shadow var(--dconnect-dur-base) var(--dconnect-ease);
       }
 
       button:hover {
-        background: var(--mconnect-button-hover);
-        box-shadow: var(--mconnect-shadow-soft);
+        transform: translateY(-1px);
+        background: var(--dconnect-button-hover);
+        border-color: var(--dconnect-border-strong);
+        box-shadow: var(--dconnect-shadow-hover);
       }
 
       button:active {
@@ -238,7 +241,7 @@ export class DuskConnectButtonElement extends HTMLElement {
 
       button:focus-visible {
         outline: none;
-        box-shadow: var(--mconnect-shadow-focus);
+        box-shadow: var(--dconnect-shadow-focus);
       }
 
       button:disabled {
@@ -251,48 +254,97 @@ export class DuskConnectButtonElement extends HTMLElement {
       button[data-variant="solid"][data-status="missing"],
       button[data-variant="solid"][data-status="disconnected"],
       button[data-variant="solid"][data-status="locked"] {
-        color: var(--mconnect-primary-foreground);
-        border-color: rgba(255, 255, 255, 0.12);
-        background: var(--mconnect-primary-gradient);
+        color: var(--dconnect-primary-foreground);
+        border-color: transparent;
+        background: var(--dconnect-primary-gradient);
       }
 
       button[data-variant="solid"][data-status="missing"]:hover,
       button[data-variant="solid"][data-status="disconnected"]:hover,
       button[data-variant="solid"][data-status="locked"]:hover {
-        background: var(--mconnect-primary-gradient-hover);
-        box-shadow: var(--mconnect-shadow);
+        background: var(--dconnect-primary-gradient-hover);
+        box-shadow: var(--dconnect-shadow);
       }
 
       .avatar {
-        width: 26px;
-        height: 26px;
-        border-radius: var(--mconnect-radius-pill);
+        flex: 0 0 auto;
+        width: 18px;
+        height: 18px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-weight: 900;
+        font-family: var(--dconnect-font-mono);
+        font-weight: 500;
         font-size: 12px;
-        background: var(--mconnect-avatar-gradient);
+        color: var(--dconnect-avatar-fg);
+        background: transparent;
+        transition:
+          color var(--dconnect-dur-base) var(--dconnect-ease),
+          transform var(--dconnect-dur-fast) var(--dconnect-ease);
+      }
+
+      .avatar::before {
+        content: "";
+        width: 16px;
+        height: 16px;
+        display: block;
+        background: currentColor;
+        -webkit-mask: var(--dconnect-logo-mark) center / contain no-repeat;
+        mask: var(--dconnect-logo-mark) center / contain no-repeat;
+        transform-origin: center;
+      }
+
+      button:hover .avatar {
+        color: var(--dconnect-primary-hover);
+      }
+
+      button:hover .avatar::before {
+        animation: dconnect-logo-pulse 540ms var(--dconnect-ease-out);
+      }
+
+      button[data-variant="solid"][data-status="missing"] .avatar,
+      button[data-variant="solid"][data-status="disconnected"] .avatar,
+      button[data-variant="solid"][data-status="locked"] .avatar {
+        color: var(--dconnect-primary-foreground);
+      }
+
+      button[data-variant="solid"][data-status="missing"]:hover .avatar,
+      button[data-variant="solid"][data-status="disconnected"]:hover .avatar,
+      button[data-variant="solid"][data-status="locked"]:hover .avatar {
+        color: var(--dconnect-primary-foreground);
       }
 
       .label {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        min-width: 0;
+        max-width: 18ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .net {
-        margin-left: 6px;
-        padding: 4px 8px;
-        border-radius: var(--mconnect-radius-pill);
-        font-family: var(--mconnect-font-sans);
-        font-weight: 800;
-        font-size: 11px;
+        flex: 0 0 auto;
+        padding: 4px 7px;
+        border-radius: var(--dconnect-radius-sm);
+        font-family: var(--dconnect-font-mono);
+        font-weight: 500;
+        font-size: 10px;
         line-height: 1;
-        border: 1px solid var(--mconnect-border);
-        background: rgba(0, 0, 0, 0.18);
-        color: inherit;
-        opacity: 0.92;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        border: 1px solid rgba(113, 177, 255, 0.28);
+        background: rgba(113, 177, 255, 0.12);
+        color: var(--dconnect-primary);
+        transition:
+          background var(--dconnect-dur-base) var(--dconnect-ease),
+          border-color var(--dconnect-dur-base) var(--dconnect-ease),
+          color var(--dconnect-dur-base) var(--dconnect-ease);
+      }
+
+      button:hover .net {
+        border-color: rgba(113, 177, 255, 0.42);
+        background: rgba(113, 177, 255, 0.18);
       }
 
       /* size */
@@ -301,33 +353,33 @@ export class DuskConnectButtonElement extends HTMLElement {
         font-size: 12px;
       }
       button[data-size="sm"] .avatar {
-        width: 24px;
-        height: 24px;
+        width: 17px;
+        height: 17px;
       }
       button[data-size="lg"] {
         padding: 12px 16px;
         font-size: 14px;
       }
       button[data-size="lg"] .avatar {
-        width: 28px;
-        height: 28px;
+        width: 20px;
+        height: 20px;
       }
 
       /* variant */
       button[data-variant="outline"] {
         background: transparent;
-        border-color: var(--mconnect-border);
+        border-color: var(--dconnect-border-strong);
       }
       button[data-variant="solid"] {
-        background: var(--mconnect-button-bg);
+        background: var(--dconnect-button-bg);
       }
     `;
 
     this._shadow.innerHTML = `
       <style>${css}</style>
       <button type="button">
-        <span class="avatar" part="avatar">M</span>
-        <span class="label" part="label">Connect Wallet</span>
+        <span class="avatar" part="avatar" aria-hidden="true"></span>
+        <span class="label" part="label">Connect wallet</span>
         <span class="net" part="network"></span>
       </button>
     `;
@@ -376,11 +428,13 @@ export class DuskConnectButtonElement extends HTMLElement {
     if (!this._modal && this._wallet) {
       const appName = this.getAttribute("app-name") || "";
       const installUrl = this.getAttribute("install-url") || "";
+      const theme = (this.getAttribute("theme") || "auto").toLowerCase();
 
       // With `exactOptionalPropertyTypes`, do not set optionals to `undefined`.
       const modalOpts: any = {};
       if (appName) modalOpts.appName = appName;
       if (installUrl) modalOpts.installUrl = installUrl;
+      if (theme === "dark" || theme === "light") modalOpts.theme = theme;
       if (this.hasAttribute("close-on-connect")) {
         modalOpts.closeOnConnect = boolAttr(this.getAttribute("close-on-connect"));
       }
@@ -448,15 +502,15 @@ export class DuskConnectButtonElement extends HTMLElement {
 
     if (!this._label || !this._avatar || !this._net) return;
 
-    const connectText = this.getAttribute("connect-text") || "Connect Wallet";
-    const lockedText = this.getAttribute("locked-text") || "Unlock Wallet";
-    const installText = this.getAttribute("install-text") || "Install Wallet";
+    const connectText = this.getAttribute("connect-text") || "Connect wallet";
+    const lockedText = this.getAttribute("locked-text") || "Unlock wallet";
+    const installText = this.getAttribute("install-text") || "Install wallet";
     const hideNetwork = boolAttr(this.getAttribute("hide-network"));
 
     // status already computed above
 
     // network badge
-    if (hideNetwork || !st) {
+    if (hideNetwork || !st || status !== "connected") {
       this._net.textContent = "";
       this._net.style.display = "none";
     } else {
@@ -465,11 +519,10 @@ export class DuskConnectButtonElement extends HTMLElement {
       this._net.style.display = net ? "inline-flex" : "none";
     }
 
-    const defaultBg = "var(--mconnect-avatar-gradient)";
     const setDefault = (text: string) => {
       this._label!.textContent = text;
-      this._avatar!.textContent = "D";
-      this._avatar!.style.background = defaultBg;
+      this._avatar!.textContent = "";
+      this._avatar!.style.background = "";
     };
 
     if (status !== "connected") {
@@ -480,10 +533,8 @@ export class DuskConnectButtonElement extends HTMLElement {
     // connected
     const acct = st?.accounts?.[0] || "";
     this._label.textContent = acct ? shortenMiddle(acct, 6, 4) : "Connected";
-    const hue = hashHue(acct);
-    const hue2 = (hue + 55) % 360;
     this._avatar.textContent = "";
-    this._avatar.style.background = `linear-gradient(135deg, hsl(${hue} 85% 55%), hsl(${hue2} 85% 50%))`;
+    this._avatar.style.background = "";
   }
 }
 
@@ -507,6 +558,7 @@ export function createDuskConnectButton(options: DuskConnectButtonOptions = {}):
   if (options.connectText) el.setAttribute("connect-text", options.connectText);
   if (options.lockedText) el.setAttribute("locked-text", options.lockedText);
   if (options.installText) el.setAttribute("install-text", options.installText);
+  if (options.theme && options.theme !== "auto") el.setAttribute("theme", options.theme);
 
   if (options.walletOptions) el.walletOptions = options.walletOptions;
   if (options.wallet) el.wallet = options.wallet;

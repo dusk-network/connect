@@ -85,6 +85,38 @@ describe("connect button", () => {
     expect(shadow.querySelector(".net")?.textContent).toBe("Mainnet");
   });
 
+  it("hides the network badge until the wallet is connected", () => {
+    const wallet = createMockUiWallet({
+      installed: true,
+      authorized: false,
+      accounts: [],
+      chainId: "dusk:2",
+      node: {
+        chainId: "dusk:2",
+        nodeUrl: "https://testnet.nodes.dusk.network",
+        networkName: "Testnet",
+      },
+    } as any);
+    const el = createDuskConnectButton({
+      wallet: wallet as any,
+      modal: { open() {}, close() {}, destroy() {}, isOpen: () => false } as any,
+    });
+
+    document.body.appendChild(el);
+
+    const net = el.shadowRoot!.querySelector(".net") as HTMLElement;
+    expect(net.textContent).toBe("");
+    expect(net.style.display).toBe("none");
+  });
+
+  it("supports an explicit light theme attribute", () => {
+    const el = createDuskConnectButton({ theme: "light" });
+
+    document.body.appendChild(el);
+
+    expect(el.getAttribute("theme")).toBe("light");
+  });
+
   it("routes missing-wallet clicks to installUrl instead of opening the modal", () => {
     const wallet = createMockUiWallet({
       installed: false,
