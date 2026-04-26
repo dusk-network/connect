@@ -413,6 +413,7 @@ If you want the common “Connect Wallet” button UX, the SDK ships a small web
   app-name="My dApp"
   install-url="https://chrome.google.com/webstore/detail/<YOUR-EXTENSION-ID>"
   variant="solid"
+  theme="auto"
 ></dusk-connect-button>
 ```
 
@@ -443,18 +444,22 @@ If you want higher-level semantics like “connected / disconnected”, compare 
 
 The connect UI is skinnable via **CSS variables**.
 
+The UI supports `theme="auto" | "dark" | "light"` on `<dusk-connect-button>`.
+`auto` is the default and follows `prefers-color-scheme`; explicit `dark` or `light`
+also applies to the owned connect modal.
+
 All tokens are **namespaced** to avoid collisions with host dApps:
 
-- `--mconnect-*`
+- `--dconnect-*`
 
 You can override them globally (affects modal + button):
 
 ```css
 :root {
-  --mconnect-primary: #7aa2ff;
-  --mconnect-background: #05070c;
-  --mconnect-foreground: rgba(255,255,255,0.92);
-  --mconnect-radius: 14px;
+  --dconnect-primary: #71B1FF;
+  --dconnect-background: #101010;
+  --dconnect-foreground: #F2F0EB;
+  --dconnect-radius: 8px;
 }
 ```
 
@@ -462,15 +467,16 @@ You can override them globally (affects modal + button):
 
 ```css
 dusk-connect-button {
-  --mconnect-primary: #9b7bff;
+  --dconnect-primary: #71B1FF;
 }
 ```
 
 Commonly useful tokens:
 
-- `--mconnect-primary`, `--mconnect-ring`, `--mconnect-destructive`
-- `--mconnect-background`, `--mconnect-foreground`, `--mconnect-border`
-- `--mconnect-radius`, `--mconnect-shadow`
+- `--dconnect-primary`, `--dconnect-ring`, `--dconnect-destructive`
+- `--dconnect-background`, `--dconnect-foreground`, `--dconnect-border`
+- `--dconnect-radius-sm`, `--dconnect-radius`, `--dconnect-radius-lg`, `--dconnect-shadow`
+- `--dconnect-font-sans`, `--dconnect-font-mono`
 
 
 ## Script tag (ES module)
