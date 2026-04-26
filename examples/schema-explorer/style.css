@@ -1,34 +1,13 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
-
-:root {
-  color-scheme: dark;
-  --bg: #0d0f14;
-  --card: #151925;
-  --border: rgba(255, 255, 255, 0.08);
-  --text: #eef2ff;
-  --muted: #9aa4b2;
-  --primary: #7aa2ff;
-  --ring: #33d1ff;
-  --danger: #ff4d6d;
-  --radius: 14px;
-  --sans: "Space Grotesk", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-* { box-sizing: border-box; }
+@import "../dusk-theme.css";
 
 body {
-  margin: 0;
-  font-family: var(--sans);
-  background: radial-gradient(1200px 800px at 10% -20%, rgba(122, 162, 255, 0.15), transparent 60%),
-    radial-gradient(900px 600px at 90% -10%, rgba(51, 209, 255, 0.12), transparent 60%),
-    var(--bg);
   color: var(--text);
 }
 
 .hero {
   padding: 40px 24px 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--rail-bg);
 }
 
 .hero-inner {
@@ -36,9 +15,31 @@ body {
   margin: 0 auto;
 }
 
+.heroBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  background: transparent;
+  border: 0;
+  color: var(--foreground);
+}
+
+.logo::before {
+  width: 20px;
+  height: 20px;
+}
+
 .eyebrow {
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 0.18em;
   font-size: 11px;
   color: var(--muted);
 }
@@ -46,7 +47,7 @@ body {
 h1 {
   margin: 8px 0 8px;
   font-size: 28px;
-  letter-spacing: -0.4px;
+  letter-spacing: 0;
 }
 
 .hero p {
@@ -61,6 +62,7 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 0;
 }
 
 .panel {
@@ -71,6 +73,7 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
 }
 
 .panel-row {
@@ -86,11 +89,17 @@ h1 {
 .input {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--panel2);
   color: var(--text);
   font-family: var(--mono);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
 }
 
 .panel-actions {
@@ -102,20 +111,21 @@ h1 {
 
 .btn {
   appearance: none;
-  border: 1px solid rgba(122, 162, 255, 0.35);
-  background: rgba(16, 16, 16, 0.25);
+  border: 1px solid var(--border);
+  background: var(--panel2);
   color: var(--text);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   padding: 10px 16px;
   cursor: pointer;
-  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+  transition: transform 120ms var(--ease), background 120ms var(--ease), border-color 120ms var(--ease);
 }
 
-.btn:hover { transform: translateY(-1px); border-color: rgba(122, 162, 255, 0.55); }
+.btn:hover { transform: translateY(-1px); border-color: rgba(242, 240, 235, 0.20); background: var(--dusk-jet); }
 
 .btn.primary {
-  border-color: rgba(122, 162, 255, 0.65);
-  background: rgba(122, 162, 255, 0.18);
+  border-color: var(--primary);
+  background: var(--control-primary-bg);
+  color: var(--control-primary-fg);
 }
 
 .hint {
@@ -167,7 +177,7 @@ h1 {
   font-size: 13px;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.18em;
 }
 
 .contractInfo {
@@ -175,8 +185,8 @@ h1 {
   font-size: 12px;
   color: var(--text);
   padding: 10px 14px;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 8px;
+  background: var(--panel2);
+  border-radius: var(--radius);
   border: 1px solid var(--border);
 }
 
@@ -187,15 +197,15 @@ h1 {
 }
 
 .methodCard {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--panel2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 14px;
   transition: border-color 120ms ease;
 }
 
 .methodCard:hover {
-  border-color: rgba(122, 162, 255, 0.25);
+  border-color: rgba(113, 177, 255, 0.35);
 }
 
 .methodHeader {
@@ -209,27 +219,73 @@ h1 {
   font-family: var(--mono);
   font-size: 13px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--foreground);
 }
 
 .methodType {
   font-size: 10px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
 
 .methodType.read {
-  background: rgba(51, 209, 255, 0.15);
+  background: rgba(113, 177, 255, 0.12);
   color: var(--ring);
-  border: 1px solid rgba(51, 209, 255, 0.25);
+  border: 1px solid rgba(113, 177, 255, 0.30);
+}
+
+@media (min-width: 1040px) {
+  body {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+
+  .hero {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    align-self: start;
+    padding: 28px 16px;
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
+  }
+
+  .hero-inner {
+    max-width: none;
+  }
+
+  .heroBrand {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  h1 {
+    margin-top: 18px;
+    font-size: 18px;
+    line-height: 1.25;
+  }
+
+  .hero p {
+    max-width: 200px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .wrap {
+    width: min(980px, calc(100vw - 340px));
+    max-width: none;
+    margin: 0 auto;
+    padding: 32px 24px 56px;
+  }
 }
 
 .methodType.write {
-  background: rgba(255, 77, 109, 0.15);
+  background: rgba(227, 122, 122, 0.14);
   color: var(--danger);
-  border: 1px solid rgba(255, 77, 109, 0.25);
+  border: 1px solid rgba(227, 122, 122, 0.30);
 }
 
 .methodInputs {
@@ -247,6 +303,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .inputLabel {
@@ -254,16 +311,18 @@ h1 {
   font-size: 11px;
   color: var(--muted);
   min-width: 80px;
+  overflow-wrap: anywhere;
 }
 
 .inputField {
   flex: 1;
+  min-width: 0;
   font-family: var(--mono);
   font-size: 12px;
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg);
   color: var(--text);
   outline: none;
   transition: border-color 120ms ease;
@@ -274,7 +333,7 @@ h1 {
 }
 
 .inputField::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--muted);
 }
 
 .methodActions {
@@ -287,17 +346,17 @@ h1 {
   font-size: 12px;
   font-weight: 500;
   padding: 8px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg);
   color: var(--text);
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease;
 }
 
 .methodBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--dusk-jet);
+  border-color: rgba(242, 240, 235, 0.20);
 }
 
 .methodBtn:disabled {
@@ -306,20 +365,21 @@ h1 {
 }
 
 .methodBtn.primary {
-  background: rgba(122, 162, 255, 0.15);
-  border-color: rgba(122, 162, 255, 0.35);
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--dusk-smoky-black);
 }
 
 .methodBtn.primary:hover {
-  background: rgba(122, 162, 255, 0.25);
+  background: var(--dusk-cornflower-hover);
 }
 
 .rawSchema {
   font-family: var(--mono);
   font-size: 11px;
   padding: 14px;
-  background: rgba(0, 0, 0, 0.35);
-  border-radius: 8px;
+  background: var(--panel2);
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   overflow: auto;
   max-height: 300px;
@@ -333,8 +393,8 @@ h1 {
   font-family: var(--mono);
   font-size: 11px;
   padding: 14px;
-  background: rgba(0, 0, 0, 0.35);
-  border-radius: 8px;
+  background: var(--panel2);
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   overflow: auto;
   max-height: 200px;
@@ -353,5 +413,14 @@ h1 {
 
   dusk-connect-button {
     width: 100%;
+  }
+
+  .inputRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inputLabel {
+    min-width: 0;
   }
 }

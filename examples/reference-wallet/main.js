@@ -6,15 +6,9 @@ const DUSK_ANNOUNCE_PROVIDER_EVENT = "dusk:announceProvider";
 function svgIcon() {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-      <defs>
-        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-          <stop stop-color="#9bf0c3" />
-          <stop offset="1" stop-color="#73ccff" />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="18" fill="#09131d" />
-      <rect x="8" y="8" width="48" height="48" rx="14" fill="url(#g)" />
-      <text x="50%" y="53%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#092132">DW</text>
+      <rect width="64" height="64" rx="8" fill="#101010" />
+      <rect x="8" y="8" width="48" height="48" rx="4" fill="#71B1FF" />
+      <text x="50%" y="53%" dominant-baseline="middle" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" font-weight="500" fill="#101010">DW</text>
     </svg>
   `;
 
