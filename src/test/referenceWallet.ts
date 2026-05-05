@@ -13,6 +13,7 @@ import type {
   DuskProviderCapabilities,
   DuskProviderEventMap,
   DuskProviderInfo,
+  DuskProfile,
   GasPriceResult,
   SignAuthParams,
   SignAuthResult,
@@ -74,6 +75,7 @@ function isoNowPlus(minutes: number): string {
 export type ReferenceWalletProvider = DuskProvider & {
   emit<E extends keyof DuskProviderEventMap>(eventName: E, payload: DuskProviderEventMap[E]): void;
   setAccounts(next: AccountId[]): void;
+  setProfiles(next: DuskProfile[]): void;
   setAuthorized(next: boolean): void;
   setNetwork(next: DuskNodeChangedPayload): void;
   setBalance(next: BalanceResult): void;
@@ -125,6 +127,8 @@ export function installReferenceWallet(
   });
 
   let accounts = [...(options.accounts ?? ["dusk1referenceaccount1111111111111111111111111111111"])];
+  let profileId = "profile:0";
+  let shieldedAddress = "dusk1referenceshieldedreceiveaddress111111111111111111111111";
   let authorized = false;
   let balance = { ...DEFAULT_BALANCE, ...(options.balance ?? {}) };
   let gas = { ...DEFAULT_GAS, ...(options.gas ?? {}) };
@@ -164,6 +168,17 @@ export function installReferenceWallet(
     for (const handler of [...set]) handler(payload);
   };
 
+  const currentProfiles = (includeShielded = false): DuskProfile[] => {
+    if (!authorized || !accounts[0]) return [];
+    return [
+      {
+        profileId,
+        account: accounts[0],
+        ...(includeShielded ? { shieldedAddress } : {}),
+      },
+    ];
+  };
+
   const capabilities = (): DuskProviderCapabilities => ({
     provider: info.rdns,
     walletVersion: "0.0.0-reference",
@@ -172,8 +187,9 @@ export function installReferenceWallet(
     networkName: node.networkName,
     methods: [
       "dusk_getCapabilities",
-      "dusk_requestAccounts",
-      "dusk_accounts",
+      "dusk_requestProfiles",
+      "dusk_profiles",
+      "dusk_requestShieldedAddress",
       "dusk_chainId",
       "dusk_switchNetwork",
       "dusk_getPublicBalance",
@@ -193,6 +209,7 @@ export function installReferenceWallet(
     features: {
       shieldedRead: false,
       shieldedRecipients: true,
+      shieldedReceiveAddress: true,
       signMessage: true,
       signAuth: true,
       contractCallPrivacy: true,
@@ -210,8 +227,8 @@ export function installReferenceWallet(
     get chainId() {
       return node.chainId;
     },
-    get selectedAddress() {
-      return authorized ? (accounts[0] ?? null) : null;
+    get profiles() {
+      return currentProfiles();
     },
     get isAuthorized() {
       return authorized;
@@ -238,14 +255,25 @@ export function installReferenceWallet(
         case "dusk_getCapabilities":
           return capabilities();
 
-        case "dusk_accounts":
-          return authorized ? [...accounts] : [];
+        case "dusk_profiles":
+          return currentProfiles();
 
-        case "dusk_requestAccounts":
+        case "dusk_requestProfiles": {
           authorized = true;
           emit("connect", { chainId: node.chainId });
-          emit("accountsChanged", [...accounts]);
-          return [...accounts];
+          const includeShielded = Boolean((params as any)?.shieldedReceiveAddress);
+          const profiles = currentProfiles(includeShielded);
+          emit("profilesChanged", profiles);
+          return profiles;
+        }
+
+        case "dusk_requestShieldedAddress":
+          return {
+            address: shieldedAddress,
+            profileId,
+            account: accounts[0] ?? null,
+            chainId: node.chainId,
+          };
 
         case "dusk_chainId":
           return node.chainId;
@@ -346,7 +374,7 @@ export function installReferenceWallet(
         case "dusk_disconnect":
           authorized = false;
           emit("disconnect", { code: 4900, message: "Disconnected" });
-          emit("accountsChanged", []);
+          emit("profilesChanged", []);
           return true;
 
         default:
@@ -364,9 +392,6 @@ export function installReferenceWallet(
       }
       listeners.clear();
     },
-    enable() {
-      return this.request({ method: "dusk_requestAccounts" });
-    },
     isConnected() {
       return true;
     },
@@ -375,7 +400,14 @@ export function installReferenceWallet(
     },
     setAccounts(next: AccountId[]) {
       accounts = [...next];
-      emit("accountsChanged", authorized ? [...accounts] : []);
+      emit("profilesChanged", currentProfiles());
+    },
+    setProfiles(next: DuskProfile[]) {
+      const first = next[0];
+      accounts = first?.account ? [first.account] : [];
+      profileId = first?.profileId ?? "profile:0";
+      shieldedAddress = first?.shieldedAddress ?? shieldedAddress;
+      emit("profilesChanged", next.map((profile) => ({ ...profile })));
     },
     setAuthorized(next: boolean) {
       authorized = next;
@@ -390,7 +422,8 @@ export function installReferenceWallet(
     },
     revokePermissions() {
       authorized = false;
-      emit("accountsChanged", []);
+      emit("disconnect", { code: 4100, message: "Permissions revoked" });
+      emit("profilesChanged", []);
     },
   } satisfies Partial<ReferenceWalletProvider>;
 

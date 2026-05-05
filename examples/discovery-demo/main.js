@@ -75,10 +75,17 @@ function createMockProvider({ info, account, chainId, networkName, balance }) {
             networkName,
             methods: [
               "dusk_getCapabilities",
-              "dusk_requestAccounts",
-              "dusk_accounts",
+              "dusk_requestProfiles",
+              "dusk_profiles",
+              "dusk_requestShieldedAddress",
               "dusk_chainId",
+              "dusk_switchNetwork",
               "dusk_getPublicBalance",
+              "dusk_estimateGas",
+              "dusk_sendTransaction",
+              "dusk_watchAsset",
+              "dusk_signMessage",
+              "dusk_signAuth",
               "dusk_disconnect",
             ],
             txKinds: ["transfer", "contract_call"],
@@ -90,6 +97,7 @@ function createMockProvider({ info, account, chainId, networkName, balance }) {
             features: {
               shieldedRead: false,
               shieldedRecipients: true,
+              shieldedReceiveAddress: true,
               signMessage: true,
               signAuth: true,
               contractCallPrivacy: true,
@@ -97,14 +105,31 @@ function createMockProvider({ info, account, chainId, networkName, balance }) {
             },
           };
 
-        case "dusk_requestAccounts":
+        case "dusk_profiles":
+          return authorized ? [{ profileId: "profile:0", account }] : [];
+
+        case "dusk_requestProfiles":
           authorized = true;
           emit("connect", { chainId });
-          emit("accountsChanged", [account]);
-          return [account];
+          const profiles = [
+            {
+              profileId: "profile:0",
+              account,
+              ...(params?.shieldedReceiveAddress
+                ? { shieldedAddress: "dusk1demoshieldedreceiveaddress111111111111111111111111111" }
+                : {}),
+            },
+          ];
+          emit("profilesChanged", profiles);
+          return profiles;
 
-        case "dusk_accounts":
-          return authorized ? [account] : [];
+        case "dusk_requestShieldedAddress":
+          return {
+            address: "dusk1demoshieldedreceiveaddress111111111111111111111111111",
+            profileId: "profile:0",
+            account,
+            chainId,
+          };
 
         case "dusk_chainId":
           return chainId;
@@ -118,7 +143,7 @@ function createMockProvider({ info, account, chainId, networkName, balance }) {
         case "dusk_disconnect":
           authorized = false;
           emit("disconnect", { code: 4900, message: "Disconnected" });
-          emit("accountsChanged", []);
+          emit("profilesChanged", []);
           return true;
 
         case "dusk_switchNetwork": {
@@ -150,17 +175,14 @@ function createMockProvider({ info, account, chainId, networkName, balance }) {
       }
       listeners.clear();
     },
-    enable() {
-      return provider.request({ method: "dusk_requestAccounts" });
-    },
     isConnected() {
       return true;
     },
     get chainId() {
       return chainId;
     },
-    get selectedAddress() {
-      return authorized ? account : null;
+    get profiles() {
+      return authorized ? [{ profileId: "profile:0", account }] : [];
     },
     get isAuthorized() {
       return authorized;
@@ -259,7 +281,7 @@ function renderProviders(state) {
 function render(state) {
   const installed = !!state.installed;
   const needsSelection = installed && (state.availableProviders?.length ?? 0) > 1 && !state.providerId;
-  const connected = !!state.authorized && (state.accounts?.length ?? 0) > 0;
+  const connected = !!state.authorized && (state.profiles?.length ?? 0) > 0;
 
   elStatus.textContent = !installed
     ? "No wallets discovered"
@@ -270,7 +292,7 @@ function render(state) {
         : "Wallet selected";
   elSelectedWallet.textContent = state.providerInfo?.name ?? "—";
   elProviderId.textContent = state.providerId ?? "—";
-  elAccount.textContent = connected ? shorten(state.accounts[0]) : "—";
+  elAccount.textContent = connected ? shorten(state.selectedProfile?.account || state.profiles[0]?.account) : "—";
   elChainId.textContent = state.chainId ?? "—";
   renderProviders(state);
 }
@@ -298,8 +320,8 @@ btnDiscover.addEventListener("click", async () => {
 
 btnConnect.addEventListener("click", async () => {
   try {
-    const accounts = await wallet.connect();
-    log(`connected ${accounts[0] ?? "unknown account"}`);
+    const profiles = await wallet.connect();
+    log(`connected ${profiles[0]?.account ?? "unknown profile"}`);
   } catch (error) {
     log(`connect failed: ${error instanceof Error ? error.message : String(error)}`);
   }

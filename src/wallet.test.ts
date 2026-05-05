@@ -123,7 +123,7 @@ describe("wallet", () => {
     await expect(wallet.connect()).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
 
     await wallet.selectProvider("wallet.secondary");
-    await expect(wallet.connect()).resolves.toEqual(["dusk1secondary"]);
+    await expect(wallet.connect()).resolves.toEqual([{ profileId: "profile:0", account: "dusk1secondary" }]);
     expect(wallet.state.providerId).toBe("wallet.secondary");
     expect(wallet.state.providerInfo?.name).toBe("Secondary Wallet");
 
@@ -148,7 +148,7 @@ describe("wallet", () => {
     });
     const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
 
-    await expect(wallet.connect()).resolves.toEqual(["dusk1watched"]);
+    await expect(wallet.connect()).resolves.toEqual([{ profileId: "profile:0", account: "dusk1watched" }]);
     expect(wallet.state.authorized).toBe(true);
 
     const contractBytes = new Uint8Array(32).map((_, index) => index);
@@ -180,6 +180,220 @@ describe("wallet", () => {
     await expect(wallet.disconnect()).resolves.toBe(true);
     expect(wallet.state.authorized).toBe(false);
     expect(wallet.state.accounts).toEqual([]);
+  });
+
+  it("requests a shielded receive address and updates profile state from the grant", async () => {
+    const provider = createMockProvider({
+      authorized: false,
+      accounts: ["dusk1public"],
+      shieldedAddress: "dusk1shieldedreceive",
+    });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+
+    await expect(wallet.requestShieldedAddress({ reason: "payment_request" })).resolves.toBe("dusk1shieldedreceive");
+    expect(wallet.state.authorized).toBe(true);
+    expect(wallet.state.accounts).toEqual(["dusk1public"]);
+    expect(wallet.state.selectedProfile).toEqual({
+      profileId: "profile:0",
+      account: "dusk1public",
+      shieldedAddress: "dusk1shieldedreceive",
+    });
+    expect(provider.request).toHaveBeenLastCalledWith({
+      method: "dusk_requestShieldedAddress",
+      params: { reason: "payment_request" },
+    });
+  });
+
+  it("updates shielded address grants by profile id", async () => {
+    const provider = createMockProvider({
+      authorized: false,
+      accounts: ["dusk1publicpair"],
+      shieldedAddress: "dusk1pairedshielded",
+    });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+
+    await wallet.connect();
+    await expect(wallet.requestShieldedAddress({ reason: "payment_request" })).resolves.toBe("dusk1pairedshielded");
+
+    expect(wallet.state.selectedProfile).toEqual({
+      profileId: "profile:0",
+      account: "dusk1publicpair",
+      shieldedAddress: "dusk1pairedshielded",
+    });
+
+    provider.setAccounts(["dusk1publicpair"]);
+    expect(wallet.state.selectedProfile?.shieldedAddress).toBeUndefined();
+  });
+
+  it("connects with an explicitly requested shielded receive address on the selected profile", async () => {
+    const provider = createMockProvider({
+      authorized: false,
+      accounts: ["dusk1publicprofile"],
+      shieldedAddress: "dusk1profiledshielded",
+    });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+
+    await expect(wallet.connect({ shieldedReceiveAddress: true, reason: "payment_request" })).resolves.toEqual([
+      {
+        profileId: "profile:0",
+        account: "dusk1publicprofile",
+        shieldedAddress: "dusk1profiledshielded",
+      },
+    ]);
+
+    expect(wallet.state.accounts).toEqual(["dusk1publicprofile"]);
+    expect(wallet.state.selectedProfile).toEqual({
+      profileId: "profile:0",
+      account: "dusk1publicprofile",
+      shieldedAddress: "dusk1profiledshielded",
+    });
+    expect(provider.request).toHaveBeenLastCalledWith({
+      method: "dusk_requestProfiles",
+      params: { shieldedReceiveAddress: true, reason: "payment_request" },
+    });
+  });
+
+  it("forwards shielded transfer privacy before sending to the provider", async () => {
+    const provider = createMockProvider({ authorized: true, accounts: ["dusk1payer"] });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+
+    await expect(
+      wallet.sendTransfer({
+        privacy: "shielded",
+        to: "dusk1recipientshielded",
+        amount: "5000000000",
+        memo: "DuskSend:test",
+      })
+    ).resolves.toEqual({ hash: "0xtxhash", nonce: "7" });
+
+    expect(provider.request).toHaveBeenLastCalledWith({
+      method: "dusk_sendTransaction",
+      params: {
+        kind: "transfer",
+        privacy: "shielded",
+        to: "dusk1recipientshielded",
+        amount: "5000000000",
+        memo: "DuskSend:test",
+      },
+    });
+  });
+
+  it("normalizes explicit-private contract calls before forwarding to the provider", async () => {
+    const provider = createMockProvider({ authorized: true, accounts: ["dusk1payer"] });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+    const contractId = new Uint8Array(32).fill(0x11);
+
+    await expect(
+      wallet.sendContractCall({
+        privacy: "shielded",
+        contractId,
+        fnName: " pay_with_deposit ",
+        fnArgs: new Uint8Array([0xab, 0xcd]),
+        deposit: "4250000000",
+        display: {
+          title: "Private contract call",
+          referenceCommitment: "aa".repeat(32),
+        },
+      })
+    ).resolves.toEqual({ hash: "0xtxhash", nonce: "7" });
+
+    expect(provider.request).toHaveBeenLastCalledWith({
+      method: "dusk_sendTransaction",
+      params: {
+        kind: "contract_call",
+        privacy: "shielded",
+        contractId: "0x" + "11".repeat(32),
+        fnName: "pay_with_deposit",
+        fnArgs: "0xabcd",
+        deposit: "4250000000",
+        display: {
+          title: "Private contract call",
+          referenceCommitment: "aa".repeat(32),
+        },
+      },
+    });
+  });
+
+  it("rejects transfer privacy when missing or invalid", async () => {
+    const provider = createMockProvider({ authorized: true, accounts: ["dusk1payer"] });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+
+    await expect(
+      wallet.sendTransfer({
+        to: "dusk1recipient",
+        amount: "1",
+      } as any)
+    ).rejects.toThrow('privacy is required ("public" or "shielded")');
+
+    await expect(
+      wallet.sendTransfer({
+        privacy: "private",
+        to: "dusk1recipient",
+        amount: "1",
+      } as any)
+    ).rejects.toThrow('privacy must be "public" or "shielded"');
+  });
+
+  it("passes explicit public transfer privacy through", async () => {
+    const provider = createMockProvider({ authorized: true, accounts: ["dusk1payer"] });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+
+    await expect(
+      wallet.sendTransfer({
+        privacy: "public",
+        to: "dusk1recipientpublic",
+        amount: "1000",
+      })
+    ).resolves.toEqual({ hash: "0xtxhash", nonce: "7" });
+
+    expect(provider.request).toHaveBeenLastCalledWith({
+      method: "dusk_sendTransaction",
+      params: {
+        kind: "transfer",
+        privacy: "public",
+        to: "dusk1recipientpublic",
+        amount: "1000",
+      },
+    });
+  });
+
+  it("clears visible profiles on profilesChanged([]) without revoking authorization", async () => {
+    const provider = createMockProvider({
+      authorized: false,
+      accounts: ["dusk1public"],
+    });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+
+    await wallet.connect();
+    expect(wallet.state.authorized).toBe(true);
+    expect(wallet.state.profiles).toHaveLength(1);
+
+    provider.emit("profilesChanged", []);
+
+    expect(wallet.state.authorized).toBe(true);
+    expect(wallet.state.profiles).toEqual([]);
+    expect(wallet.state.accounts).toEqual([]);
+    expect(wallet.state.selectedProfile).toBeNull();
+    expect(wallet.state.selectedAddress).toBeNull();
+  });
+
+  it("does not preserve stale shielded addresses from passive profile responses", async () => {
+    const provider = createMockProvider({
+      authorized: false,
+      accounts: ["dusk1public"],
+      shieldedAddress: "dusk1shielded",
+    });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+
+    await wallet.connect({ shieldedReceiveAddress: true });
+    expect(wallet.state.selectedProfile?.shieldedAddress).toBe("dusk1shielded");
+
+    provider.emit("profilesChanged", [{ profileId: "profile:0", account: "dusk1public" }]);
+
+    expect(wallet.state.selectedProfile).toEqual({
+      profileId: "profile:0",
+      account: "dusk1public",
+    });
   });
 
   it("reacts to provider events and notifies subscribers", async () => {

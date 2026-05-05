@@ -53,15 +53,21 @@ describe("testing helpers", () => {
       },
     });
 
-    expect(report.connectedAccounts).toEqual([
-      "dusk1examplewalletaccount1111111111111111111111111111",
+    expect(report.connectedProfiles).toEqual([
+      {
+        profileId: "profile:0",
+        account: "dusk1examplewalletaccount1111111111111111111111111111",
+      },
     ]);
     expect(report.balance).toEqual({
       nonce: "7",
       value: "12500000000",
     });
-    expect(report.events.accountsChanged).toContainEqual([
-      "dusk1examplewalletaccount1111111111111111111111111111",
+    expect(report.events.profilesChanged).toContainEqual([
+      {
+        profileId: "profile:0",
+        account: "dusk1examplewalletaccount1111111111111111111111111111",
+      },
     ]);
     expect(report.afterSwitch).toEqual({
       chainId: "dusk:3",
@@ -142,7 +148,7 @@ describe("testing helpers", () => {
         installWallet: () =>
           installReferenceWallet({
             requestOverrides: {
-              dusk_requestAccounts: async () => {
+              dusk_requestProfiles: async () => {
                 throw Object.assign(new Error("User rejected connection"), {
                   code: ERROR_CODES.USER_REJECTED,
                 });

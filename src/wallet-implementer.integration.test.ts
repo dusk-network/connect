@@ -49,11 +49,17 @@ describe("integration: wallet implementer reference", () => {
       },
     });
 
-    expect(report.connectedAccounts).toEqual([
-      "dusk1examplewalletaccount1111111111111111111111111111",
+    expect(report.connectedProfiles).toEqual([
+      {
+        profileId: "profile:0",
+        account: "dusk1examplewalletaccount1111111111111111111111111111",
+      },
     ]);
-    expect(report.events.accountsChanged).toContainEqual([
-      "dusk1examplewalletaccount1111111111111111111111111111",
+    expect(report.events.profilesChanged).toContainEqual([
+      {
+        profileId: "profile:0",
+        account: "dusk1examplewalletaccount1111111111111111111111111111",
+      },
     ]);
     expect(report.events.chainChanged).toContain("dusk:3");
     expect(report.events.nodeChanged).toContainEqual({
@@ -73,11 +79,11 @@ describe("integration: wallet implementer reference", () => {
       announceOnStart: false,
     });
 
-    const onAccountsChanged = vi.fn();
+    const onProfilesChanged = vi.fn();
     const wallet = createDuskWallet({
       preferredProviderId: "com.example.wallet",
     });
-    wallet.on("accountsChanged", onAccountsChanged);
+    wallet.on("profilesChanged", onProfilesChanged);
     fixture.announce();
     await wallet.ready();
     await wallet.connect();
@@ -90,8 +96,11 @@ describe("integration: wallet implementer reference", () => {
     expect(wallet.state.selectedAddress).toBe(
       "dusk1updatedwalletaccount111111111111111111111111111"
     );
-    expect(onAccountsChanged).toHaveBeenCalledWith([
-      "dusk1updatedwalletaccount111111111111111111111111111",
+    expect(onProfilesChanged).toHaveBeenCalledWith([
+      {
+        profileId: "profile:0",
+        account: "dusk1updatedwalletaccount111111111111111111111111111",
+      },
     ]);
 
     wallet.destroy();
@@ -109,11 +118,11 @@ describe("integration: wallet implementer reference", () => {
       chainId: "dusk:2",
     });
 
-    const onAccountsChanged = vi.fn();
+    const onProfilesChanged = vi.fn();
     const wallet = createDuskWallet({
       preferredProviderId: "com.example.wallet",
     });
-    wallet.on("accountsChanged", onAccountsChanged);
+    wallet.on("profilesChanged", onProfilesChanged);
     await wallet.ready();
     await wallet.connect();
 
@@ -122,7 +131,7 @@ describe("integration: wallet implementer reference", () => {
     expect(wallet.state.authorized).toBe(false);
     expect(wallet.state.accounts).toEqual([]);
     expect(wallet.state.selectedAddress).toBeNull();
-    expect(onAccountsChanged).toHaveBeenLastCalledWith([]);
+    expect(onProfilesChanged).toHaveBeenLastCalledWith([]);
 
     await wallet.connect();
     fixture.provider.emit("disconnect", { code: 4900, message: "Disconnected" });

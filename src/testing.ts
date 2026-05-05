@@ -7,6 +7,7 @@ import type {
   DuskNodeChangedPayload,
   DuskProviderCapabilities,
   DuskProviderInfo,
+  DuskProfile,
   DuskWalletState,
   SwitchChainParams,
 } from "./types.js";
@@ -40,11 +41,11 @@ export type WalletConformanceOptions = {
 
 export type WalletConformanceReport = {
   initialState: DuskWalletState;
-  connectedAccounts: AccountId[];
+  connectedProfiles: DuskProfile[];
   capabilities: DuskProviderCapabilities;
   balance: BalanceResult | null;
   events: {
-    accountsChanged: AccountId[][];
+    profilesChanged: DuskProfile[][];
     chainChanged: ChainId[];
     nodeChanged: DuskNodeChangedPayload[];
   };
@@ -114,8 +115,8 @@ function assertBalance(balance: BalanceResult) {
 function assertCapabilities(capabilities: DuskProviderCapabilities) {
   assert(typeof capabilities.provider === "string" && capabilities.provider.length > 0, "capabilities.provider must be a non-empty string");
   assert(Array.isArray(capabilities.methods), "capabilities.methods must be an array");
-  assert(capabilities.methods.includes("dusk_requestAccounts"), "capabilities.methods must include dusk_requestAccounts");
-  assert(capabilities.methods.includes("dusk_accounts"), "capabilities.methods must include dusk_accounts");
+  assert(capabilities.methods.includes("dusk_requestProfiles"), "capabilities.methods must include dusk_requestProfiles");
+  assert(capabilities.methods.includes("dusk_profiles"), "capabilities.methods must include dusk_profiles");
   assert(capabilities.methods.includes("dusk_chainId"), "capabilities.methods must include dusk_chainId");
 }
 
@@ -162,10 +163,10 @@ export async function runWalletConformance(
     preferredProviderId: options.preferredProviderId ?? options.expectedProvider?.uuid ?? null,
   });
 
-  const accountEvents: AccountId[][] = [];
+  const profileEvents: DuskProfile[][] = [];
   const chainEvents: ChainId[] = [];
   const nodeEvents: DuskNodeChangedPayload[] = [];
-  let stopAccounts = () => {};
+  let stopProfiles = () => {};
   let stopChain = () => {};
   let stopNode = () => {};
 
@@ -184,8 +185,8 @@ export async function runWalletConformance(
       );
     }
 
-    stopAccounts = wallet.on("accountsChanged", (accounts) => {
-      accountEvents.push([...accounts]);
+    stopProfiles = wallet.on("profilesChanged", (profiles) => {
+      profileEvents.push(profiles.map((profile) => ({ ...profile })));
     });
     stopChain = wallet.on("chainChanged", (chainId) => {
       chainEvents.push(chainId);
@@ -194,13 +195,13 @@ export async function runWalletConformance(
       nodeEvents.push({ ...payload });
     });
 
-    const connectedAccounts = await wallet.connect();
-    assert(connectedAccounts.length > 0, "dusk_requestAccounts returned no accounts");
+    const connectedProfiles = await wallet.connect();
+    assert(connectedProfiles.length > 0, "dusk_requestProfiles returned no profiles");
 
     if (options.expectedAccount) {
       assert(
-        connectedAccounts[0] === options.expectedAccount,
-        `expected first account "${options.expectedAccount}" but found "${connectedAccounts[0] ?? "none"}"`
+        connectedProfiles[0]?.account === options.expectedAccount,
+        `expected first account "${options.expectedAccount}" but found "${connectedProfiles[0]?.account ?? "none"}"`
       );
     }
 
@@ -233,18 +234,18 @@ export async function runWalletConformance(
 
     return {
       initialState,
-      connectedAccounts: [...connectedAccounts],
+      connectedProfiles: connectedProfiles.map((profile) => ({ ...profile })),
       capabilities,
       balance,
       events: {
-        accountsChanged: accountEvents.map((accounts) => [...accounts]),
+        profilesChanged: profileEvents.map((profiles) => profiles.map((profile) => ({ ...profile }))),
         chainChanged: [...chainEvents],
         nodeChanged: nodeEvents.map((payload) => ({ ...payload })),
       },
       afterSwitch,
     };
   } finally {
-    stopAccounts();
+    stopProfiles();
     stopChain();
     stopNode();
     wallet.destroy();

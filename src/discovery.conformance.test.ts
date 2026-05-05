@@ -57,4 +57,35 @@ describe("Discovery Conformance", () => {
     expect(md.includes(`\`${DUSK_REQUEST_PROVIDER_EVENT}\``)).toBe(true);
     expect(md.includes(`\`${DUSK_ANNOUNCE_PROVIDER_EVENT}\``)).toBe(true);
   });
+
+  it("docs and examples do not mention removed account or placeholder provider APIs", async () => {
+    const root = process.cwd();
+    const relativePaths = [
+      "README.md",
+      "docs/wallet-discovery.md",
+      "docs/wallet-implementer.md",
+      "examples/discovery-demo/main.js",
+      "examples/reference-wallet/main.js",
+    ];
+    const forbidden = [
+      "dusk_requestAccounts",
+      "dusk_accounts",
+      "accountsChanged",
+      "dusk_requestSettlementEncryptionKey",
+      "dusk_requestDisclosureBundle",
+      "dusk_requestShieldedSettlementReceipt",
+      "dusk_requestGatewayWithdraw",
+      "Dusk Pay",
+      "disclosure bundle",
+      "settlement encryption",
+      "gateway withdraw",
+    ];
+
+    for (const relativePath of relativePaths) {
+      const text = await readFile(path.resolve(root, relativePath), "utf8");
+      for (const term of forbidden) {
+        expect(text.includes(term), `${relativePath} contains ${term}`).toBe(false);
+      }
+    }
+  });
 });

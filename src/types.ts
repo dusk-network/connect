@@ -120,6 +120,10 @@ export type ByteLike = string | number[] | Uint8Array | ArrayBuffer;
 
 export type SendTransferParams = {
   kind: "transfer";
+  /**
+   * Choose Moonlight (public) or Phoenix (shielded) transaction model.
+   */
+  privacy: PrivacyMode;
   to: AccountId | Address;
   amount: LuxString;
   memo?: string;
@@ -130,12 +134,13 @@ export type PrivacyMode = "public" | "shielded";
 
 export type SendContractCallParams = {
   kind: "contract_call";
-  /** Choose Moonlight (public) or Phoenix (shielded) transaction model. Default: "public". */
-  privacy?: PrivacyMode;
+  /** Choose Moonlight (public) or Phoenix (shielded) transaction model. */
+  privacy: PrivacyMode;
   contractId: string | number[] | Uint8Array; // must be 32 bytes
   fnName: string;
   fnArgs: ByteLike;
   amount?: LuxString;
+  /** Contract-call deposit picked up by the called contract. */
   deposit?: LuxString;
   gas?: Gas;
   /**
@@ -184,6 +189,49 @@ export type SwitchChainParams = {
   /** Custom network node URL */
   nodeUrl?: string;
 };
+
+export type DuskProfile = {
+  /** Opaque profile id scoped to this wallet/provider. */
+  profileId: string;
+  /** Public account id for this profile. */
+  account: AccountId;
+  /** Shareable shielded receive address, only present when explicitly approved. */
+  shieldedAddress?: Address;
+};
+
+export type ConnectOptions = {
+  /**
+   * Request the selected profile's shareable shielded receive address as part
+   * of the connection approval.
+   */
+  shieldedReceiveAddress?: boolean;
+  /** Optional user-facing reason shown by wallets that support scoped prompts. */
+  reason?: string;
+  /** Optional user-facing label shown by wallets that support scoped prompts. */
+  label?: string;
+};
+
+export type RequestShieldedAddressParams = {
+  /**
+   * Optional UX context shown by the wallet during approval.
+   * Example: "payment_request".
+   */
+  reason?: string;
+  /** Optional user-facing label for the address request. */
+  label?: string;
+  /** Optional public account context when the wallet supports account-scoped shielded addresses. */
+  account?: AccountId;
+};
+
+export type RequestShieldedAddressResult = {
+  /** Shareable shielded receive address approved by the user for this origin/request. */
+  address: Address;
+  account?: AccountId;
+  profileId?: string;
+  chainId?: ChainId;
+};
+
+export type RequestShieldedAddressResponse = Address | RequestShieldedAddressResult;
 
 /**
  * Convenience preset ids understood by the wallet's switch RPC.
@@ -234,9 +282,6 @@ export interface DuskProvider {
   off(eventName: string, handler: (...args: any[]) => void): void;
   removeAllListeners(eventName?: string): void;
 
-  /** Legacy convenience (calls `dusk_requestAccounts`) */
-  enable(): Promise<AccountId[]>;
-
   /**
    * Provider transport is the extension injection.
    * If the provider exists, it is "connected" to the extension.
@@ -246,8 +291,8 @@ export interface DuskProvider {
   /** Wallet chain id (CAIP-2) */
   readonly chainId: ChainId | null;
 
-  /** First exposed account id (if any) */
-  readonly selectedAddress: AccountId | null;
+  /** Approved profile records visible to this origin. */
+  readonly profiles: DuskProfile[];
 
   /** True after a successful connection approval for the current origin */
   readonly isAuthorized: boolean;
@@ -280,6 +325,11 @@ export type DuskProviderCapabilities = {
   features: {
     shieldedRead: boolean;
     shieldedRecipients: boolean;
+    /**
+     * True when the wallet can prompt the user for a shareable shielded receive
+     * address via `dusk_requestShieldedAddress`.
+     */
+    shieldedReceiveAddress?: boolean;
     signMessage: boolean;
     signAuth: boolean;
     contractCallPrivacy: boolean;
@@ -290,7 +340,7 @@ export type DuskProviderCapabilities = {
 export type DuskProviderEventMap = {
   connect: { chainId: ChainId };
   disconnect: { code: number; message: string };
-  accountsChanged: AccountId[];
+  profilesChanged: DuskProfile[];
   chainChanged: ChainId;
   duskNodeChanged: DuskNodeChangedPayload;
 };
@@ -306,12 +356,16 @@ export type DuskWalletState = {
   availableProviders: DuskProviderInfo[];
   /** Whether the origin is authorized/connected */
   authorized: boolean;
-  /** Exposed accounts for this origin */
+  /** Accounts derived from `profiles`. Convenience only; profiles are canonical. */
   accounts: AccountId[];
+  /** Exposed profile pairs for this origin. May omit shieldedAddress unless explicitly approved. */
+  profiles: DuskProfile[];
   /** Wallet chain id */
   chainId: ChainId | null;
-  /** First account (if any) */
+  /** First profile account, derived from `selectedProfile`. Convenience only. */
   selectedAddress: AccountId | null;
+  /** First exposed profile, if any. */
+  selectedProfile: DuskProfile | null;
   /** Last `duskNodeChanged` payload (if any) */
   node: DuskNodeChangedPayload | null;
   /** Provider capability snapshot (if supported by the wallet) */

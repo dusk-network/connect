@@ -73,13 +73,26 @@ function createReferenceWallet() {
     throw Object.assign(new Error("Origin is not connected"), { code: 4100 });
   };
 
+  const currentProfiles = (includeShielded = false) =>
+    authorized
+      ? [
+          {
+            profileId: `profile:${accountIndex}`,
+            account: accounts[accountIndex],
+            ...(includeShielded
+              ? { shieldedAddress: "dusk1referenceshieldedreceiveaddress111111111111111111111111" }
+              : {}),
+          },
+        ]
+      : [];
+
   const provider = {
     isDusk: true,
     get chainId() {
       return chainId;
     },
-    get selectedAddress() {
-      return authorized ? accounts[accountIndex] : null;
+    get profiles() {
+      return currentProfiles();
     },
     get isAuthorized() {
       return authorized;
@@ -95,8 +108,9 @@ function createReferenceWallet() {
             networkName,
             methods: [
               "dusk_getCapabilities",
-              "dusk_requestAccounts",
-              "dusk_accounts",
+              "dusk_requestProfiles",
+              "dusk_profiles",
+              "dusk_requestShieldedAddress",
               "dusk_chainId",
               "dusk_switchNetwork",
               "dusk_getPublicBalance",
@@ -116,6 +130,7 @@ function createReferenceWallet() {
             features: {
               shieldedRead: false,
               shieldedRecipients: true,
+              shieldedReceiveAddress: true,
               signMessage: true,
               signAuth: true,
               contractCallPrivacy: true,
@@ -123,16 +138,28 @@ function createReferenceWallet() {
             },
           };
 
-        case "dusk_requestAccounts":
+        case "dusk_profiles":
+          return currentProfiles();
+
+        case "dusk_requestProfiles": {
           authorized = true;
           emit("connect", { chainId });
-          emit("accountsChanged", [accounts[accountIndex]]);
           renderWalletPanel();
-          log("wallet approved connection");
-          return [accounts[accountIndex]];
+          const includeShielded = Boolean(params?.shieldedReceiveAddress);
+          const profiles = currentProfiles(includeShielded);
+          emit("profilesChanged", profiles);
+          log(includeShielded ? "wallet approved profile + shielded address" : "wallet approved profile");
+          return profiles;
+        }
 
-        case "dusk_accounts":
-          return authorized ? [accounts[accountIndex]] : [];
+        case "dusk_requestShieldedAddress":
+          log("wallet approved shielded receive address");
+          return {
+            address: "dusk1referenceshieldedreceiveaddress111111111111111111111111",
+            profileId: `profile:${accountIndex}`,
+            account: accounts[accountIndex],
+            chainId,
+          };
 
         case "dusk_chainId":
           return chainId;
@@ -200,7 +227,7 @@ function createReferenceWallet() {
         case "dusk_disconnect":
           authorized = false;
           emit("disconnect", { code: 4900, message: "Disconnected" });
-          emit("accountsChanged", []);
+          emit("profilesChanged", []);
           renderWalletPanel();
           log("wallet disconnected");
           return true;
@@ -223,9 +250,6 @@ function createReferenceWallet() {
       if (eventName) listeners.delete(eventName);
       else listeners.clear();
     },
-    enable() {
-      return this.request({ method: "dusk_requestAccounts" });
-    },
     isConnected() {
       return true;
     },
@@ -239,7 +263,7 @@ function createReferenceWallet() {
     announce,
     rotateAccount() {
       accountIndex = accountIndex === 0 ? 1 : 0;
-      if (authorized) emit("accountsChanged", [accounts[accountIndex]]);
+      if (authorized) emit("profilesChanged", currentProfiles());
       renderWalletPanel();
       log(`wallet rotated account -> ${accounts[accountIndex]}`);
     },
@@ -260,7 +284,7 @@ function createReferenceWallet() {
     disconnect() {
       authorized = false;
       emit("disconnect", { code: 4900, message: "Disconnected" });
-      emit("accountsChanged", []);
+      emit("profilesChanged", []);
       renderWalletPanel();
       log("wallet forced a disconnect");
     },
@@ -310,8 +334,8 @@ const wallet = createDuskWallet({
   preferredProviderId: fixture.info.uuid,
 });
 
-wallet.on("accountsChanged", (accounts) => {
-  log(`dapp observed accountsChanged -> ${accounts.join(", ") || "[]"}`);
+wallet.on("profilesChanged", (profiles) => {
+  log(`dapp observed profilesChanged -> ${profiles.map((profile) => profile.account).join(", ") || "[]"}`);
 });
 
 wallet.on("chainChanged", (chainId) => {
@@ -331,7 +355,7 @@ function renderSdkPanel(state) {
         ? "Discovered"
         : "Choose provider";
   elSdkProvider.textContent = state.providerId ?? "-";
-  elSdkAccount.textContent = state.accounts[0] ?? "-";
+  elSdkAccount.textContent = state.selectedProfile?.account ?? state.profiles[0]?.account ?? "-";
   elSdkChain.textContent = state.chainId ?? "-";
   elProviderSummary.textContent = state.availableProviders.length
     ? `${state.availableProviders[0].name} | ${state.availableProviders[0].uuid} | ${state.availableProviders[0].rdns}`
@@ -369,8 +393,8 @@ $("btnDiscover").addEventListener("click", async () => {
 });
 
 $("btnConnect").addEventListener("click", async () => {
-  const accounts = await wallet.connect();
-  log(`dapp connected -> ${accounts.join(", ")}`);
+  const profiles = await wallet.connect();
+  log(`dapp connected -> ${profiles.map((profile) => profile.account).join(", ")}`);
 });
 
 $("btnBalance").addEventListener("click", async () => {

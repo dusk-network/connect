@@ -6,11 +6,11 @@ describe("ui shared helpers", () => {
   it("computes wallet status from wallet state", () => {
     expect(walletStatus(null)).toBe("missing");
     expect(walletStatus({ installed: false } as any)).toBe("missing");
-    expect(walletStatus({ installed: true, authorized: false, accounts: [] } as any)).toBe(
+    expect(walletStatus({ installed: true, authorized: false, profiles: [] } as any)).toBe(
       "disconnected"
     );
-    expect(walletStatus({ installed: true, authorized: true, accounts: [] } as any)).toBe("locked");
-    expect(walletStatus({ installed: true, authorized: true, accounts: ["dusk1"] } as any)).toBe(
+    expect(walletStatus({ installed: true, authorized: true, profiles: [] } as any)).toBe("locked");
+    expect(walletStatus({ installed: true, authorized: true, profiles: [{ profileId: "profile:0", account: "dusk1" }] } as any)).toBe(
       "connected"
     );
   });
