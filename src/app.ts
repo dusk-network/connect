@@ -200,6 +200,7 @@ function validateContractPreset(name: string, c: DuskAppContract): void {
 function pickTxOverrides(src: any): DuskContractTxOverrides {
   return compact({
     to: src?.to,
+    privacy: src?.privacy,
     amount: src?.amount,
     deposit: src?.deposit,
     gas: src?.gas,

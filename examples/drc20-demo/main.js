@@ -77,7 +77,7 @@ if (connectBtn) connectBtn.wallet = wallet;
 function renderStatus() {
   const st = wallet.state;
   setText("status", st.installed ? (st.authorized ? "Connected" : "Installed") : "Not installed");
-  setText("account", st.selectedAddress || "—");
+  setText("account", st.selectedProfile?.account || "—");
   setText("chainId", st.chainId || "—");
   setText("nodeUrl", st.node?.nodeUrl || DEFAULT_NODE_URL);
 }
@@ -200,4 +200,3 @@ $("btnApproveMax")?.addEventListener("click", async () => {
     log(`Error: ${e?.message ?? String(e)}`);
   }
 });
-

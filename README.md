@@ -22,8 +22,9 @@ Wallet discovery is **event-based**, not singleton-based:
 - wallets expose an EIP-1193-like provider object through those events
 
 - `dusk_getCapabilities`
-- `dusk_requestAccounts`
-- `dusk_accounts`
+- `dusk_requestProfiles`
+- `dusk_profiles`
+- `dusk_requestShieldedAddress`
 - `dusk_chainId`
 - `dusk_switchNetwork`
 - `dusk_getPublicBalance`
@@ -124,7 +125,7 @@ npm i @dusk-network/connect
 Use this when you only need wallet discovery + provider access:
 
 - connect / disconnect
-- read accounts + chain
+- read profiles + chain
 - get balances
 - send transactions
 
@@ -141,7 +142,11 @@ if (wallet.state.availableProviders.length > 1 && !wallet.state.providerId) {
 }
 
 await wallet.connect();
-console.log(wallet.state.accounts);
+console.log(wallet.state.profiles);
+
+// Request the selected profile's public account + shielded receive address in one approval.
+await wallet.connect({ shieldedReceiveAddress: true, reason: "payment_request" });
+console.log(wallet.state.selectedProfile);
 ```
 
 ### `createDuskApp()`
@@ -206,8 +211,8 @@ if (wallet.state.availableProviders.length > 1 && !wallet.state.providerId) {
 
 // Prompt connection (opens wallet approval)
 try {
-  const accounts = await wallet.connect();
-  console.log("Connected account", accounts[0]);
+  const profiles = await wallet.connect();
+  console.log("Connected profile", profiles[0]);
 } catch (err: any) {
   if (err?.code === ERROR_CODES.USER_REJECTED) {
     console.log("user rejected");
@@ -218,8 +223,14 @@ try {
 const bal = await wallet.getPublicBalance();
 console.log("Balance", formatLuxShort(bal.value), "DUSK");
 
+// Shielded receive addresses are profile-scoped. This prompts for a profile
+// pair instead of exposing a loose wallet-level address.
+await wallet.connect({ shieldedReceiveAddress: true, reason: "payment_request" });
+console.log("Selected profile", wallet.state.selectedProfile);
+
 // Send a transfer
 await wallet.sendTransfer({
+  privacy: "public",
   to: "<base58-account-id>",
   amount: parseDuskToLux("1.5"), // 1.5 DUSK -> Lux string
   memo: "hello",
@@ -235,9 +246,10 @@ const wallet = createDuskWallet();
 await wallet.connect();
 
 const tx = await wallet.sendContractCall({
+  privacy: "public",
   contractId: "0x" + "02".padEnd(64, "0"), // 32 bytes
   fnName: "get_version",
-  fnArgs: "0x", // opaque bytes (hex/base64/number[]/Uint8Array supported)
+  fnArgs: "0x", // opaque bytes (hex/number[]/Uint8Array/ArrayBuffer supported)
   display: { contractName: "Example", methodSig: "get_version()" },
 });
 

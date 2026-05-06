@@ -2,6 +2,7 @@ import type {
   AccountId,
   Gas,
   LuxString,
+  PrivacyMode,
   SwitchChainParams,
   TxHandle,
   TxStatusUpdate,
@@ -19,6 +20,8 @@ import { toTxWaitReceipt } from "./internal/tx.js";
 
 export type DuskContractTxOverrides = {
   to?: AccountId;
+  /** Choose Moonlight (public) or Phoenix (shielded) for contract calls. */
+  privacy?: PrivacyMode;
   amount?: LuxString;
   deposit?: LuxString;
   gas?: Gas;
@@ -176,6 +179,12 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
       // display merge
       const userDisplay = overrides?.display ?? opts.defaultTx?.display;
       merged.display = buildDisplay(fnName, displayMeta, userDisplay);
+
+      const privacy = String(merged.privacy ?? "").trim();
+      if (privacy !== "public" && privacy !== "shielded") {
+        throw new TypeError('privacy is required ("public" or "shielded")');
+      }
+      merged.privacy = privacy;
 
       return merged;
     };

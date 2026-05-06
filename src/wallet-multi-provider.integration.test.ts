@@ -63,11 +63,17 @@ describe("integration: multi-provider wallet selection", () => {
     expect(wallet.state.providerInfo?.name).toBe("Beta Wallet");
 
     await expect(wallet.connect()).resolves.toEqual([
-      "dusk1betawalletaccount111111111111111111111111111111",
+      {
+        profileId: "profile:0",
+        account: "dusk1betawalletaccount111111111111111111111111111111",
+      },
     ]);
 
-    primary.provider.emit("accountsChanged", [
-      "dusk1alphachangedwallet111111111111111111111111111111",
+    primary.provider.emit("profilesChanged", [
+      {
+        profileId: "profile:0",
+        account: "dusk1alphachangedwallet111111111111111111111111111111",
+      },
     ]);
     primary.provider.emit("chainChanged", "dusk:1");
 

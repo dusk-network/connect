@@ -22,8 +22,10 @@ function createWalletStub() {
   const state = {
     authorized: false,
     accounts: [] as string[],
+    profiles: [] as any[],
     chainId: "dusk:1",
     selectedAddress: null as string | null,
+    selectedProfile: null as any,
   };
 
   return {
@@ -31,7 +33,9 @@ function createWalletStub() {
     connect: vi.fn(async () => {
       state.authorized = true;
       state.accounts = ["dusk1writer"];
+      state.profiles = [{ profileId: "profile:0", account: "dusk1writer" }];
       state.selectedAddress = "dusk1writer";
+      state.selectedProfile = state.profiles[0];
       return [...state.accounts];
     }),
     sendContractCall: vi.fn(async () => ({ hash: "0xtxhash", nonce: "9" })),
@@ -75,17 +79,18 @@ describe("contract facade", () => {
       driver,
       name: "Treasury",
       methodSigs: { transfer: "transfer(to: Account, value: u64)" },
-      defaultTx: { amount: "1", gas: { limit: "2", price: "3" }, display: { preset: true } },
+      defaultTx: { privacy: "public", amount: "1", gas: { limit: "2", price: "3" }, display: { preset: true } },
     });
 
     const tx = await contract.tx["transfer"]!(
       { to: "dusk1dest", value: 42n },
-      { deposit: "5", display: { fromUser: true } }
+      { privacy: "shielded", deposit: "5", display: { fromUser: true } }
     );
 
     expect(tx).toMatchObject({
       contractId: "0x" + "aa".repeat(32),
       fnName: "transfer",
+      privacy: "shielded",
       amount: "1",
       deposit: "5",
       gas: { limit: "2", price: "3" },
@@ -96,6 +101,18 @@ describe("contract facade", () => {
       },
     });
     expect(tx.fnArgs).toMatch(/^0x/);
+  });
+
+  it("rejects tx params that do not declare privacy", async () => {
+    const driver = createDriver();
+    const contract = createDuskContract({
+      contractId: "0x" + "aa".repeat(32),
+      driver,
+    });
+
+    await expect(contract.tx["transfer"]!({ to: "dusk1dest", value: 42n })).rejects.toThrow(
+      'privacy is required ("public" or "shielded")'
+    );
   });
 
   it("writes through the wallet with auto-connect, ensureChain, and tx status updates", async () => {
@@ -114,6 +131,7 @@ describe("contract facade", () => {
       wallet,
       node: node as any,
       chain: { chainId: "dusk:2" },
+      defaultTx: { privacy: "public" },
     });
 
     const handle = await contract.write["transfer"]!({ to: "dusk1dest", value: "7" });
@@ -152,7 +170,7 @@ describe("contract facade", () => {
       } as any,
     });
 
-    const handle = await contract.write["ping"]!();
+    const handle = await contract.write["ping"]!(undefined, { privacy: "public" });
     await expect(handle.wait()).resolves.toMatchObject({
       status: "timeout",
       ok: false,

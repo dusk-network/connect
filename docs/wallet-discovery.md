@@ -84,18 +84,18 @@ The announced `provider` should expose the Dusk provider API:
 
 - `request({ method, params })`
 - `on`, `once`, `off`, `removeListener`, `removeAllListeners`
-- `enable()`
 - `isConnected()`
 - `chainId`
-- `selectedAddress`
+- `profiles`
 - `isAuthorized`
 - `isDusk === true`
 
 RPC methods remain Dusk-prefixed:
 
 - `dusk_getCapabilities`
-- `dusk_requestAccounts`
-- `dusk_accounts`
+- `dusk_requestProfiles`
+- `dusk_profiles`
+- `dusk_requestShieldedAddress`
 - `dusk_chainId`
 - `dusk_switchNetwork`
 - `dusk_getPublicBalance`
@@ -167,6 +167,6 @@ window.dispatchEvent(new Event("dusk:requestProvider"));
 
 if (providers.size === 1) {
   const [{ provider }] = [...providers.values()];
-  await provider.request({ method: "dusk_requestAccounts" });
+  await provider.request({ method: "dusk_requestProfiles" });
 }
 ```

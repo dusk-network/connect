@@ -8,13 +8,13 @@ export type WalletStatus = "missing" | "disconnected" | "locked" | "connected";
  *
  * - missing: no compatible wallet discovered
  * - disconnected: installed but not authorized
- * - locked: authorized but no accounts exposed
- * - connected: authorized with at least one account
+ * - locked: authorized but no profiles exposed
+ * - connected: authorized with at least one profile
  */
 export function walletStatus(st: DuskWalletState | null | undefined): WalletStatus {
   if (!st || !st.installed) return "missing";
   if (!st.authorized) return "disconnected";
-  if (!st.accounts?.length) return "locked";
+  if (!st.profiles?.length) return "locked";
   return "connected";
 }
 

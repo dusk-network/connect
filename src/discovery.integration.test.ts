@@ -40,9 +40,11 @@ describe("integration: wallet discovery", () => {
     expect(wallet.state.providerId).toBe("wallet.integration");
     expect(wallet.state.providerInfo?.name).toBe("Integration Wallet");
 
-    await expect(wallet.connect()).resolves.toEqual(["dusk1integration"]);
+    await expect(wallet.connect()).resolves.toEqual([
+      { profileId: "profile:0", account: "dusk1integration" },
+    ]);
     expect(provider.request).toHaveBeenCalledWith({
-      method: "dusk_requestAccounts",
+      method: "dusk_requestProfiles",
       params: undefined,
     });
 

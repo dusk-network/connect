@@ -1,32 +1,21 @@
 # Dusk Wallet Implementer Guide
 
-This guide is for wallet teams that want to expose a Dusk provider that works
-with `@dusk-network/connect` and any dApp that follows the same discovery
-standard.
+This guide is for wallet teams that want to expose a Dusk provider compatible
+with `@dusk-network/connect`.
 
-The protocol is intentionally small:
+Discovery is event-based:
 
 - wallets listen for `dusk:requestProvider`
 - wallets answer with `dusk:announceProvider`
 - the announced provider exposes an EIP-1193-like object with Dusk RPC methods
 
-If you only implement those pieces correctly, dApps can discover your wallet,
-let the user select it, and call `provider.request(...)` without depending on a
-global singleton like `window.dusk`.
+The canonical discovery event spec lives in
+[wallet-discovery.md](./wallet-discovery.md).
 
 ## Required Discovery Events
 
 - `dusk:requestProvider`
 - `dusk:announceProvider`
-
-Your wallet should:
-
-1. create a provider object
-2. create stable `info` metadata
-3. announce once on load when practical
-4. re-announce every time the page dispatches `dusk:requestProvider`
-
-The canonical event spec lives in [wallet-discovery.md](./wallet-discovery.md).
 
 ## Wallet Metadata
 
@@ -37,16 +26,12 @@ The canonical event spec lives in [wallet-discovery.md](./wallet-discovery.md).
 - `icon`
 - `rdns`
 
-Guidance:
+`uuid` should be stable across product versions and page loads. `rdns` should
+identify the wallet product, for example `com.example.wallet`.
 
-- `uuid` should be stable across product versions and page loads
-- `name` should be user-facing
-- `icon` should be a usable URL or data URI
-- `rdns` should identify the wallet product, for example `com.example.wallet`
+## Provider Surface
 
-## Minimum Provider Surface
-
-At minimum, the announced provider should expose:
+The announced provider should expose:
 
 - `request({ method, params })`
 - `on(eventName, handler)`
@@ -54,43 +39,65 @@ At minimum, the announced provider should expose:
 - `off(eventName, handler)`
 - `removeListener(eventName, handler)`
 - `removeAllListeners(eventName?)`
-- `enable()`
 - `isConnected()`
 - `chainId`
-- `selectedAddress`
+- `profiles`
 - `isAuthorized`
 - `isDusk === true`
 
-The first three RPC methods a dApp will usually hit are:
+Profiles are the provider identity model. A profile contains the public account
+and may include the explicitly approved shareable shielded receive address:
+
+```ts
+type DuskProfile = {
+  profileId: string;
+  account: string;
+  shieldedAddress?: string;
+};
+```
+
+## RPC Methods
+
+Wallets should expose the Dusk Send provider methods:
 
 - `dusk_getCapabilities`
-- `dusk_accounts`
-- `dusk_requestAccounts`
+- `dusk_requestProfiles`
+- `dusk_profiles`
+- `dusk_requestShieldedAddress`
+- `dusk_chainId`
+- `dusk_switchNetwork`
+- `dusk_getPublicBalance`
+- `dusk_estimateGas`
+- `dusk_sendTransaction`
+- `dusk_watchAsset`
+- `dusk_signMessage`
+- `dusk_signAuth`
+- `dusk_disconnect`
 
-The broader Dusk RPC surface is documented in the
-[Dusk Wallet provider API](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md).
+## Event Semantics
 
-## Minimum Event Semantics
-
-If your wallet supports connection state changes, emit these provider events:
+If your wallet supports connection state changes, emit:
 
 - `connect`
 - `disconnect`
-- `accountsChanged`
+- `profilesChanged`
 - `chainChanged`
 - `duskNodeChanged`
 
 Recommended behavior:
 
-- emit `connect` after a successful `dusk_requestAccounts`
-- emit `accountsChanged` when the exposed account changes
+- emit `connect` after a successful `dusk_requestProfiles`
+- emit `profilesChanged` when visible profile fields change
+- emit `profilesChanged([])` when the wallet is locked or no profile fields are visible
 - emit `chainChanged` when the active CAIP-2 chain id changes
-- emit `duskNodeChanged` when the selected node/network details change
+- emit `duskNodeChanged` when the selected node or network details change
 - emit `disconnect` when the origin loses authorization or the wallet disconnects
 
-## Minimal Reference Injection
+`profilesChanged([])` is not necessarily a permission revoke. It may also mean
+the wallet is locked. Use `disconnect` for explicit disconnection or permission
+loss.
 
-This is the smallest useful pattern to copy into a wallet injection script:
+## Minimal Reference Injection
 
 ```js
 const DUSK_REQUEST_PROVIDER_EVENT = "dusk:requestProvider";
@@ -115,13 +122,6 @@ function createEmitter() {
     off(eventName, handler) {
       listeners.get(eventName)?.delete(handler);
     },
-    once(eventName, handler) {
-      const wrapped = (payload) => {
-        this.off(eventName, wrapped);
-        handler(payload);
-      };
-      this.on(eventName, wrapped);
-    },
     emit(eventName, payload) {
       for (const handler of listeners.get(eventName) ?? []) handler(payload);
     },
@@ -134,35 +134,82 @@ function createEmitter() {
 
 const events = createEmitter();
 let authorized = false;
-let accounts = ["dusk1exampleaccount"];
 let chainId = "dusk:2";
+const profile = {
+  profileId: "profile:0",
+  account: "dusk1example...",
+};
+const shieldedAddress = "dusk1shielded...";
+
+function visibleProfiles(includeShielded = false) {
+  if (!authorized) return [];
+  return [
+    {
+      ...profile,
+      ...(includeShielded ? { shieldedAddress } : {}),
+    },
+  ];
+}
 
 const provider = {
   isDusk: true,
   get chainId() {
     return chainId;
   },
-  get selectedAddress() {
-    return authorized ? accounts[0] ?? null : null;
+  get profiles() {
+    return visibleProfiles();
   },
   get isAuthorized() {
     return authorized;
+  },
+  isConnected() {
+    return true;
+  },
+  on: events.on,
+  off: events.off,
+  removeListener: events.off,
+  removeAllListeners: events.removeAllListeners,
+  once(eventName, handler) {
+    const wrapped = (payload) => {
+      events.off(eventName, wrapped);
+      handler(payload);
+    };
+    events.on(eventName, wrapped);
   },
   async request({ method, params }) {
     switch (method) {
       case "dusk_getCapabilities":
         return {
           provider: info.rdns,
-          walletVersion: "1.0.0",
+          walletVersion: "0.0.0",
           chainId,
           nodeUrl: "https://testnet.nodes.dusk.network",
           networkName: "Testnet",
-          methods: ["dusk_getCapabilities", "dusk_accounts", "dusk_requestAccounts"],
+          methods: [
+            "dusk_getCapabilities",
+            "dusk_requestProfiles",
+            "dusk_profiles",
+            "dusk_requestShieldedAddress",
+            "dusk_chainId",
+            "dusk_switchNetwork",
+            "dusk_getPublicBalance",
+            "dusk_estimateGas",
+            "dusk_sendTransaction",
+            "dusk_watchAsset",
+            "dusk_signMessage",
+            "dusk_signAuth",
+            "dusk_disconnect",
+          ],
           txKinds: ["transfer", "contract_call"],
-          limits: { maxFnArgsBytes: 65536, maxFnNameChars: 64, maxMemoBytes: 512 },
+          limits: {
+            maxFnArgsBytes: 65536,
+            maxFnNameChars: 64,
+            maxMemoBytes: 512,
+          },
           features: {
             shieldedRead: false,
             shieldedRecipients: true,
+            shieldedReceiveAddress: true,
             signMessage: true,
             signAuth: true,
             contractCallPrivacy: true,
@@ -170,32 +217,39 @@ const provider = {
           },
         };
 
-      case "dusk_accounts":
-        return authorized ? [...accounts] : [];
-
-      case "dusk_requestAccounts":
+      case "dusk_requestProfiles": {
         authorized = true;
+        const includeShielded = Boolean(params?.shieldedReceiveAddress);
+        const profiles = visibleProfiles(includeShielded);
         events.emit("connect", { chainId });
-        events.emit("accountsChanged", [...accounts]);
-        return [...accounts];
+        events.emit("profilesChanged", profiles);
+        return profiles;
+      }
+
+      case "dusk_profiles":
+        return visibleProfiles();
+
+      case "dusk_requestShieldedAddress":
+        authorized = true;
+        return {
+          address: shieldedAddress,
+          account: profile.account,
+          profileId: profile.profileId,
+          chainId,
+        };
 
       case "dusk_chainId":
         return chainId;
 
+      case "dusk_disconnect":
+        authorized = false;
+        events.emit("disconnect", { code: 4900, message: "Disconnected" });
+        events.emit("profilesChanged", []);
+        return true;
+
       default:
         throw Object.assign(new Error(`Unsupported method: ${method}`), { code: 4200 });
     }
-  },
-  on: events.on.bind(events),
-  once: events.once.bind(events),
-  off: events.off.bind(events),
-  removeListener: events.off.bind(events),
-  removeAllListeners: events.removeAllListeners.bind(events),
-  enable() {
-    return this.request({ method: "dusk_requestAccounts" });
-  },
-  isConnected() {
-    return true;
   },
 };
 
@@ -211,96 +265,26 @@ window.addEventListener(DUSK_REQUEST_PROVIDER_EVENT, announce);
 announce();
 ```
 
-## Reference Artifacts In This Repository
+## Conformance Helper
 
-If you want something runnable instead of a prose guide, this repository now
-includes:
-
-- `examples/reference-wallet/`
-- `@dusk-network/connect/testing`
-- `src/test/referenceWallet.ts`
-- `src/wallet-implementer.integration.test.ts`
-
-The example page demonstrates a minimal wallet injection talking to a dApp that
-uses `createDuskWallet()`. The test fixture and integration test show the same
-pattern in executable form.
-
-## Drop-In Vitest Harness
-
-If you want a small certification-style test in another wallet repository, use
-the `@dusk-network/connect/testing` entrypoint from a jsdom test:
+Wallet repositories can run the reusable Connect conformance helper in a
+browser-like test environment:
 
 ```ts
-// @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
 import { runWalletConformance } from "@dusk-network/connect/testing";
 
-import { installInjectedWallet } from "../src/injected/installWallet";
-
-describe("wallet injection", () => {
-  it("passes the basic Dusk conformance pass", async () => {
-    const report = await runWalletConformance({
-      installWallet: () => installInjectedWallet(window),
-      expectedProvider: {
-        uuid: "com.example.wallet",
-        name: "Example Wallet",
-        rdns: "com.example.wallet",
-      },
-      expectedChainId: "dusk:2",
-      switchChain: {
-        params: { chainId: "dusk:3" },
-        expectedChainId: "dusk:3",
-      },
-    });
-
-    expect(report.connectedAccounts.length).toBeGreaterThan(0);
-    expect(report.capabilities.methods).toContain("dusk_requestAccounts");
-  });
+await runWalletConformance({
+  installWallet(window) {
+    // install your provider into the supplied window
+  },
+  expectedProvider: {
+    rdns: "com.example.wallet",
+  },
 });
 ```
 
-What the helper checks:
+The helper checks discovery, profile connection, passive profile reads,
+capabilities, chain switching, and basic provider events.
 
-- the wallet is discoverable through `dusk:requestProvider` / `dusk:announceProvider`
-- a provider is selected and matches the expected metadata
-- `dusk_requestAccounts` returns at least one account
-- `dusk_getCapabilities` exposes a sane minimum surface
-- `dusk_getPublicBalance` returns the expected shape
-- optional `dusk_switchNetwork` behavior updates wallet state and emits node info
-
-## Conformance Snippet
-
-Wallet implementers can use this as a starting point in their own repo:
-
-```ts
-import { describe, expect, it } from "vitest";
-import { createDuskWallet } from "@dusk-network/connect";
-
-describe("wallet injection", () => {
-  it("is discoverable and connectable", async () => {
-    const wallet = createDuskWallet({
-      preferredProviderId: "com.example.wallet",
-    });
-
-    await wallet.ready();
-
-    expect(wallet.state.installed).toBe(true);
-    expect(wallet.state.providerId).toBe("com.example.wallet");
-
-    const accounts = await wallet.connect();
-
-    expect(accounts.length).toBeGreaterThan(0);
-    expect(wallet.state.chainId).toMatch(/^dusk:/);
-    expect(wallet.state.authorized).toBe(true);
-  });
-});
-```
-
-## Practical Rules
-
-- Do not inject a `window.dusk` singleton as the canonical integration path.
-- Do not depend on injection order.
-- Keep `uuid` stable and unique.
-- Re-announce on every `dusk:requestProvider`.
-- Return empty arrays, not errors, for `dusk_accounts` when the origin is not connected.
-- Use typed RPC errors when rejecting (`4001`, `4100`, `4200`, `4900`).
+The runnable browser example lives at `examples/reference-wallet/`. The matching
+repository integration test is `src/wallet-implementer.integration.test.ts`.

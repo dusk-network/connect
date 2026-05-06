@@ -1,4 +1,4 @@
-import type { DuskWalletState } from "../types.js";
+import type { ConnectOptions, DuskWalletState } from "../types.js";
 import { createDuskWallet, type DuskWallet, type DuskWalletOptions } from "../wallet.js";
 import { createDuskConnectModal, type DuskConnectModal } from "./modal.js";
 import { networkLabel, shortenMiddle, walletStatus } from "./shared.js";
@@ -27,6 +27,8 @@ export type DuskConnectButtonOptions = {
   walletOptions?: DuskWalletOptions;
   /** Provide a modal instance. If omitted, the button creates its own modal. */
   modal?: DuskConnectModal;
+  /** Options passed to wallet.connect when the modal's primary action connects. */
+  connectOptions?: ConnectOptions;
 };
 
 type Status = ReturnType<typeof walletStatus>;
@@ -58,6 +60,7 @@ export class DuskConnectButtonElement extends HTMLElement {
   private _wallet: DuskWallet | null = null;
   private _modal: DuskConnectModal | null = null;
   private _walletOptions: DuskWalletOptions | undefined;
+  private _connectOptions: ConnectOptions | undefined;
 
   private _ownsWallet = false;
   private _ownsModal = false;
@@ -76,7 +79,14 @@ export class DuskConnectButtonElement extends HTMLElement {
   }
 
   get state(): DuskWalletState | null {
-    return this._latest ? { ...this._latest, accounts: [...this._latest.accounts] } : null;
+    return this._latest
+      ? {
+          ...this._latest,
+          accounts: [...this._latest.accounts],
+          profiles: this._latest.profiles.map((profile) => ({ ...profile })),
+          selectedProfile: this._latest.selectedProfile ? { ...this._latest.selectedProfile } : null,
+        }
+      : null;
   }
 
   get wallet(): DuskWallet | null {
@@ -111,6 +121,23 @@ export class DuskConnectButtonElement extends HTMLElement {
 
   set walletOptions(opts: DuskWalletOptions | undefined) {
     this._walletOptions = opts;
+  }
+
+  get connectOptions(): ConnectOptions | undefined {
+    return this._connectOptions;
+  }
+
+  set connectOptions(opts: ConnectOptions | undefined) {
+    this._connectOptions = opts;
+    if (this._ownsModal && this._modal) {
+      try {
+        this._modal.destroy();
+      } catch {
+        // ignore
+      }
+      this._modal = null;
+      this._ownsModal = false;
+    }
   }
 
   open(): void {
@@ -435,6 +462,7 @@ export class DuskConnectButtonElement extends HTMLElement {
       if (appName) modalOpts.appName = appName;
       if (installUrl) modalOpts.installUrl = installUrl;
       if (theme === "dark" || theme === "light") modalOpts.theme = theme;
+      if (this._connectOptions) modalOpts.connectOptions = this._connectOptions;
       if (this.hasAttribute("close-on-connect")) {
         modalOpts.closeOnConnect = boolAttr(this.getAttribute("close-on-connect"));
       }
@@ -531,7 +559,7 @@ export class DuskConnectButtonElement extends HTMLElement {
     }
 
     // connected
-    const acct = st?.accounts?.[0] || "";
+    const acct = st?.selectedProfile?.account || st?.profiles?.[0]?.account || "";
     this._label.textContent = acct ? shortenMiddle(acct, 6, 4) : "Connected";
     this._avatar.textContent = "";
     this._avatar.style.background = "";
@@ -563,6 +591,7 @@ export function createDuskConnectButton(options: DuskConnectButtonOptions = {}):
   if (options.walletOptions) el.walletOptions = options.walletOptions;
   if (options.wallet) el.wallet = options.wallet;
   if (options.modal) el.modal = options.modal;
+  if (options.connectOptions) el.connectOptions = options.connectOptions;
 
   return el;
 }

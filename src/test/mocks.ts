@@ -2,7 +2,9 @@ import { vi } from "vitest";
 
 import type {
   AccountId,
+  Address,
   ChainId,
+  DuskProfile,
   DuskNodeChangedPayload,
   DuskProvider,
   DuskProviderInfo,
@@ -21,6 +23,7 @@ export type MockDuskProvider = DuskProvider & {
   request: ReturnType<typeof vi.fn>;
   emit<E extends keyof DuskProviderEventMap>(event: E, payload: DuskProviderEventMap[E]): void;
   setAccounts(next: AccountId[]): void;
+  setProfiles(next: DuskProfile[]): void;
   setChainId(next: ChainId | null): void;
   setAuthorized(next: boolean): void;
   setResponse(method: string, response: MockResponse | undefined): void;
@@ -29,6 +32,7 @@ export type MockDuskProvider = DuskProvider & {
 export function createMockProvider(
   opts: {
     accounts?: AccountId[];
+    shieldedAddress?: Address;
     chainId?: ChainId | null;
     authorized?: boolean;
     capabilities?: Partial<DuskProviderCapabilities>;
@@ -36,6 +40,8 @@ export function createMockProvider(
   } = {}
 ): MockDuskProvider {
   let accounts = [...(opts.accounts ?? ["dusk1mockaccount"])];
+  let shieldedAddress = opts.shieldedAddress ?? "dusk1mockshieldedreceiveaddress";
+  let profileId = "profile:0";
   let chainId = opts.chainId ?? "dusk:2";
   let authorized = opts.authorized ?? false;
   const responses = new Map(Object.entries(opts.responses ?? {}));
@@ -75,13 +81,24 @@ export function createMockProvider(
     }
   };
 
+  const currentProfiles = (includeShielded = false): DuskProfile[] => {
+    if (!authorized || !accounts[0]) return [];
+    return [
+      {
+        profileId,
+        account: accounts[0],
+        ...(includeShielded ? { shieldedAddress } : {}),
+      },
+    ];
+  };
+
   const provider = {
     isDusk: true as const,
     get chainId() {
       return chainId;
     },
-    get selectedAddress() {
-      return accounts[0] ?? null;
+    get profiles() {
+      return currentProfiles();
     },
     get isAuthorized() {
       return authorized;
@@ -102,26 +119,53 @@ export function createMockProvider(
             chainId: chainId ?? "dusk:2",
             nodeUrl: "https://testnet.nodes.dusk.network",
             networkName: "Testnet",
-            methods: ["dusk_requestAccounts", "dusk_accounts", "dusk_chainId"],
+            methods: [
+              "dusk_getCapabilities",
+              "dusk_requestProfiles",
+              "dusk_profiles",
+              "dusk_requestShieldedAddress",
+              "dusk_chainId",
+              "dusk_switchNetwork",
+              "dusk_getPublicBalance",
+              "dusk_estimateGas",
+              "dusk_sendTransaction",
+              "dusk_watchAsset",
+              "dusk_signMessage",
+              "dusk_signAuth",
+              "dusk_disconnect",
+            ],
             txKinds: ["transfer", "contract_call"],
             limits: { maxFnArgsBytes: 65536, maxFnNameChars: 64, maxMemoBytes: 512 },
+            features: {
+              shieldedRead: false,
+              shieldedRecipients: true,
+              shieldedReceiveAddress: true,
+              signMessage: true,
+              signAuth: true,
+              contractCallPrivacy: true,
+              watchAsset: true,
+            },
             ...opts.capabilities,
           } satisfies DuskProviderCapabilities;
         case "dusk_chainId":
           return chainId;
-        case "dusk_accounts":
-          return authorized ? [...accounts] : [];
-        case "dusk_requestAccounts": {
+        case "dusk_profiles": {
+          return currentProfiles();
+        }
+        case "dusk_requestProfiles": {
           authorized = true;
-          const next = [...accounts];
+          const includeShielded = Boolean((params as any)?.shieldedReceiveAddress);
+          const next = currentProfiles(includeShielded);
           emit("connect", { chainId: chainId ?? "dusk:2" });
-          emit("accountsChanged", next);
+          emit("profilesChanged", next);
           return next;
         }
+        case "dusk_requestShieldedAddress":
+          return { address: shieldedAddress, profileId, chainId: chainId ?? "dusk:2", account: accounts[0] };
         case "dusk_disconnect":
           authorized = false;
-          emit("disconnect", { code: 4900 });
-          emit("accountsChanged", []);
+          emit("disconnect", { code: 4900, message: "Disconnected" });
+          emit("profilesChanged", []);
           return true;
         case "dusk_sendTransaction":
           return { hash: "0xtxhash", nonce: "7" };
@@ -136,16 +180,20 @@ export function createMockProvider(
     removeListener: off,
     off,
     removeAllListeners,
-    enable: vi.fn(async () => {
-      return await (provider as MockDuskProvider).request({ method: "dusk_requestAccounts" });
-    }),
     isConnected: vi.fn(() => true),
     emit(eventName: EventName, payload: unknown) {
       emit(eventName, payload);
     },
     setAccounts(next: AccountId[]) {
       accounts = [...next];
-      emit("accountsChanged", [...accounts]);
+      emit("profilesChanged", currentProfiles());
+    },
+    setProfiles(next: DuskProfile[]) {
+      const first = next[0];
+      accounts = first?.account ? [first.account] : [];
+      profileId = first?.profileId ?? "profile:0";
+      shieldedAddress = first?.shieldedAddress ?? shieldedAddress;
+      emit("profilesChanged", next.map((profile) => ({ ...profile })));
     },
     setChainId(next: ChainId | null) {
       chainId = next;
@@ -197,15 +245,25 @@ export function createMockUiWallet(
     "providerInfo" in initial ? (initial.providerInfo ?? null) : (availableProviders[0] ?? null);
   const providerId = "providerId" in initial ? (initial.providerId ?? null) : (providerInfo?.uuid ?? null);
 
+  const initialAccounts = initial.accounts ?? [];
+  const initialProfiles =
+    initial.profiles ??
+    initialAccounts.map((account, index) => ({
+      profileId: `profile:${index}`,
+      account,
+    }));
+
   let state: DuskWalletState = {
     installed: initial.installed ?? availableProviders.length > 0,
     providerId,
     providerInfo,
     availableProviders: availableProviders.map((provider) => ({ ...provider })),
     authorized: false,
-    accounts: [],
+    accounts: initialAccounts,
+    profiles: initialProfiles,
     chainId: "dusk:2",
-    selectedAddress: null,
+    selectedAddress: initial.selectedAddress ?? initialProfiles[0]?.account ?? null,
+    selectedProfile: initial.selectedProfile ?? initialProfiles[0] ?? null,
     node: null,
     capabilities: null,
     lastUpdated: Date.now(),
@@ -219,6 +277,8 @@ export function createMockUiWallet(
     providerInfo: state.providerInfo ? { ...state.providerInfo } : null,
     availableProviders: state.availableProviders.map((provider) => ({ ...provider })),
     accounts: [...state.accounts],
+    profiles: state.profiles.map((profile) => ({ ...profile })),
+    selectedProfile: state.selectedProfile ? { ...state.selectedProfile } : null,
     node: state.node ? { ...state.node } : null,
   });
 
@@ -246,29 +306,43 @@ export function createMockUiWallet(
         providerInfo: { ...next },
         authorized: false,
         accounts: [],
+        profiles: [],
         selectedAddress: null,
+        selectedProfile: null,
         lastUpdated: Date.now(),
       };
       notify();
       return snapshot();
     }),
-    connect: vi.fn(async () => {
+    connect: vi.fn(async (options?: { shieldedReceiveAddress?: boolean }) => {
+      const accounts = state.accounts.length ? [...state.accounts] : ["dusk1connectedacct"];
+      const profiles = [
+        {
+          profileId: "profile:0",
+          account: accounts[0] ?? "dusk1connectedacct",
+          ...(options?.shieldedReceiveAddress ? { shieldedAddress: "dusk1connectedshielded" } : {}),
+        },
+      ];
       state = {
         ...state,
         authorized: true,
-        accounts: state.accounts.length ? [...state.accounts] : ["dusk1connectedacct"],
-        selectedAddress: state.accounts[0] ?? "dusk1connectedacct",
+        accounts,
+        profiles,
+        selectedAddress: accounts[0] ?? null,
+        selectedProfile: profiles[0] ?? null,
         lastUpdated: Date.now(),
       };
       notify();
-      return [...state.accounts];
+      return state.profiles.map((profile) => ({ ...profile }));
     }),
     disconnect: vi.fn(async () => {
       state = {
         ...state,
         authorized: false,
         accounts: [],
+        profiles: [],
         selectedAddress: null,
+        selectedProfile: null,
         lastUpdated: Date.now(),
       };
       notify();
@@ -277,9 +351,22 @@ export function createMockUiWallet(
     ready: vi.fn(async () => wallet as any),
     destroy: vi.fn(),
     emit(partial: Partial<DuskWalletState>) {
+      const nextProfiles =
+        partial.profiles ??
+        (partial.accounts
+          ? partial.accounts.map((account, index) => ({
+              profileId: `profile:${index}`,
+              account,
+            }))
+          : state.profiles);
       state = {
         ...state,
         ...partial,
+        profiles: nextProfiles,
+        selectedProfile:
+          partial.selectedProfile === undefined ? (nextProfiles[0] ?? null) : partial.selectedProfile,
+        selectedAddress:
+          partial.selectedAddress === undefined ? (nextProfiles[0]?.account ?? null) : partial.selectedAddress,
         providerInfo:
           partial.providerInfo === undefined
             ? state.providerInfo
@@ -291,6 +378,15 @@ export function createMockUiWallet(
             ? state.availableProviders.map((provider) => ({ ...provider }))
             : partial.availableProviders.map((provider) => ({ ...provider })),
         accounts: partial.accounts ? [...partial.accounts] : [...state.accounts],
+        profiles: nextProfiles.map((profile) => ({ ...profile })),
+        selectedProfile:
+          partial.selectedProfile === undefined
+            ? nextProfiles[0]
+              ? { ...nextProfiles[0] }
+              : null
+            : partial.selectedProfile
+              ? { ...partial.selectedProfile }
+              : null,
         node: partial.node === undefined ? state.node : partial.node,
         lastUpdated: Date.now(),
       };

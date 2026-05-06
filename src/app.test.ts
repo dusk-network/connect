@@ -125,12 +125,14 @@ describe("app facade", () => {
       contract: "demo",
       functionName: "ping",
       args: { ok: true },
+      privacy: "public",
       amount: "5",
     });
 
     expect(prepared).toMatchObject({
       contractId: VALID_CONTRACT_ID,
       fnName: "ping",
+      privacy: "public",
       amount: "5",
       display: {
         contractName: "Demo",
@@ -142,11 +144,12 @@ describe("app facade", () => {
       contract: "demo",
       functionName: "ping",
       args: { ok: true },
+      privacy: "public",
     });
 
     await expect(handle.wait()).resolves.toMatchObject({ status: "executed", ok: true });
     expect(provider.request).toHaveBeenCalledWith({
-      method: "dusk_requestAccounts",
+      method: "dusk_requestProfiles",
       params: undefined,
     });
     expect(provider.request).toHaveBeenCalledWith({

@@ -27,7 +27,7 @@ function render(st) {
   const installed = !!st.installed;
   const walletCount = st.availableProviders?.length ?? 0;
   const needsSelection = installed && walletCount > 1 && !st.providerId;
-  const connected = !!st.authorized && (st.accounts?.length ?? 0) > 0;
+  const connected = !!st.authorized && (st.profiles?.length ?? 0) > 0;
 
   elStatus.textContent = !installed
     ? "No wallet discovered"
@@ -38,7 +38,7 @@ function render(st) {
         : "Not connected";
   elWalletCount.textContent = String(walletCount);
   elProviderName.textContent = st.providerInfo?.name ?? "—";
-  elAccount.textContent = connected ? shorten(st.accounts[0]) : "—";
+  elAccount.textContent = connected ? shorten(st.selectedProfile?.account || st.profiles[0]?.account) : "—";
   elChainId.textContent = st.chainId ?? "—";
 
   if (elProviderSelect) {

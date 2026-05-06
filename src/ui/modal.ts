@@ -1,4 +1,4 @@
-import type { DuskProviderInfo, DuskWalletState } from "../types.js";
+import type { ConnectOptions, DuskProviderInfo, DuskWalletState } from "../types.js";
 import type { DuskWallet } from "../wallet.js";
 import { networkLabel, shortenMiddle, walletStatus, type WalletStatus } from "./shared.js";
 import { DCONNECT_UI_BASE_CSS } from "./styles.js";
@@ -12,6 +12,8 @@ export type DuskConnectModalOptions = {
   closeOnConnect?: boolean;
   /** Force a UI theme. Default: auto (follows prefers-color-scheme). */
   theme?: "auto" | "dark" | "light";
+  /** Options passed to wallet.connect when the user approves connection. */
+  connectOptions?: ConnectOptions;
 };
 
 export type DuskConnectModal = {
@@ -659,7 +661,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           <div class="dconnect-row dconnect-row-data"><div class="dconnect-lab">Status</div><div class="dconnect-val" id="dwcStatus">—</div></div>
           <div class="dconnect-row dconnect-row-data"><div class="dconnect-lab">Wallet</div><div class="dconnect-val"><span id="dwcWallet">—</span></div></div>
           <div class="dconnect-row dconnect-row-data">
-            <div class="dconnect-lab">Account</div>
+            <div class="dconnect-lab">Profile</div>
             <div class="dconnect-val"><span id="dwcAccount">—</span><button class="dconnect-copy" id="dwcCopy" type="button" data-action="copy" hidden>Copy</button></div>
           </div>
           <div class="dconnect-row dconnect-row-data"><div class="dconnect-lab">Network</div><div class="dconnect-val" id="dwcNetwork">—</div></div>
@@ -707,7 +709,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
       const status = walletStatus(st);
 
       if (action === "copy") {
-        const acct = st.accounts?.[0] || "";
+        const acct = st.selectedProfile?.account || st.profiles?.[0]?.account || "";
         if (!acct) return;
         const ok = await copyToClipboard(acct);
         toast(ok ? "Copied" : "Copy failed");
@@ -735,7 +737,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           return;
         }
 
-        await wallet.connect();
+        await wallet.connect(options.connectOptions);
       }
     });
 
@@ -757,7 +759,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
 
   const update = (st: DuskWalletState) => {
     const status = walletStatus(st);
-    const acct = st.accounts?.[0] || "";
+    const acct = st.selectedProfile?.account || st.profiles?.[0]?.account || "";
     const net = networkLabel(st);
     const needsSelection = st.availableProviders.length > 0 && !st.providerId;
 

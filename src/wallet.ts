@@ -3,6 +3,8 @@ import type {
   BalanceResult,
   ByteLike,
   ChainId,
+  ConnectOptions,
+  DuskProfile,
   DuskProvider,
   DuskProviderCapabilities,
   DuskProviderDetail,
@@ -10,6 +12,9 @@ import type {
   DuskProviderInfo,
   DuskWalletState,
   GasPriceResult,
+  Address,
+  RequestShieldedAddressParams,
+  RequestShieldedAddressResponse,
   SendTransactionParams,
   SignAuthParams,
   SignAuthResult,
@@ -43,6 +48,7 @@ import {
 } from "./discovery.js";
 
 import { normalizeContractId0x } from "./internal/contractId.js";
+import { bytesToHex, toBytes } from "./bytes.js";
 
 export type WaitForProviderOptions = WaitForDuskProvidersOptions;
 
@@ -62,7 +68,7 @@ export type DuskWalletOptions = {
   /** Discovery polling options (only used if `waitForProvider !== false`). */
   providerWaitOptions?: WaitForProviderOptions;
 
-  /** Immediately fetch `dusk_chainId` and `dusk_accounts` on init. Default: true. */
+  /** Immediately fetch `dusk_chainId` and `dusk_profiles` on init. Default: true. */
   autoRefresh?: boolean;
 
   /** Persist and restore the last selected provider. Default: true. */
@@ -83,8 +89,10 @@ const initialState = (installed: boolean): DuskWalletState => ({
   availableProviders: EMPTY_PROVIDERS,
   authorized: false,
   accounts: [],
+  profiles: [],
   chainId: null,
   selectedAddress: null,
+  selectedProfile: null,
   node: null,
   capabilities: null,
   lastUpdated: Date.now(),
@@ -105,6 +113,8 @@ function cloneState(st: DuskWalletState): DuskWalletState {
     providerInfo: st.providerInfo ? cloneProviderInfo(st.providerInfo) : null,
     availableProviders: st.availableProviders.map(cloneProviderInfo),
     accounts: [...st.accounts],
+    profiles: st.profiles.map((profile) => ({ ...profile })),
+    selectedProfile: st.selectedProfile ? { ...st.selectedProfile } : null,
     node: st.node ? { ...st.node } : null,
   };
 }
@@ -167,24 +177,62 @@ export class DuskWallet {
   private _preferredProviderId: string | null = null;
   private _readySettled = false;
 
-  private _accountsFrom(value: unknown): AccountId[] {
-    return Array.isArray(value) ? (value as AccountId[]) : [];
+  private _profilesFrom(value: unknown): DuskProfile[] {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item, index) => {
+        if (!item || typeof item !== "object") return null;
+        const raw = item as Partial<DuskProfile>;
+        const account = typeof raw.account === "string" ? raw.account.trim() : "";
+        if (!account) return null;
+        const shieldedAddress =
+          typeof raw.shieldedAddress === "string" && raw.shieldedAddress.trim()
+            ? raw.shieldedAddress.trim()
+            : undefined;
+        const previous = this._state.profiles.find((profile) => profile.account === account);
+        return {
+          profileId:
+            typeof raw.profileId === "string" && raw.profileId.trim()
+              ? raw.profileId.trim()
+              : (previous?.profileId ?? `profile:${index}`),
+          account,
+          ...(shieldedAddress ? { shieldedAddress } : {}),
+        };
+      })
+      .filter(Boolean) as DuskProfile[];
   }
 
-  private _setAccounts(value: unknown, opts: { notify?: boolean } = {}) {
-    const next = this._accountsFrom(value);
-    const selectedAddress = next[0] ?? null;
-    const sameAccounts = shallowArrayEq(this._state.accounts, next);
-    const nextAuthorized = next.length > 0;
-    const sameAuthorization = this._state.authorized === nextAuthorized;
-    if (sameAccounts && this._state.selectedAddress === selectedAddress && sameAuthorization) return;
-    const notify = opts.notify ?? (!sameAccounts || !sameAuthorization);
-    this._patch({ accounts: next, selectedAddress, authorized: nextAuthorized }, { notify });
+  private _setProfiles(value: unknown, opts: { notify?: boolean } = {}) {
+    const profiles = this._profilesFrom(value);
+    const accounts = profiles.map((profile) => profile.account);
+    const selectedProfile = profiles[0] ?? null;
+    const selectedAddress = accounts[0] ?? null;
+    const sameProfiles = JSON.stringify(this._state.profiles) === JSON.stringify(profiles);
+    const sameAccounts = shallowArrayEq(this._state.accounts, accounts);
+    const sameSelectedProfile =
+      JSON.stringify(this._state.selectedProfile ?? null) === JSON.stringify(selectedProfile ?? null);
+    if (sameProfiles && sameAccounts && sameSelectedProfile && this._state.selectedAddress === selectedAddress) return;
+    this._patch(
+      {
+        profiles,
+        accounts,
+        selectedProfile,
+        selectedAddress,
+      },
+      opts
+    );
   }
 
   private _setDisconnected() {
-    if (!this._state.authorized && this._state.accounts.length === 0 && this._state.selectedAddress === null) return;
-    this._patch({ authorized: false, accounts: [], selectedAddress: null });
+    if (
+      !this._state.authorized &&
+      this._state.accounts.length === 0 &&
+      this._state.profiles.length === 0 &&
+      this._state.selectedAddress === null &&
+      this._state.selectedProfile === null
+    )
+      return;
+    this._patch({ authorized: false, accounts: [], profiles: [], selectedAddress: null, selectedProfile: null });
   }
 
   private _hydrateFromProvider(p: DuskProvider, opts: { notify?: boolean } = {}) {
@@ -192,11 +240,13 @@ export class DuskWallet {
       {
         installed: this._providers.size > 0 || Boolean(this._provider),
         chainId: p.chainId ?? this._state.chainId,
-        selectedAddress: p.selectedAddress ?? this._state.selectedAddress,
         authorized: Boolean(p.isAuthorized),
       },
       opts
     );
+    if (Array.isArray(p.profiles)) {
+      this._setProfiles(p.profiles, { notify: false });
+    }
   }
 
   private _onConnect = (payload: DuskProviderEventMap["connect"]) => {
@@ -209,8 +259,8 @@ export class DuskWallet {
     this._setDisconnected();
   };
 
-  private _onAccountsChanged = (accounts: DuskProviderEventMap["accountsChanged"]) => {
-    this._setAccounts(accounts);
+  private _onProfilesChanged = (profiles: DuskProviderEventMap["profilesChanged"]) => {
+    this._setProfiles(profiles);
   };
 
   private _onChainChanged = (chainId: DuskProviderEventMap["chainChanged"]) => {
@@ -227,7 +277,7 @@ export class DuskWallet {
   private _events: Array<[keyof DuskProviderEventMap, (payload: any) => void]> = [
     ["connect", this._onConnect],
     ["disconnect", this._onDisconnect],
-    ["accountsChanged", this._onAccountsChanged],
+    ["profilesChanged", this._onProfilesChanged],
     ["chainChanged", this._onChainChanged],
     ["duskNodeChanged", this._onNodeChanged],
   ];
@@ -319,7 +369,9 @@ export class DuskWallet {
         availableProviders: this._availableProviderInfos(),
         authorized: false,
         accounts: [],
-        selectedAddress: provider.selectedAddress ?? null,
+        profiles: [],
+        selectedAddress: null,
+        selectedProfile: null,
         chainId: provider.chainId ?? null,
         node: null,
         capabilities: null,
@@ -392,7 +444,9 @@ export class DuskWallet {
         providerInfo: nextInfo,
         authorized: false,
         accounts: [],
-        selectedAddress: nextProvider?.selectedAddress ?? null,
+        profiles: [],
+        selectedAddress: null,
+        selectedProfile: null,
         chainId: nextProvider?.chainId ?? null,
         node: null,
         capabilities: null,
@@ -537,7 +591,7 @@ export class DuskWallet {
     }
   }
 
-  /** Refresh chain id + accounts without prompting. */
+  /** Refresh capabilities, chain id, and approved profiles without prompting. */
   async refresh(): Promise<DuskWalletState> {
     const p = this._getProvider();
     if (!p) {
@@ -548,7 +602,9 @@ export class DuskWallet {
           providerInfo: null,
           authorized: false,
           accounts: [],
+          profiles: [],
           selectedAddress: null,
+          selectedProfile: null,
           chainId: null,
           node: null,
           capabilities: null,
@@ -559,10 +615,10 @@ export class DuskWallet {
       return this.state;
     }
 
-    const [caps, chainId, accounts] = await Promise.all([
+    const [caps, chainId, profiles] = await Promise.all([
       this.request<DuskProviderCapabilities>("dusk_getCapabilities").catch(() => null),
       this.request<ChainId>("dusk_chainId").catch(() => p.chainId ?? null),
-      this.request<AccountId[]>("dusk_accounts").catch(() => []),
+      this.request<DuskProfile[]>("dusk_profiles").catch(() => []),
     ]);
 
     const nextChainId = typeof chainId === "string" ? chainId : p.chainId ?? null;
@@ -574,22 +630,28 @@ export class DuskWallet {
       },
       { notify: false }
     );
-    this._setAccounts(accounts, { notify: false });
+    this._setProfiles(profiles, { notify: false });
     this._notify();
 
     return this.state;
   }
 
   /** Prompt the user to connect (permission grant). */
-  async connect(): Promise<AccountId[]> {
-    const accountsRaw = await this.request<AccountId[]>("dusk_requestAccounts");
-    const accounts = this._accountsFrom(accountsRaw);
+  async connect(options?: ConnectOptions): Promise<DuskProfile[]> {
+    return await this.requestProfiles(options);
+  }
+
+  /** Prompt the user to connect and return approved profile pairs. */
+  async requestProfiles(options?: ConnectOptions): Promise<DuskProfile[]> {
+    const params = options && Object.keys(options).length > 0 ? options : undefined;
+    const profilesRaw = await this.request<DuskProfile[]>("dusk_requestProfiles", params);
+    const profiles = this._profilesFrom(profilesRaw);
 
     this._patch({ authorized: true, chainId: this._provider?.chainId ?? this._state.chainId }, { notify: false });
-    this._setAccounts(accounts, { notify: false });
+    this._setProfiles(profiles, { notify: false });
     this._notify();
 
-    return accounts;
+    return profiles;
   }
 
   /** Revoke the site's connection permission. */
@@ -599,9 +661,17 @@ export class DuskWallet {
     return Boolean(res);
   }
 
+  async getProfiles(): Promise<DuskProfile[]> {
+    const profiles = await this.request<DuskProfile[]>("dusk_profiles");
+    const next = this._profilesFrom(profiles);
+    this._setProfiles(next, { notify: false });
+    this._notify();
+    return next;
+  }
+
   async getAccounts(): Promise<AccountId[]> {
-    const accounts = await this.request<AccountId[]>("dusk_accounts");
-    return this._accountsFrom(accounts);
+    const profiles = await this.getProfiles();
+    return profiles.map((profile) => profile.account);
   }
 
   async getChainId(): Promise<ChainId> {
@@ -615,6 +685,67 @@ export class DuskWallet {
 
   async getPublicBalance(): Promise<BalanceResult> {
     return await this.request<BalanceResult>("dusk_getPublicBalance");
+  }
+
+  /**
+   * Prompt the wallet to reveal a shareable shielded receive address.
+   *
+   * Receive addresses are useful for payment links but should only be
+   * disclosed after explicit user intent.
+   */
+  async requestShieldedAddress(params: RequestShieldedAddressParams = {}): Promise<Address> {
+    const result = await this.request<RequestShieldedAddressResponse>("dusk_requestShieldedAddress", params);
+    const address = typeof result === "string" ? result : result?.address;
+    const trimmed = typeof address === "string" ? address.trim() : "";
+    if (!trimmed) {
+      throw new Error("Wallet did not return a shielded receive address");
+    }
+
+    const profileId =
+      typeof result === "object" && result && typeof result.profileId === "string"
+        ? result.profileId.trim()
+        : "";
+    const account =
+      typeof result === "object" && result && typeof result.account === "string"
+        ? result.account.trim()
+        : (params.account ?? this._state.selectedProfile?.account ?? "");
+    const resultChainId =
+      typeof result === "object" && result && typeof result.chainId === "string" && result.chainId.trim()
+        ? result.chainId.trim()
+        : "";
+    if (profileId || account) {
+      let matched = false;
+      const profiles = this._state.profiles.length
+        ? this._state.profiles.map((profile, index) => {
+            const isMatch = profileId ? profile.profileId === profileId : profile.account === account;
+            if (isMatch) matched = true;
+            return isMatch
+              ? { ...profile, shieldedAddress: trimmed }
+              : { ...profile, profileId: profile.profileId || `profile:${index}` };
+          })
+        : [
+            {
+              profileId: profileId || this._state.selectedProfile?.profileId || `account:0:${account}`,
+              account,
+              shieldedAddress: trimmed,
+            },
+          ];
+      const nextProfiles =
+        this._state.profiles.length > 0 && !matched && account
+          ? [...profiles, { profileId: profileId || `account:${profiles.length}:${account}`, account, shieldedAddress: trimmed }]
+          : profiles;
+      this._patch(
+        {
+          authorized: true,
+          chainId: resultChainId || this._state.chainId,
+        },
+        { notify: false }
+      );
+      this._setProfiles(nextProfiles, { notify: false });
+      this._notify();
+    }
+
+    return trimmed;
   }
 
   /** Fetch current gas price stats from the node mempool. */
@@ -635,7 +766,7 @@ export class DuskWallet {
   }
 
   async sendTransaction(params: SendTransactionParams): Promise<TxResult> {
-    return await this.request<TxResult>("dusk_sendTransaction", params);
+    return await this.request<TxResult>("dusk_sendTransaction", this._normalizeTransactionParams(params));
   }
 
   async sendTransfer(params: Omit<Extract<SendTransactionParams, { kind: "transfer" }>, "kind">): Promise<TxResult> {
@@ -648,10 +779,50 @@ export class DuskWallet {
     return await this.sendTransaction({ kind: "contract_call", ...params });
   }
 
+  private _normalizeTransactionParams(params: SendTransactionParams): SendTransactionParams {
+    if ((params as any)?.kind === "transfer") {
+      const input = params as Extract<SendTransactionParams, { kind: "transfer" }>;
+      const privacy = String((input as any).privacy ?? "").trim();
+      if (!privacy) {
+        throw new TypeError('privacy is required ("public" or "shielded")');
+      }
+      if (privacy !== "public" && privacy !== "shielded") {
+        throw new TypeError('privacy must be "public" or "shielded"');
+      }
+
+      return {
+        ...input,
+        privacy,
+      };
+    }
+
+    if ((params as any)?.kind !== "contract_call") return params;
+
+    const input = params as Extract<SendTransactionParams, { kind: "contract_call" }>;
+    const fnName = String(input.fnName ?? "").trim();
+    if (!fnName) throw new TypeError("fnName is required");
+
+    const privacy = String((input as any).privacy ?? "").trim();
+    if (!privacy) {
+      throw new TypeError('privacy is required ("public" or "shielded")');
+    }
+    if (privacy !== "public" && privacy !== "shielded") {
+      throw new TypeError('privacy must be "public" or "shielded"');
+    }
+
+    return {
+      ...input,
+      privacy,
+      contractId: normalizeContractId0x(input.contractId),
+      fnName,
+      fnArgs: "0x" + bytesToHex(toBytes(input.fnArgs)).toLowerCase(),
+    };
+  }
+
   /**
    * Prompt the user to add a standard token/NFT contract to the wallet UI.
    *
-   * NOTE: the wallet requires prior connection permission (dusk_requestAccounts).
+   * NOTE: the wallet requires prior profile connection permission.
    * This helper can optionally auto-connect first (default: true).
    */
   async watchAsset(params: WatchAssetParams, opts: { autoConnect?: boolean } = {}): Promise<boolean> {
