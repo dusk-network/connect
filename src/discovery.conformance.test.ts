@@ -88,4 +88,16 @@ describe("Discovery Conformance", () => {
       }
     }
   });
+
+  it("README documents the canonical v0.1 doc owners", async () => {
+    const readmePath = path.resolve(process.cwd(), "README.md");
+    const md = await readFile(readmePath, "utf8");
+
+    expect(md).toContain("Provider API");
+    expect(md).toContain("Discovery protocol");
+    expect(md).toContain("Connect SDK usage");
+    expect(md).toContain("Wallet implementer guidance");
+    expect(md).toContain("Security/threat model");
+    expect(md).toContain("v0.1 release checklist");
+  });
 });
