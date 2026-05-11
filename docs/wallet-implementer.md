@@ -1,7 +1,15 @@
 # Dusk Wallet Implementer Guide
 
 This guide is for wallet teams that want to expose a Dusk provider compatible
-with `@dusk-network/connect`.
+with `@dusk-network/connect` and the v0.1 Dusk Wallet provider API.
+
+Canonical source ownership:
+
+- Discovery protocol: [wallet-discovery.md](./wallet-discovery.md)
+- Provider API: [dusk-network/wallet docs/provider-api.md](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md)
+- Security/threat model: [dusk-network/wallet docs/SECURITY.md](https://github.com/dusk-network/wallet/blob/main/docs/SECURITY.md)
+- Runnable SDK fixture: `examples/reference-wallet/`
+- SDK conformance coverage: `src/wallet-implementer.integration.test.ts`
 
 Discovery is event-based:
 
@@ -56,9 +64,10 @@ type DuskProfile = {
 };
 ```
 
-## RPC Methods
+## RPC Method Summary
 
-Wallets should expose the Dusk Send provider methods:
+The wallet repo's provider API is the canonical source for method parameters,
+permissions, errors, and limits. Wallets should expose these v0.1 methods:
 
 - `dusk_getCapabilities`
 - `dusk_requestProfiles`

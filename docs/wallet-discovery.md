@@ -1,6 +1,9 @@
 # Dusk Wallet Discovery Standard
 
-This document defines the canonical browser discovery flow for Dusk wallets.
+This document is the canonical browser discovery protocol for Dusk wallets.
+It deliberately does not duplicate the provider RPC specification. The
+provider API is owned by
+[dusk-network/wallet docs/provider-api.md](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md).
 
 If you want an implementer-oriented walkthrough with a minimal provider fixture,
 see [wallet-implementer.md](./wallet-implementer.md).
@@ -78,9 +81,17 @@ Expected semantics:
 
 Wallets should keep `uuid` stable across page loads and product versions. dApps should de-duplicate discovered wallets by `uuid`.
 
-## Provider Contract
+## Provider Summary
 
-The announced `provider` should expose the Dusk provider API:
+Discovery only hands the dApp a provider object. The current v0.1 provider
+identity model is profile-based:
+
+- connect with `dusk_requestProfiles`
+- read current grants with `dusk_profiles`
+- listen for `profilesChanged`
+- request a `shieldedAddress` only through explicit user approval
+
+The provider should expose:
 
 - `request({ method, params })`
 - `on`, `once`, `off`, `removeListener`, `removeAllListeners`
@@ -90,21 +101,9 @@ The announced `provider` should expose the Dusk provider API:
 - `isAuthorized`
 - `isDusk === true`
 
-RPC methods remain Dusk-prefixed:
-
-- `dusk_getCapabilities`
-- `dusk_requestProfiles`
-- `dusk_profiles`
-- `dusk_requestShieldedAddress`
-- `dusk_chainId`
-- `dusk_switchNetwork`
-- `dusk_getPublicBalance`
-- `dusk_estimateGas`
-- `dusk_sendTransaction`
-- `dusk_watchAsset`
-- `dusk_signMessage`
-- `dusk_signAuth`
-- `dusk_disconnect`
+See the wallet repo's
+[provider API](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md)
+for the canonical method, event, error, permission, and limit definitions.
 
 ## Selection Rules
 

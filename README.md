@@ -9,11 +9,14 @@ A tiny, framework-agnostic SDK for **Dusk wallet discovery + dApp integration**.
 - Includes an **optional connect modal** (conceptually similar to a very small Reown/AppKit)
 - Includes an optional **connect button** (`<dusk-connect-button />`) for drop-in UI
 
-This SDK targets the wallet provider described in the
-[Dusk Wallet provider API](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md).
-The discovery protocol itself is specified in [docs/wallet-discovery.md](./docs/wallet-discovery.md).
-If you're implementing a wallet, start with
-[docs/wallet-implementer.md](./docs/wallet-implementer.md).
+Canonical v0.1 docs:
+
+- Provider API: [dusk-network/wallet docs/provider-api.md](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md)
+- Discovery protocol: [docs/wallet-discovery.md](./docs/wallet-discovery.md)
+- Connect SDK usage: this README
+- Wallet implementer guidance: [docs/wallet-implementer.md](./docs/wallet-implementer.md)
+- Security/threat model: [dusk-network/wallet docs/SECURITY.md](https://github.com/dusk-network/wallet/blob/main/docs/SECURITY.md)
+- v0.1 release checklist: [docs/RELEASE_CHECKLIST_v0.1.md](./docs/RELEASE_CHECKLIST_v0.1.md)
 
 Wallet discovery is **event-based**, not singleton-based:
 
@@ -508,7 +511,11 @@ Example (served from your own site):
     console.log("Dusk Wallet not installed");
   } else {
     await wallet.connect();
-    await wallet.sendTransfer({ to: "<base58>", amount: parseDuskToLux("1") });
+    await wallet.sendTransfer({
+      privacy: "public",
+      to: "<base58-public-account-id>",
+      amount: parseDuskToLux("1"),
+    });
   }
 </script>
 ```
