@@ -30,7 +30,9 @@ the owner docs instead of restating their full specifications.
 
 ## Release Hygiene
 
-- [ ] Version numbers and package metadata match the intended v0.1 release.
+- [ ] Final release PR bumps `@dusk-network/connect` from `0.0.1` to `0.1.0` and confirms package metadata.
 - [ ] Published package contents and extension artifacts are validated from clean builds.
 - [ ] Dependency update and security advisory PRs are triaged before release tagging.
+- [ ] Connect publish/release workflow is added or explicitly run manually before tagging v0.1.
+- [ ] PR, push-to-main, manual, tag, and package-publish CI paths are checked before release.
 - [ ] Vulnerability reporting instructions are checked after branch/tag publication.
