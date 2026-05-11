@@ -36,6 +36,19 @@ function extractSectionBacktickedBullets(markdown: string, sectionTitle: string)
   return out;
 }
 
+function extractCallObjectArgs(source: string, callName: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(`${callName}\\s*\\(\\s*\\{([\\s\\S]*?)\\}\\s*\\)`, "g");
+
+  for (;;) {
+    const match = re.exec(source);
+    if (!match) break;
+    out.push(match[1] ?? "");
+  }
+
+  return out;
+}
+
 describe("Discovery Conformance", () => {
   it("docs/wallet-discovery.md matches exported discovery events and info fields", async () => {
     const docPath = path.resolve(process.cwd(), "docs", "wallet-discovery.md");
@@ -99,5 +112,16 @@ describe("Discovery Conformance", () => {
     expect(md).toContain("Wallet implementer guidance");
     expect(md).toContain("Security/threat model");
     expect(md).toContain("v0.1 release checklist");
+  });
+
+  it("README sendTransfer examples include required transfer privacy", async () => {
+    const readmePath = path.resolve(process.cwd(), "README.md");
+    const md = await readFile(readmePath, "utf8");
+    const examples = extractCallObjectArgs(md, "sendTransfer");
+
+    expect(examples.length).toBeGreaterThan(0);
+    for (const example of examples) {
+      expect(example, example).toMatch(/\bprivacy\s*:\s*["'](?:public|shielded)["']/);
+    }
   });
 });

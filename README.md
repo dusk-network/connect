@@ -511,7 +511,11 @@ Example (served from your own site):
     console.log("Dusk Wallet not installed");
   } else {
     await wallet.connect();
-    await wallet.sendTransfer({ to: "<base58>", amount: parseDuskToLux("1") });
+    await wallet.sendTransfer({
+      privacy: "public",
+      to: "<base58-public-account-id>",
+      amount: parseDuskToLux("1"),
+    });
   }
 </script>
 ```

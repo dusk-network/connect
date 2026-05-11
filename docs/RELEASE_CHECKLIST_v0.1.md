@@ -10,6 +10,7 @@ the owner docs instead of restating their full specifications.
 - [ ] Connect SDK usage is current in `dusk-network/connect/README.md`.
 - [ ] Wallet implementer guidance is current in `dusk-network/connect/docs/wallet-implementer.md`.
 - [ ] Security/threat model is current in `dusk-network/wallet/docs/SECURITY.md`.
+- [ ] Vulnerability reporting contact or private reporting instructions are present and non-placeholder in `dusk-network/wallet/docs/SECURITY.md`.
 
 ## Provider Surface
 
@@ -26,3 +27,10 @@ the owner docs instead of restating their full specifications.
 - [ ] Wallet build passes for supported extension targets.
 - [ ] Connect build passes and generated types match source.
 - [ ] Remaining v0.1 ambiguities are listed in the release notes or final audit report.
+
+## Release Hygiene
+
+- [ ] Version numbers and package metadata match the intended v0.1 release.
+- [ ] Published package contents and extension artifacts are validated from clean builds.
+- [ ] Dependency update and security advisory PRs are triaged before release tagging.
+- [ ] Vulnerability reporting instructions are checked after branch/tag publication.
