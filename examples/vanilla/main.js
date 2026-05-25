@@ -23,6 +23,35 @@ function shorten(s, left = 10, right = 8) {
   return `${s.slice(0, left)}…${s.slice(-right)}`;
 }
 
+function renderProviderOptions(select, providers, selectedProviderId) {
+  const optionsKey = JSON.stringify(
+    providers.map((provider) => [provider.uuid, provider.name, provider.rdns])
+  );
+  if (select.dataset.options !== optionsKey) {
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent =
+      providers.length > 1
+        ? "Choose wallet"
+        : providers.length
+          ? "Wallet auto-selected"
+          : "No wallets found";
+
+    const options = providers.map((provider) => {
+      const option = document.createElement("option");
+      option.value = provider.uuid;
+      option.textContent = `${provider.name} (${provider.rdns})`;
+      return option;
+    });
+
+    select.replaceChildren(placeholder, ...options);
+    select.dataset.options = optionsKey;
+  }
+
+  select.value = selectedProviderId ?? "";
+  select.disabled = providers.length <= 1;
+}
+
 function render(st) {
   const installed = !!st.installed;
   const walletCount = st.availableProviders?.length ?? 0;
@@ -43,23 +72,7 @@ function render(st) {
 
   if (elProviderSelect) {
     const providers = st.availableProviders ?? [];
-    const options = [
-      providers.length > 1
-        ? `<option value="">Choose wallet</option>`
-        : `<option value="">${providers.length ? "Wallet auto-selected" : "No wallets found"}</option>`,
-      ...providers.map(
-        (provider) =>
-          `<option value="${provider.uuid}">${provider.name} (${provider.rdns})</option>`
-      ),
-    ].join("");
-
-    if (elProviderSelect.dataset.options !== options) {
-      elProviderSelect.innerHTML = options;
-      elProviderSelect.dataset.options = options;
-    }
-
-    elProviderSelect.value = st.providerId ?? "";
-    elProviderSelect.disabled = providers.length <= 1;
+    renderProviderOptions(elProviderSelect, providers, st.providerId);
   }
 }
 
