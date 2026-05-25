@@ -25,11 +25,19 @@ function providerAccent(provider) {
 }
 
 function providerIcon(provider) {
+  const icon = document.createElement("span");
+  icon.classList.add("providerIcon");
+  icon.setAttribute("aria-hidden", "true");
+
   if (isDuskProvider(provider)) {
-    return `<span class="providerIcon providerIconDusk" aria-hidden="true"></span>`;
+    icon.classList.add("providerIconDusk");
+    return icon;
   }
 
-  return `<span class="providerIcon providerIconInitial" style="--provider-accent: ${providerAccent(provider)}" aria-hidden="true">${providerInitial(provider)}</span>`;
+  icon.classList.add("providerIconInitial");
+  icon.style.setProperty("--provider-accent", providerAccent(provider));
+  icon.textContent = providerInitial(provider);
+  return icon;
 }
 
 function createMockProvider({ info, account, chainId, networkName, balance }) {
@@ -252,30 +260,63 @@ function log(line) {
 
 function renderProviders(state) {
   const providers = state.availableProviders ?? [];
+  elProviderList.replaceChildren();
+
   if (!providers.length) {
-    elProviderList.innerHTML = `<div class="providerCard"><div class="providerCopy"><div class="providerName">No wallets discovered</div><div class="providerMeta">Dispatch \`dusk:requestProvider\` to ask wallets to announce again.</div></div></div>`;
+    const card = document.createElement("div");
+    card.className = "providerCard";
+
+    const copy = document.createElement("div");
+    copy.className = "providerCopy";
+
+    const name = document.createElement("div");
+    name.className = "providerName";
+    name.textContent = "No wallets discovered";
+
+    const meta = document.createElement("div");
+    meta.className = "providerMeta";
+    meta.textContent = "Dispatch `dusk:requestProvider` to ask wallets to announce again.";
+
+    copy.append(name, meta);
+    card.append(copy);
+    elProviderList.append(card);
     return;
   }
 
-  elProviderList.innerHTML = providers
-    .map(
-      (provider) => `
-        <article class="providerCard" data-selected="${provider.uuid === state.providerId}">
-          <div class="providerMain">
-            ${providerIcon(provider)}
-            <div class="providerCopy">
-              <div class="providerName">${provider.name}</div>
-              <div class="providerMeta mono">${provider.uuid}</div>
-              <div class="providerMeta">${provider.rdns}</div>
-            </div>
-          </div>
-          <button class="providerUse" type="button" data-provider-id="${provider.uuid}">
-            ${provider.uuid === state.providerId ? "Selected" : "Use Wallet"}
-          </button>
-        </article>
-      `
-    )
-    .join("");
+  for (const provider of providers) {
+    const card = document.createElement("article");
+    card.className = "providerCard";
+    card.dataset.selected = provider.uuid === state.providerId ? "true" : "false";
+
+    const main = document.createElement("div");
+    main.className = "providerMain";
+
+    const copy = document.createElement("div");
+    copy.className = "providerCopy";
+
+    const name = document.createElement("div");
+    name.className = "providerName";
+    name.textContent = provider.name;
+
+    const uuid = document.createElement("div");
+    uuid.className = "providerMeta mono";
+    uuid.textContent = provider.uuid;
+
+    const rdns = document.createElement("div");
+    rdns.className = "providerMeta";
+    rdns.textContent = provider.rdns;
+
+    const button = document.createElement("button");
+    button.className = "providerUse";
+    button.type = "button";
+    button.dataset.providerId = provider.uuid;
+    button.textContent = provider.uuid === state.providerId ? "Selected" : "Use Wallet";
+
+    copy.append(name, uuid, rdns);
+    main.append(providerIcon(provider), copy);
+    card.append(main, button);
+    elProviderList.append(card);
+  }
 }
 
 function render(state) {
