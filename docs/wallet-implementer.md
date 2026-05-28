@@ -281,6 +281,7 @@ browser-like test environment:
 
 ```ts
 import { runWalletConformance } from "@dusk-network/connect/testing";
+// JSR: import { runWalletConformance } from "jsr:@dusk/connect/testing";
 
 await runWalletConformance({
   installWallet(window) {

@@ -121,6 +121,19 @@ This demo focuses on inspecting a data-driver schema and invoking methods based 
 npm i @dusk-network/connect
 ```
 
+Or with JSR:
+
+```ts
+import { createDuskWallet } from "jsr:@dusk/connect";
+```
+
+JSR also exposes the optional entrypoints:
+
+```ts
+import { runWalletConformance } from "jsr:@dusk/connect/testing";
+import { defineDuskConnectButton } from "jsr:@dusk/connect/ui";
+```
+
 ## Which entrypoint should I use?
 
 ### `createDuskWallet()` / `DuskWallet`
@@ -528,3 +541,16 @@ npm run build
 
 Produces ESM + types in `dist/`.
 `npm pack` and `npm publish` run this automatically via `prepack`.
+
+## Publishing
+
+The npm package is published as `@dusk-network/connect`.
+The JSR package is published as `@dusk/connect` from TypeScript source.
+
+Before publishing v0.1:
+
+```bash
+npm run ci
+npm pack --dry-run
+npx jsr publish --dry-run
+```

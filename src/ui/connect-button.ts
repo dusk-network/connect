@@ -40,7 +40,7 @@ function boolAttr(v: string | null): boolean {
 // `networkLabel` is shared with the modal.
 
 export class DuskConnectButtonElement extends HTMLElement {
-  static get observedAttributes() {
+  static get observedAttributes(): string[] {
     return [
       "app-name",
       "install-url",

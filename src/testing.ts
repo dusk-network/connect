@@ -1,3 +1,18 @@
+/**
+ * Testing helpers for Dusk wallet implementers.
+ *
+ * Import this entrypoint from wallet test suites that want to exercise the
+ * v0.1 provider discovery and provider RPC contract against a browser-like
+ * environment such as jsdom.
+ *
+ * @example
+ * ```ts
+ * import { runWalletConformance } from "@dusk/connect/testing";
+ * ```
+ *
+ * @module
+ */
+
 import { createDuskWallet } from "./wallet.js";
 
 import type {

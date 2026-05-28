@@ -1,0 +1,23 @@
+{
+  "name": "@dusk/connect",
+  "version": "0.1.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts",
+    "./ui": "./src/ui.ts"
+  },
+  "publish": {
+    "include": [
+      "LICENSE",
+      "README.md",
+      "dusk-connect.png",
+      "docs/*.md",
+      "src/**/*.ts"
+    ],
+    "exclude": [
+      "src/**/*.test.ts",
+      "src/test/**"
+    ]
+  }
+}
