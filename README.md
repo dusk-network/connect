@@ -117,11 +117,13 @@ This demo focuses on inspecting a data-driver schema and invoking methods based 
 
 ## Install
 
-```bash
-npm i @dusk/connect
-```
+Published package:
 
-JSR uses the same package name:
+```bash
+npx jsr add @dusk/connect
+# or, in Deno:
+deno add jsr:@dusk/connect
+```
 
 ```ts
 import { createDuskWallet } from "@dusk/connect";
@@ -544,7 +546,10 @@ Produces ESM + types in `dist/`.
 
 ## Publishing
 
-The package is published as `@dusk/connect` on npm and JSR.
+The package is published as `@dusk/connect` on JSR.
+
+npm publishing is intentionally separate; do not assume npm availability unless
+a later npm release under an appropriate npm scope is announced.
 
 Before publishing v0.1:
 
