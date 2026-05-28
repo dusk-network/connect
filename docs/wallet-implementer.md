@@ -1,7 +1,7 @@
 # Dusk Wallet Implementer Guide
 
 This guide is for wallet teams that want to expose a Dusk provider compatible
-with `@dusk-network/connect` and the v0.1 Dusk Wallet provider API.
+with `@dusk/connect` and the v0.1 Dusk Wallet provider API.
 
 Canonical source ownership:
 
@@ -280,8 +280,7 @@ Wallet repositories can run the reusable Connect conformance helper in a
 browser-like test environment:
 
 ```ts
-import { runWalletConformance } from "@dusk-network/connect/testing";
-// JSR: import { runWalletConformance } from "jsr:@dusk/connect/testing";
+import { runWalletConformance } from "@dusk/connect/testing";
 
 await runWalletConformance({
   installWallet(window) {

@@ -30,8 +30,7 @@ the owner docs instead of restating their full specifications.
 
 ## Release Hygiene
 
-- [ ] Confirm npm package metadata is correct for `@dusk-network/connect@0.1.0`.
-- [ ] Confirm JSR package metadata is correct for `@dusk/connect@0.1.0`.
+- [ ] Confirm package metadata is correct for `@dusk/connect@0.1.0` on npm and JSR.
 - [ ] Published package contents and extension artifacts are validated from clean builds.
 - [ ] `npx jsr publish --dry-run` passes before manual JSR publish.
 - [ ] Dependency update and security advisory PRs are triaged before release tagging.

@@ -83,7 +83,7 @@ If you're building a wallet instead of a dApp:
 The reference page shows a minimal wallet injection built on the raw browser
 events and a dApp consuming it through `createDuskWallet()`.
 If you want to test a wallet implementation from another repository, use
-`@dusk-network/connect/testing` from a jsdom test as described in
+`@dusk/connect/testing` from a jsdom test as described in
 [`docs/wallet-implementer.md`](./docs/wallet-implementer.md).
 
 ## Dario FSM demo
@@ -118,20 +118,20 @@ This demo focuses on inspecting a data-driver schema and invoking methods based 
 ## Install
 
 ```bash
-npm i @dusk-network/connect
+npm i @dusk/connect
 ```
 
-Or with JSR:
+JSR uses the same package name:
 
 ```ts
-import { createDuskWallet } from "jsr:@dusk/connect";
+import { createDuskWallet } from "@dusk/connect";
 ```
 
-JSR also exposes the optional entrypoints:
+Optional entrypoints:
 
 ```ts
-import { runWalletConformance } from "jsr:@dusk/connect/testing";
-import { defineDuskConnectButton } from "jsr:@dusk/connect/ui";
+import { runWalletConformance } from "@dusk/connect/testing";
+import { defineDuskConnectButton } from "@dusk/connect/ui";
 ```
 
 ## Which entrypoint should I use?
@@ -148,7 +148,7 @@ Use this when you only need wallet discovery + provider access:
 It’s the smallest surface area and has no opinion about contracts, nodes, or data-drivers.
 
 ```ts
-import { createDuskWallet } from "@dusk-network/connect";
+import { createDuskWallet } from "@dusk/connect";
 
 const wallet = createDuskWallet();
 await wallet.ready();
@@ -178,7 +178,7 @@ Use this when you’re building a **smart contract dApp** and you want one objec
   - `writeContract()`
 
 ```ts
-import { createDuskApp, DUSK_CHAIN_PRESETS } from "@dusk-network/connect";
+import { createDuskApp, DUSK_CHAIN_PRESETS } from "@dusk/connect";
 
 const dusk = createDuskApp({
   nodeUrl: "https://testnet.nodes.dusk.network",
@@ -206,7 +206,7 @@ import {
   parseDuskToLux,
   formatLuxShort,
   ERROR_CODES,
-} from "@dusk-network/connect";
+} from "@dusk/connect";
 
 const wallet = createDuskWallet();
 await wallet.ready();
@@ -256,7 +256,7 @@ await wallet.sendTransfer({
 ## Contract call
 
 ```ts
-import { createDuskWallet } from "@dusk-network/connect";
+import { createDuskWallet } from "@dusk/connect";
 
 const wallet = createDuskWallet();
 await wallet.connect();
@@ -285,8 +285,8 @@ If you want a **single entrypoint** for contract developers:
 use `createDuskApp()`.
 
 ```ts
-import { createDuskApp, DUSK_CHAIN_PRESETS, parseDuskToLux } from "@dusk-network/connect";
-import { defineDuskConnectButton } from "@dusk-network/connect/ui";
+import { createDuskApp, DUSK_CHAIN_PRESETS, parseDuskToLux } from "@dusk/connect";
+import { defineDuskConnectButton } from "@dusk/connect/ui";
 
 defineDuskConnectButton();
 
@@ -368,7 +368,7 @@ The wallet will show a user approval prompt.
 Chain IDs use CAIP-2 format (`dusk:<id>`).
 
 ```ts
-import { createDuskWallet, DUSK_CHAIN_PRESETS } from "@dusk-network/connect";
+import { createDuskWallet, DUSK_CHAIN_PRESETS } from "@dusk/connect";
 
 const wallet = createDuskWallet();
 await wallet.connect();
@@ -395,7 +395,7 @@ import {
   createDuskWallet,
   ensureChain,
   DUSK_CHAIN_PRESETS,
-} from "@dusk-network/connect";
+} from "@dusk/connect";
 
 const wallet = createDuskWallet();
 await wallet.connect();
@@ -415,7 +415,7 @@ await ensureChain(wallet, { nodeUrl: "https://my.custom.node:9000" }, { strictNo
 If you want a quick, drop-in "connect" flow (Reown/AppKit-style, but tiny):
 
 ```ts
-import { createDuskConnectKit } from "@dusk-network/connect/ui";
+import { createDuskConnectKit } from "@dusk/connect/ui";
 
 const kit = createDuskConnectKit({
   modal: {
@@ -448,8 +448,8 @@ If you want the common “Connect Wallet” button UX, the SDK ships a small web
 Then wire it to a wallet instance (so your dApp and the button share the same state):
 
 ```ts
-import { createDuskWallet } from "@dusk-network/connect";
-import { defineDuskConnectButton } from "@dusk-network/connect/ui";
+import { createDuskWallet } from "@dusk/connect";
+import { defineDuskConnectButton } from "@dusk/connect/ui";
 
 defineDuskConnectButton();
 
@@ -544,8 +544,7 @@ Produces ESM + types in `dist/`.
 
 ## Publishing
 
-The npm package is published as `@dusk-network/connect`.
-The JSR package is published as `@dusk/connect` from TypeScript source.
+The package is published as `@dusk/connect` on npm and JSR.
 
 Before publishing v0.1:
 
