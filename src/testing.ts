@@ -1,3 +1,18 @@
+/**
+ * Testing helpers for Dusk wallet implementers.
+ *
+ * Import this entrypoint from wallet test suites that want to exercise the
+ * v0.1 provider discovery and provider RPC contract against a browser-like
+ * environment such as jsdom.
+ *
+ * @example
+ * ```ts
+ * import { runWalletConformance } from "@dusk/connect/testing";
+ * ```
+ *
+ * @module
+ */
+
 import { createDuskWallet } from "./wallet.js";
 
 import type {
@@ -12,6 +27,7 @@ import type {
   SwitchChainParams,
 } from "./types.js";
 
+/** Cleanup return value accepted from a wallet conformance installer. */
 export type WalletConformanceCleanup =
   | void
   | (() => void | Promise<void>)
@@ -19,16 +35,19 @@ export type WalletConformanceCleanup =
       cleanup?: () => void | Promise<void>;
     };
 
+/** Installs a wallet provider into the target test window. */
 export type InstallWalletForConformance = (
   target: Window
 ) => WalletConformanceCleanup | Promise<WalletConformanceCleanup>;
 
+/** Expected result for an optional chain-switch conformance step. */
 export type WalletConformanceSwitchExpectation = {
   params: SwitchChainParams;
   expectedChainId?: ChainId;
   expectedNode?: Partial<DuskNodeChangedPayload>;
 };
 
+/** Options for running the wallet provider conformance helper. */
 export type WalletConformanceOptions = {
   installWallet: InstallWalletForConformance;
   preferredProviderId?: string | null;
@@ -39,6 +58,7 @@ export type WalletConformanceOptions = {
   switchChain?: WalletConformanceSwitchExpectation;
 };
 
+/** Report returned by the wallet provider conformance helper. */
 export type WalletConformanceReport = {
   initialState: DuskWalletState;
   connectedProfiles: DuskProfile[];

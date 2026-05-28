@@ -1,9 +1,22 @@
-// Public entrypoint.
-//
-// Keep the surface area intentionally small:
-// - wallet (connection + tx send)
-// - app facade (read/write contract helpers)
-// - core types + a couple of amount helpers
+/**
+ * Dusk Connect dApp SDK.
+ *
+ * Use this entrypoint for wallet discovery, profile permissions, public
+ * balance reads, transaction submission, Dusk-native signing helpers, and
+ * contract read/write helpers.
+ *
+ * @example Connect to the selected Dusk wallet
+ * ```ts
+ * import { createDuskWallet } from "@dusk/connect";
+ *
+ * const wallet = createDuskWallet();
+ * await wallet.ready();
+ * await wallet.connect();
+ * console.log(wallet.state.selectedProfile);
+ * ```
+ *
+ * @module
+ */
 
 export * from "./types.js";
 export * from "./errors.js";

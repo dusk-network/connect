@@ -4,6 +4,7 @@ import { createDuskConnectModal, type DuskConnectModal } from "./modal.js";
 import { networkLabel, shortenMiddle, walletStatus } from "./shared.js";
 import { DCONNECT_UI_BASE_CSS } from "./styles.js";
 
+/** Options for the `<dusk-connect-button>` custom element. */
 export type DuskConnectButtonOptions = {
   /** App name shown in the modal header (e.g. "My dApp"). */
   appName?: string;
@@ -39,8 +40,9 @@ function boolAttr(v: string | null): boolean {
 
 // `networkLabel` is shared with the modal.
 
+/** Custom element that renders a Dusk wallet connect button. */
 export class DuskConnectButtonElement extends HTMLElement {
-  static get observedAttributes() {
+  static get observedAttributes(): string[] {
     return [
       "app-name",
       "install-url",
@@ -566,6 +568,7 @@ export class DuskConnectButtonElement extends HTMLElement {
   }
 }
 
+/** Define the Dusk connect button custom element if it is not already defined. */
 export function defineDuskConnectButton(tagName = "dusk-connect-button"): void {
   if (typeof window === "undefined") return;
   if (customElements.get(tagName)) return;
@@ -575,6 +578,7 @@ export function defineDuskConnectButton(tagName = "dusk-connect-button"): void {
 /**
  * Programmatic helper if you prefer not to write the custom element in HTML.
  */
+/** Create a configured Dusk connect button element. */
 export function createDuskConnectButton(options: DuskConnectButtonOptions = {}): DuskConnectButtonElement {
   defineDuskConnectButton();
   const el = document.createElement("dusk-connect-button") as DuskConnectButtonElement;

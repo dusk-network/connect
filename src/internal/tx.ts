@@ -1,6 +1,7 @@
 import type { TxExecutedEvent } from "../node.js";
 import type { TxWaitReceipt } from "../types.js";
 
+/** Infer whether a RUES transaction event represents successful execution. */
 export function inferTxOk(payload: unknown): boolean {
   // Best-effort: node/w3sper versions vary.
   // Common patterns:
@@ -22,6 +23,7 @@ export function inferTxOk(payload: unknown): boolean {
   }
 }
 
+/** Extract a best-effort error message from a RUES transaction event payload. */
 export function inferTxError(payload: unknown): string {
   try {
     if (!payload || typeof payload !== "object") return "";
@@ -40,6 +42,7 @@ export function inferTxError(payload: unknown): string {
   }
 }
 
+/** Convert a raw execution event into Connect's receipt-like transaction result. */
 export function toTxWaitReceipt(hash: string, executed: TxExecutedEvent | null): TxWaitReceipt {
   const h = String(hash ?? "");
   if (!executed) {

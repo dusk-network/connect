@@ -9,6 +9,7 @@
  * contract's ABI exposed via the Rust `ConvertibleContract` trait.
  */
 
+/** Contract data-driver interface used to encode and decode contract calls. */
 export type DuskDataDriver = {
   init?: () => number | void;
 
@@ -217,6 +218,7 @@ export async function loadWasmDataDriver(bytes: Uint8Array | ArrayBuffer): Promi
   };
 }
 
+/** Fetch, instantiate, and initialize a WASM data-driver from a URL. */
 export async function fetchWasmDataDriver(
   url: string,
   opts: { fetch?: typeof fetch; init?: RequestInit } = {}

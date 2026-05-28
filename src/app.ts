@@ -28,6 +28,7 @@ import {
 // Types
 // ------------------------------
 
+/** Contract preset used by the high-level Dusk app facade. */
 export type DuskAppContract = {
   /** 0x-prefixed 32-byte contract id */
   contractId: string;
@@ -41,6 +42,7 @@ export type DuskAppContract = {
   defaultTx?: DuskContractTxOverrides;
 };
 
+/** Options for creating a high-level Dusk app facade. */
 export type DuskAppOptions = {
   /** Provide an existing wallet instance or wallet constructor options */
   wallet?: DuskWallet | DuskWalletOptions;
@@ -61,6 +63,7 @@ export type DuskAppOptions = {
   disableDriverCache?: boolean;
 };
 
+/** Parameters for a read-only contract call. */
 export type ReadContractParams = {
   /** Contract preset name or inline contract config */
   contract: string | DuskAppContract;
@@ -75,8 +78,10 @@ export type ReadContractParams = {
 /** Tx override fields that map 1:1 to `wallet.sendContractCall(...)`. */
 export type ContractTxOverrides = DuskContractTxOverrides;
 
+/** Parameters for preparing a wallet contract-call transaction. */
 export type PrepareContractCallParams = ReadContractParams & ContractTxOverrides;
 
+/** Parameters for sending a wallet contract-call transaction. */
 export type WriteContractParams = PrepareContractCallParams & {
   /** If true, call wallet.connect() when not authorized. Default: true */
   autoConnect?: boolean;
@@ -84,8 +89,10 @@ export type WriteContractParams = PrepareContractCallParams & {
   chain?: SwitchChainParams;
 };
 
+/** Wallet-ready contract-call transaction parameters. */
 export type PreparedContractCall = Omit<Extract<SendTransactionParams, { kind: "contract_call" }>, "kind">;
 
+/** High-level facade that combines wallet, node, and contract helpers. */
 export type DuskApp = {
   wallet: DuskWallet;
 
@@ -230,7 +237,7 @@ function pickTxOverrides(src: any): DuskContractTxOverrides {
  *
  * @example
  * ```ts
- * import { createDuskApp, DUSK_CHAIN_PRESETS } from "@dusk-network/connect";
+ * import { createDuskApp, DUSK_CHAIN_PRESETS } from "@dusk/connect";
  *
  * const dusk = createDuskApp({
  *   nodeUrl: "https://testnet.nodes.dusk.network",

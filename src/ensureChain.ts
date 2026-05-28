@@ -2,6 +2,7 @@ import type { ChainId, SwitchChainParams } from "./types.js";
 import type { DuskWallet } from "./wallet.js";
 import { normalizeBaseUrl, normalizeCaip2ChainId } from "./internal/normalize.js";
 
+/** Options for {@link ensureChain}. */
 export type EnsureChainOptions = {
   /**
    * If true, the helper will call `wallet.refresh()` first (no prompt).

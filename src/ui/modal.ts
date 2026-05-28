@@ -3,6 +3,7 @@ import type { DuskWallet } from "../wallet.js";
 import { networkLabel, shortenMiddle, walletStatus, type WalletStatus } from "./shared.js";
 import { DCONNECT_UI_BASE_CSS } from "./styles.js";
 
+/** Options for the framework-agnostic Dusk connect modal. */
 export type DuskConnectModalOptions = {
   /** Optional app name shown in the header (e.g. "My dApp") */
   appName?: string;
@@ -16,6 +17,7 @@ export type DuskConnectModalOptions = {
   connectOptions?: ConnectOptions;
 };
 
+/** Imperative controller returned by {@link createDuskConnectModal}. */
 export type DuskConnectModal = {
   open: () => void;
   close: () => void;
@@ -102,6 +104,7 @@ function renderProviderIcon(provider: DuskProviderInfo): string {
   return `<img class="dconnect-provider-icon" src="${escapeHtml(icon)}" alt="" />`;
 }
 
+/** Create a small wallet-selection and connect modal. */
 export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectModalOptions = {}): DuskConnectModal {
   if (typeof window === "undefined") {
     return { open: () => {}, close: () => {}, destroy: () => {}, isOpen: () => false };

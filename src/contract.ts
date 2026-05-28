@@ -18,6 +18,7 @@ import { ensureChain } from "./ensureChain.js";
 import { compact } from "./internal/normalize.js";
 import { toTxWaitReceipt } from "./internal/tx.js";
 
+/** Optional wallet transaction fields for a contract call. */
 export type DuskContractTxOverrides = {
   to?: AccountId;
   /** Choose Moonlight (public) or Phoenix (shielded) for contract calls. */
@@ -29,6 +30,7 @@ export type DuskContractTxOverrides = {
   display?: unknown;
 };
 
+/** Options for immediately submitting a contract call through the wallet. */
 export type DuskContractWriteOptions = DuskContractTxOverrides & {
   /** If true, call wallet.connect() when not authorized. Default: true */
   autoConnect?: boolean;
@@ -36,6 +38,7 @@ export type DuskContractWriteOptions = DuskContractTxOverrides & {
   chain?: SwitchChainParams;
 };
 
+/** Options for creating a data-driver-backed contract facade. */
 export type CreateDuskContractOptions = {
   contractId: string | Uint8Array | number[];
   driver: DuskDataDriver | Promise<DuskDataDriver>;
@@ -62,6 +65,7 @@ export type CreateDuskContractOptions = {
   autoConnect?: boolean;
 };
 
+/** Proxy-based contract facade with read, tx-build, and write helpers. */
 export type DuskContract = {
   /** 0x-prefixed 32-byte contract id */
   readonly id: string;
@@ -127,6 +131,7 @@ function createFnProxy<T extends Record<string, any>>(factory: (fnName: string) 
   ) as any;
 }
 
+/** Create a data-driver-backed contract facade. */
 export function createDuskContract(opts: CreateDuskContractOptions): DuskContract {
   const { idHex0x, idHexNo0x } = normalizeContractId(opts.contractId);
   const driverPromise = Promise.resolve(opts.driver);

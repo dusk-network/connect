@@ -2,6 +2,7 @@ import { createDuskWallet, type DuskWallet, type DuskWalletOptions } from "../wa
 import type { DuskWalletState } from "../types.js";
 import { createDuskConnectModal, type DuskConnectModal, type DuskConnectModalOptions } from "./modal.js";
 
+/** Options for creating a bundled wallet wrapper and modal controller. */
 export type DuskConnectKitOptions = {
   /** Wallet options (provider detection, refresh, etc.) */
   wallet?: DuskWalletOptions;
@@ -9,6 +10,7 @@ export type DuskConnectKitOptions = {
   modal?: DuskConnectModalOptions;
 };
 
+/** Minimal framework-agnostic connect kit for Dusk dApps. */
 export type DuskConnectKit = {
   wallet: DuskWallet;
   modal: DuskConnectModal;

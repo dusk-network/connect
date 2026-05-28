@@ -1,6 +1,7 @@
 import { toBytes } from "./bytes.js";
 import { normalizeBaseUrl, strip0x } from "./internal/normalize.js";
 
+/** Options for low-level read-only contract calls through Rusk HTTP. */
 export type ContractCallOptions = {
   /**
    * If true, force feeder mode. If false, disable feeder mode.
@@ -13,6 +14,7 @@ export type ContractCallOptions = {
   signal?: AbortSignal;
 };
 
+/** Options for waiting on a RUES transaction execution event. */
 export type WaitForTxExecutedOptions = {
   /**
    * How long to wait for the tx to be executed before returning `null`.
@@ -24,6 +26,7 @@ export type WaitForTxExecutedOptions = {
   signal?: AbortSignal;
 };
 
+/** RUES transaction execution event decoded by the node client. */
 export type TxExecutedEvent = {
   /** RUES headers for the executed event */
   headers: Headers;
@@ -31,6 +34,7 @@ export type TxExecutedEvent = {
   payload: unknown;
 };
 
+/** Minimal node client used by Connect read helpers. */
 export type DuskNodeClient = {
   /** Resolved base URL (no trailing slash) */
   getBaseUrl(): string;
@@ -143,6 +147,7 @@ async function subscribeRues(
   }
 }
 
+/** Create a lightweight Rusk HTTP/RUES client for contract reads and tx waits. */
 export function createDuskNodeClient(opts: {
   /** Base URL, e.g. https://testnet.nodes.dusk.network */
   baseUrl: string | (() => string);

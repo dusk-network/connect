@@ -11,13 +11,22 @@ import type { DrcAccount } from "./types.js";
 import { createDuskContract } from "../contract.js";
 import { fetchWasmDataDriver } from "../driver.js";
 
+/** Arguments for DRC20 `balance_of`. */
 export type Drc20BalanceOf = { account: DrcAccount };
+
+/** Arguments for DRC20 `allowance`. */
 export type Drc20Allowance = { owner: DrcAccount; spender: DrcAccount };
 
+/** Arguments for DRC20 `transfer`. */
 export type Drc20TransferCall = { to: DrcAccount; value: LuxString };
+
+/** Arguments for DRC20 `approve`. */
 export type Drc20ApproveCall = { spender: DrcAccount; value: LuxString };
+
+/** Arguments for DRC20 `transfer_from`. */
 export type Drc20TransferFromCall = { owner: DrcAccount; to: DrcAccount; value: LuxString };
 
+/** Method signatures for the supported DRC20 interface. */
 export const DRC20_METHOD_SIGS: Record<string, string> = {
   // Views
   name: "name()",
@@ -65,6 +74,7 @@ function buildDrc20Display(op: string, args: unknown): any {
   };
 }
 
+/** Options for creating a DRC20 helper facade. */
 export type CreateDrc20Options = Omit<CreateDuskContractOptions, "driver" | "methodSigs"> & {
   /** Driver instance or promise. Prefer passing a cached promise for repeated calls. */
   driver?: DuskDataDriver | Promise<DuskDataDriver>;
@@ -77,6 +87,7 @@ export type CreateDrc20Options = Omit<CreateDuskContractOptions, "driver" | "met
   methodSigs?: Record<string, string>;
 };
 
+/** DRC20 helper facade with typed reads, tx builders, and writes. */
 export type Drc20Contract = {
   contract: DuskContract;
   read: {
@@ -99,6 +110,7 @@ export type Drc20Contract = {
   };
 };
 
+/** Wrap an existing contract facade as a DRC20 helper. */
 export function asDrc20(contract: DuskContract): Drc20Contract {
   return {
     contract,
@@ -147,6 +159,7 @@ export function asDrc20(contract: DuskContract): Drc20Contract {
   };
 }
 
+/** Create a DRC20 helper from contract and data-driver options. */
 export function createDrc20(opts: CreateDrc20Options): Drc20Contract {
   const driver = opts.driver ?? (opts.driverUrl ? fetchWasmDataDriver(opts.driverUrl) : null);
   if (!driver) throw new Error("createDrc20: driver or driverUrl is required");
