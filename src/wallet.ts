@@ -50,8 +50,10 @@ import {
 import { normalizeContractId0x } from "./internal/contractId.js";
 import { bytesToHex, toBytes } from "./bytes.js";
 
+/** Provider discovery wait options used by {@link DuskWallet}. */
 export type WaitForProviderOptions = WaitForDuskProvidersOptions;
 
+/** Options for constructing a {@link DuskWallet} wrapper. */
 export type DuskWalletOptions = {
   /** Provide a provider explicitly (useful for tests or custom integrations). */
   provider?: DuskProvider | null;
@@ -78,6 +80,7 @@ export type DuskWalletOptions = {
   providerStorageKey?: string;
 };
 
+/** Subscriber callback invoked when wallet state changes. */
 export type DuskWalletSubscriber = (state: DuskWalletState) => void;
 
 const EMPTY_PROVIDERS: DuskProviderInfo[] = [];

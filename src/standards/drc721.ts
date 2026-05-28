@@ -11,16 +11,31 @@ import type { DrcAccount } from "./types.js";
 import { createDuskContract } from "../contract.js";
 import { fetchWasmDataDriver } from "../driver.js";
 
+/** Arguments for DRC721 `balance_of`. */
 export type Drc721BalanceOf = { account: DrcAccount };
+
+/** Arguments for DRC721 `owner_of`. */
 export type Drc721OwnerOf = { token_id: LuxString };
+
+/** Arguments for DRC721 `token_uri`. */
 export type Drc721TokenUri = { token_id: LuxString };
+
+/** Arguments for DRC721 `get_approved`. */
 export type Drc721GetApproved = { token_id: LuxString };
+
+/** Arguments for DRC721 `is_approved_for_all`. */
 export type Drc721IsApprovedForAll = { owner: DrcAccount; operator: DrcAccount };
 
+/** Arguments for DRC721 `approve`. */
 export type Drc721ApproveCall = { approved: DrcAccount; token_id: LuxString };
+
+/** Arguments for DRC721 `set_approval_for_all`. */
 export type Drc721SetApprovalForAllCall = { operator: DrcAccount; approved: boolean };
+
+/** Arguments for DRC721 `transfer_from`. */
 export type Drc721TransferFromCall = { from: DrcAccount; to: DrcAccount; token_id: LuxString };
 
+/** Method signatures for the supported DRC721 interface. */
 export const DRC721_METHOD_SIGS: Record<string, string> = {
   // Views
   name: "name()",
@@ -55,6 +70,7 @@ function buildDrc721Display(op: string, args: unknown): any {
   };
 }
 
+/** Options for creating a DRC721 helper facade. */
 export type CreateDrc721Options = Omit<CreateDuskContractOptions, "driver" | "methodSigs"> & {
   /** Driver instance or promise. Prefer passing a cached promise for repeated calls. */
   driver?: DuskDataDriver | Promise<DuskDataDriver>;
@@ -67,6 +83,7 @@ export type CreateDrc721Options = Omit<CreateDuskContractOptions, "driver" | "me
   methodSigs?: Record<string, string>;
 };
 
+/** DRC721 helper facade with typed reads, tx builders, and writes. */
 export type Drc721Contract = {
   contract: DuskContract;
   read: {
@@ -92,6 +109,7 @@ export type Drc721Contract = {
   };
 };
 
+/** Wrap an existing contract facade as a DRC721 helper. */
 export function asDrc721(contract: DuskContract): Drc721Contract {
   return {
     contract,
@@ -143,6 +161,7 @@ export function asDrc721(contract: DuskContract): Drc721Contract {
   };
 }
 
+/** Create a DRC721 helper from contract and data-driver options. */
 export function createDrc721(opts: CreateDrc721Options): Drc721Contract {
   const driver = opts.driver ?? (opts.driverUrl ? fetchWasmDataDriver(opts.driverUrl) : null);
   if (!driver) throw new Error("createDrc721: driver or driverUrl is required");

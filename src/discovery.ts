@@ -1,10 +1,18 @@
 import type { DuskProvider, DuskProviderDetail, DuskProviderInfo } from "./types.js";
 
+/** Window event name dApps dispatch to request Dusk provider announcements. */
 export const DUSK_REQUEST_PROVIDER_EVENT = "dusk:requestProvider";
+
+/** Window event name wallets dispatch to announce a Dusk provider. */
 export const DUSK_ANNOUNCE_PROVIDER_EVENT = "dusk:announceProvider";
+
+/** Default localStorage key for remembering the selected wallet provider. */
 export const DUSK_SELECTED_PROVIDER_STORAGE_KEY = "dusk.connect.selectedProvider";
+
+/** Provider info fields required by Dusk provider discovery. */
 export const DUSK_PROVIDER_INFO_FIELDS = ["uuid", "name", "icon", "rdns"] as const;
 
+/** Options for a single provider-discovery request cycle. */
 export type RequestDuskProvidersOptions = {
   /** How long to collect announcement events after dispatching the request event. Default: 40ms. */
   timeoutMs?: number;
@@ -12,6 +20,7 @@ export type RequestDuskProvidersOptions = {
   signal?: AbortSignal;
 };
 
+/** Options for waiting until one or more providers are discovered. */
 export type WaitForDuskProvidersOptions = {
   /** Max total wait time. Default: 2000ms. */
   timeoutMs?: number;
@@ -19,6 +28,7 @@ export type WaitForDuskProvidersOptions = {
   intervalMs?: number;
 };
 
+/** Callback invoked for each valid Dusk provider announcement. */
 export type DuskProviderDiscoveryListener = (detail: DuskProviderDetail) => void;
 
 function trim(value: unknown): string {
@@ -34,6 +44,7 @@ function cloneInfo(info: DuskProviderInfo): DuskProviderInfo {
   };
 }
 
+/** Return true when a value satisfies the Dusk injected-provider shape. */
 export function isDuskProvider(value: any): value is DuskProvider {
   return (
     value &&
@@ -44,6 +55,7 @@ export function isDuskProvider(value: any): value is DuskProvider {
   );
 }
 
+/** Return true when a value contains valid Dusk provider metadata. */
 export function isDuskProviderInfo(value: any): value is DuskProviderInfo {
   return (
     value &&
@@ -55,6 +67,7 @@ export function isDuskProviderInfo(value: any): value is DuskProviderInfo {
   );
 }
 
+/** Return true when a discovery payload pairs provider metadata with a provider. */
 export function isDuskProviderDetail(value: any): value is DuskProviderDetail {
   return (
     value &&
@@ -64,6 +77,7 @@ export function isDuskProviderDetail(value: any): value is DuskProviderDetail {
   );
 }
 
+/** Normalize provider metadata for comparison and display. */
 export function normalizeDuskProviderInfo(info: DuskProviderInfo): DuskProviderInfo {
   return {
     uuid: trim(info.uuid),
@@ -73,6 +87,7 @@ export function normalizeDuskProviderInfo(info: DuskProviderInfo): DuskProviderI
   };
 }
 
+/** Normalize a full provider discovery payload. */
 export function normalizeDuskProviderDetail(detail: DuskProviderDetail): DuskProviderDetail {
   return {
     info: normalizeDuskProviderInfo(detail.info),
@@ -80,21 +95,25 @@ export function normalizeDuskProviderDetail(detail: DuskProviderDetail): DuskPro
   };
 }
 
+/** Create a provider-announcement event for wallet implementations. */
 export function makeDuskAnnounceProviderEvent(detail: DuskProviderDetail): CustomEvent<DuskProviderDetail> {
   return new CustomEvent<DuskProviderDetail>(DUSK_ANNOUNCE_PROVIDER_EVENT, {
     detail: normalizeDuskProviderDetail(detail),
   });
 }
 
+/** Create a provider-request event for dApps. */
 export function makeDuskRequestProviderEvent(): Event {
   return new Event(DUSK_REQUEST_PROVIDER_EVENT);
 }
 
+/** Announce a wallet provider on `window`. */
 export function announceDuskProvider(detail: DuskProviderDetail): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(makeDuskAnnounceProviderEvent(detail));
 }
 
+/** Request currently available Dusk providers and collect their announcements. */
 export function requestDuskProviders(opts: RequestDuskProvidersOptions = {}): Promise<DuskProviderDetail[]> {
   if (typeof window === "undefined") return Promise.resolve([]);
 
@@ -141,6 +160,7 @@ export function requestDuskProviders(opts: RequestDuskProvidersOptions = {}): Pr
   });
 }
 
+/** Poll discovery until providers are found or the timeout expires. */
 export async function waitForDuskProviders(
   opts: WaitForDuskProvidersOptions = {}
 ): Promise<DuskProviderDetail[]> {
@@ -161,6 +181,7 @@ export async function waitForDuskProviders(
   }
 }
 
+/** Subscribe to future Dusk provider announcements. */
 export function subscribeDuskProviders(
   listener: DuskProviderDiscoveryListener,
   options: { requestOnStart?: boolean } = {}

@@ -5,9 +5,14 @@
  * an EIP-1193-like provider object. All RPC methods are Dusk-prefixed (`dusk_*`).
  */
 
-export type AccountId = string; // base58 public account identifier
-export type Address = string; // base58 Dusk address
-export type LuxString = string; // base-10, non-negative integer string (u64 semantics)
+/** Base58 public Moonlight account identifier. */
+export type AccountId = string;
+
+/** Base58 Phoenix shielded receive address. */
+export type Address = string;
+
+/** Base-10, non-negative Lux amount string with u64 semantics. */
+export type LuxString = string;
 
 /**
  * Dusk wallet chain identifier (NOT Ethereum chain id).
@@ -15,6 +20,7 @@ export type LuxString = string; // base-10, non-negative integer string (u64 sem
  */
 export type ChainId = string;
 
+/** Optional gas limit and price override for a wallet transaction. */
 export type Gas =
   | {
       /** gas limit in Lux (decimal string) */
@@ -25,6 +31,7 @@ export type Gas =
   | null
   | undefined;
 
+/** Transaction result returned by wallet submission methods. */
 export type TxResult = {
   /** tx hash string (as produced by the protocol driver) */
   hash: string;
@@ -41,6 +48,7 @@ export type TxResult = {
  */
 export type TxWaitStatus = "executed" | "failed" | "timeout";
 
+/** Options for waiting on transaction execution. */
 export type WaitForTxOptions = {
   /** How long to wait before returning a `timeout` receipt. Default: 60_000ms. */
   timeoutMs?: number;
@@ -72,6 +80,7 @@ export type TxWaitReceipt = {
  */
 export type TxStatus = "submitted" | "executing" | "executed" | "failed" | "timeout";
 
+/** Status notification emitted by a submitted transaction handle. */
 export type TxStatusUpdate =
   | { status: "submitted"; hash: string; nonce: string }
   | { status: "executing"; hash: string }
@@ -98,6 +107,7 @@ export type TxHandle = TxResult & {
   onStatus(handler: (update: TxStatusUpdate) => void): () => void;
 };
 
+/** Public account balance response returned by the wallet. */
 export type BalanceResult = {
   /** nonce as decimal string */
   nonce: string;
@@ -105,6 +115,7 @@ export type BalanceResult = {
   value: LuxString;
 };
 
+/** Gas-price statistics returned by a node or wallet provider. */
 export type GasPriceResult = {
   /** average gas price in Lux (decimal string) */
   average: LuxString;
@@ -116,8 +127,10 @@ export type GasPriceResult = {
   min: LuxString;
 };
 
+/** Byte input accepted by signing and contract-call helpers. */
 export type ByteLike = string | number[] | Uint8Array | ArrayBuffer;
 
+/** Parameters for a Moonlight or Phoenix transfer. */
 export type SendTransferParams = {
   kind: "transfer";
   /**
@@ -130,8 +143,10 @@ export type SendTransferParams = {
   gas?: Gas;
 };
 
+/** Transaction privacy model: Moonlight public account or Phoenix shielded notes. */
 export type PrivacyMode = "public" | "shielded";
 
+/** Parameters for a wallet-mediated contract call. */
 export type SendContractCallParams = {
   kind: "contract_call";
   /** Choose Moonlight (public) or Phoenix (shielded) transaction model. */
@@ -150,8 +165,10 @@ export type SendContractCallParams = {
   display?: unknown;
 };
 
+/** Union of transaction kinds supported by `dusk_sendTransaction`. */
 export type SendTransactionParams = SendTransferParams | SendContractCallParams;
 
+/** Asset-watch request accepted by wallets that support `dusk_watchAsset`. */
 export type WatchAssetParams =
   | {
       type: "DRC20";
@@ -190,6 +207,7 @@ export type SwitchChainParams = {
   nodeUrl?: string;
 };
 
+/** Public profile record exposed to an origin after wallet approval. */
 export type DuskProfile = {
   /** Opaque profile id scoped to this wallet/provider. */
   profileId: string;
@@ -199,6 +217,7 @@ export type DuskProfile = {
   shieldedAddress?: Address;
 };
 
+/** Options for requesting profile access from the wallet. */
 export type ConnectOptions = {
   /**
    * Request the selected profile's shareable shielded receive address as part
@@ -211,6 +230,7 @@ export type ConnectOptions = {
   label?: string;
 };
 
+/** Parameters for explicitly requesting a shareable Phoenix receive address. */
 export type RequestShieldedAddressParams = {
   /**
    * Optional UX context shown by the wallet during approval.
@@ -223,6 +243,7 @@ export type RequestShieldedAddressParams = {
   account?: AccountId;
 };
 
+/** Structured response for an approved shielded-address request. */
 export type RequestShieldedAddressResult = {
   /** Shareable shielded receive address approved by the user for this origin/request. */
   address: Address;
@@ -231,6 +252,7 @@ export type RequestShieldedAddressResult = {
   chainId?: ChainId;
 };
 
+/** Compatibility response for shielded-address requests. */
 export type RequestShieldedAddressResponse = Address | RequestShieldedAddressResult;
 
 /**
@@ -246,13 +268,16 @@ export const DUSK_CHAIN_PRESETS = {
   devnet: "dusk:3",
 } as const;
 
+/** Known wallet network preset id. */
 export type DuskChainPresetId = (typeof DUSK_CHAIN_PRESETS)[keyof typeof DUSK_CHAIN_PRESETS];
 
+/** JSON-RPC-like request shape accepted by a Dusk provider. */
 export type DuskRpcRequest = {
   method: string;
   params?: unknown;
 };
 
+/** Wallet metadata advertised during provider discovery. */
 export type DuskProviderInfo = {
   /** Stable wallet id (UUID recommended). */
   uuid: string;
@@ -264,6 +289,7 @@ export type DuskProviderInfo = {
   rdns: string;
 };
 
+/** Injected wallet provider interface used by dApps. */
 export interface DuskProvider {
   /** true if this object is the Dusk Wallet provider */
   readonly isDusk: true;
@@ -298,17 +324,20 @@ export interface DuskProvider {
   readonly isAuthorized: boolean;
 }
 
+/** Discovery event payload pairing wallet metadata with its provider object. */
 export type DuskProviderDetail = {
   info: DuskProviderInfo;
   provider: DuskProvider;
 };
 
+/** Network details emitted when the wallet switches node or chain. */
 export type DuskNodeChangedPayload = {
   chainId: ChainId;
   nodeUrl: string;
   networkName: string;
 };
 
+/** Capability snapshot advertised by a wallet provider. */
 export type DuskProviderCapabilities = {
   provider: string;
   walletVersion: string;
@@ -337,6 +366,7 @@ export type DuskProviderCapabilities = {
   };
 };
 
+/** Strongly typed event payload map for wallet provider events. */
 export type DuskProviderEventMap = {
   connect: { chainId: ChainId };
   disconnect: { code: number; message: string };
@@ -345,6 +375,7 @@ export type DuskProviderEventMap = {
   duskNodeChanged: DuskNodeChangedPayload;
 };
 
+/** Reactive state snapshot maintained by the Connect wallet wrapper. */
 export type DuskWalletState = {
   /** Whether at least one Dusk wallet provider has been discovered */
   installed: boolean;
@@ -374,6 +405,7 @@ export type DuskWalletState = {
   lastUpdated: number;
 };
 
+/** Result of a low-level `dusk_signMessage` byte-signing request. */
 export type SignMessageResult = {
   account: AccountId;
   origin: string;
@@ -384,12 +416,14 @@ export type SignMessageResult = {
   payload: string; // 0x...
 };
 
+/** Parameters for `dusk_signAuth`, the structured auth-signing flow. */
 export type SignAuthParams = {
   nonce: string;
   statement?: string;
   expiresAt?: string;
 };
 
+/** Result of a structured `dusk_signAuth` request. */
 export type SignAuthResult = {
   account: AccountId;
   origin: string;

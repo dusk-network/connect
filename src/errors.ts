@@ -7,6 +7,7 @@
  * - error.data?: any
  */
 
+/** JSON-RPC and EIP-1193-compatible error codes used by Dusk wallets. */
 export const ERROR_CODES = {
   USER_REJECTED: 4001,
   UNAUTHORIZED: 4100,
@@ -17,13 +18,16 @@ export const ERROR_CODES = {
   METHOD_NOT_FOUND: -32601,
 } as const;
 
+/** Numeric JSON-RPC or provider error code. */
 export type RpcErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES] | number;
 
+/** Error object shape returned by wallet providers. */
 export type RpcErrorLike = Error & {
   code?: RpcErrorCode;
   data?: unknown;
 };
 
+/** Base error class used by Connect helpers. */
 export class DuskSdkError extends Error {
   code?: RpcErrorCode;
   data?: unknown;
@@ -40,6 +44,7 @@ export class DuskSdkError extends Error {
   }
 }
 
+/** Raised when no Dusk wallet provider is available. */
 export class DuskWalletNotInstalledError extends DuskSdkError {
   constructor(message = "Dusk Wallet not detected") {
     super(message, { code: ERROR_CODES.UNSUPPORTED });
@@ -47,6 +52,7 @@ export class DuskWalletNotInstalledError extends DuskSdkError {
   }
 }
 
+/** Raised when a provider does not support the requested method. */
 export class DuskWalletUnsupportedMethodError extends DuskSdkError {
   constructor(message = "Dusk Wallet does not support this method") {
     super(message, { code: ERROR_CODES.UNSUPPORTED });
@@ -54,6 +60,7 @@ export class DuskWalletUnsupportedMethodError extends DuskSdkError {
   }
 }
 
+/** Raised when an origin is not connected or the wallet is locked. */
 export class DuskWalletUnauthorizedError extends DuskSdkError {
   constructor(message = "Dusk Wallet is locked or the site is not connected") {
     super(message, { code: ERROR_CODES.UNAUTHORIZED });
@@ -61,6 +68,7 @@ export class DuskWalletUnauthorizedError extends DuskSdkError {
   }
 }
 
+/** Raised when the user rejects a wallet prompt. */
 export class DuskWalletUserRejectedError extends DuskSdkError {
   constructor(message = "User rejected the request") {
     super(message, { code: ERROR_CODES.USER_REJECTED });
@@ -68,6 +76,7 @@ export class DuskWalletUserRejectedError extends DuskSdkError {
   }
 }
 
+/** Raised when the selected provider disconnects. */
 export class DuskWalletDisconnectedError extends DuskSdkError {
   constructor(message = "Dusk Wallet provider is disconnected") {
     super(message, { code: ERROR_CODES.DISCONNECTED });
@@ -75,6 +84,7 @@ export class DuskWalletDisconnectedError extends DuskSdkError {
   }
 }
 
+/** Raised when a request needs a selected provider but none is selected. */
 export class DuskWalletProviderSelectionError extends DuskSdkError {
   constructor(message = "Select a Dusk wallet provider before making requests") {
     super(message, { code: ERROR_CODES.UNSUPPORTED });
@@ -82,6 +92,7 @@ export class DuskWalletProviderSelectionError extends DuskSdkError {
   }
 }
 
+/** Raised when a requested provider id is not available. */
 export class DuskWalletProviderNotFoundError extends DuskSdkError {
   constructor(message = "Requested Dusk wallet provider is not available") {
     super(message, { code: ERROR_CODES.UNSUPPORTED });
@@ -89,6 +100,7 @@ export class DuskWalletProviderNotFoundError extends DuskSdkError {
   }
 }
 
+/** Return true when a value looks like a wallet/RPC error. */
 export function isRpcErrorLike(err: unknown): err is RpcErrorLike {
   return (
     typeof err === "object" &&

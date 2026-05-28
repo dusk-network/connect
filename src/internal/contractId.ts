@@ -1,5 +1,6 @@
 import { bytesToHex, hexToBytes } from "../bytes.js";
 
+/** Normalize a contract id to a lowercase 0x-prefixed 32-byte hex string. */
 export function normalizeContractId0x(input: string | Uint8Array | number[]): string {
   const bytes =
     typeof input === "string"
@@ -14,4 +15,3 @@ export function normalizeContractId0x(input: string | Uint8Array | number[]): st
 
   return "0x" + bytesToHex(bytes).toLowerCase();
 }
-

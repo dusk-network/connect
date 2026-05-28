@@ -5,7 +5,10 @@
  * 1 DUSK = 1e9 Lux.
  */
 
+/** Number of Lux decimal places in one DUSK. */
 export const LUX_DECIMALS = 9;
+
+/** Number of Lux units in one DUSK. */
 export const LUX_SCALE = 10n ** 9n;
 
 /**
