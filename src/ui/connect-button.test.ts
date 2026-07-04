@@ -117,7 +117,7 @@ describe("connect button", () => {
     expect(el.getAttribute("theme")).toBe("light");
   });
 
-  it("routes missing-wallet clicks to installUrl instead of opening the modal", () => {
+  it("opens the modal for missing-wallet clicks", () => {
     const wallet = createMockUiWallet({
       installed: false,
       authorized: false,
@@ -131,18 +131,13 @@ describe("connect button", () => {
     };
 
     const el = document.createElement("dusk-connect-button") as DuskConnectButtonElement;
-    el.setAttribute("install-url", "https://wallet.example/install");
     el.wallet = wallet as any;
     el.modal = modal as any;
     document.body.appendChild(el);
 
     (el.shadowRoot!.querySelector("button") as HTMLButtonElement).click();
 
-    expect(window.open).toHaveBeenCalledWith(
-      "https://wallet.example/install",
-      "_blank",
-      "noopener,noreferrer"
-    );
-    expect(modal.open).not.toHaveBeenCalled();
+    expect(window.open).not.toHaveBeenCalled();
+    expect(modal.open).toHaveBeenCalledTimes(1);
   });
 });

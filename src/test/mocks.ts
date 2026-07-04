@@ -229,6 +229,7 @@ export function createMockProviderInfo(
 export type MockUiWallet = {
   readonly state: DuskWalletState;
   subscribe: ReturnType<typeof vi.fn>;
+  discoverProviders: ReturnType<typeof vi.fn>;
   selectProvider: ReturnType<typeof vi.fn>;
   connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
@@ -295,6 +296,15 @@ export function createMockUiWallet(
       subs.add(fn);
       fn(snapshot());
       return () => subs.delete(fn);
+    }),
+    discoverProviders: vi.fn(async () => {
+      state = {
+        ...state,
+        installed: state.availableProviders.length > 0,
+        lastUpdated: Date.now(),
+      };
+      notify();
+      return state.availableProviders.map((provider) => ({ ...provider }));
     }),
     selectProvider: vi.fn(async (nextProviderId: string) => {
       const next = state.availableProviders.find((provider) => provider.uuid === nextProviderId) ?? null;

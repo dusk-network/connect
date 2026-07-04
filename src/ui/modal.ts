@@ -1,5 +1,9 @@
 import type { ConnectOptions, DuskProviderInfo, DuskWalletState } from "../types.js";
 import type { DuskWallet } from "../wallet.js";
+import {
+  getDuskWalletInstallTargets,
+  type DuskWalletInstallTarget,
+} from "./installOptions.js";
 import { networkLabel, shortenMiddle, walletStatus, type WalletStatus } from "./shared.js";
 import { DCONNECT_UI_BASE_CSS } from "./styles.js";
 
@@ -7,8 +11,6 @@ import { DCONNECT_UI_BASE_CSS } from "./styles.js";
 export type DuskConnectModalOptions = {
   /** Optional app name shown in the header (e.g. "My dApp") */
   appName?: string;
-  /** Where to send the user if no wallet is installed */
-  installUrl?: string;
   /** Close the modal automatically after a successful connect. Default: true */
   closeOnConnect?: boolean;
   /** Force a UI theme. Default: auto (follows prefers-color-scheme). */
@@ -35,7 +37,7 @@ const STATUS_TEXT: Record<Status, string> = {
 };
 
 const PRIMARY_TEXT: Record<Status, string> = {
-  missing: "Install wallet",
+  missing: "Refresh wallets",
   disconnected: "Connect wallet",
   locked: "Unlock wallet",
   connected: "Disconnect",
@@ -104,6 +106,33 @@ function renderProviderIcon(provider: DuskProviderInfo): string {
   return `<img class="dconnect-provider-icon" src="${escapeHtml(icon)}" alt="" />`;
 }
 
+function installTargetInitial(target: DuskWalletInstallTarget): string {
+  const initial = String(target.name || "Wallet").trim().charAt(0).toUpperCase();
+  return /^[A-Z0-9]$/.test(initial) ? initial : "W";
+}
+
+function renderInstallTargetIcon(target: DuskWalletInstallTarget): string {
+  const icon = String(target.iconUrl || "").trim();
+  if (icon) {
+    return `<img class="dconnect-provider-icon" src="${escapeHtml(icon)}" alt="" />`;
+  }
+
+  if (target.id.startsWith("dusk-wallet-")) {
+    return `<span class="dconnect-provider-mark dconnect-provider-dusk" aria-hidden="true"></span>`;
+  }
+
+  return `<span class="dconnect-provider-mark dconnect-provider-initial" style="--dconnect-provider-accent: #6FBF8E" aria-hidden="true">${installTargetInitial(target)}</span>`;
+}
+
+function safeInstallUrl(input: string): string {
+  try {
+    const url = new URL(String(input || "").trim());
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
 /** Create a small wallet-selection and connect modal. */
 export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectModalOptions = {}): DuskConnectModal {
   if (typeof window === "undefined") {
@@ -125,6 +154,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
   let $account: HTMLElement | null = null;
   let $network: HTMLElement | null = null;
   let $copy: HTMLButtonElement | null = null;
+  let $sectionLabel: HTMLElement | null = null;
   let $providers: HTMLElement | null = null;
   let $primary: HTMLButtonElement | null = null;
   let $hint: HTMLElement | null = null;
@@ -601,6 +631,43 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
   const renderProviders = (st: DuskWalletState) => {
     if (!$providers) return;
 
+    if (walletStatus(st) === "missing") {
+      const targets = getDuskWalletInstallTargets();
+
+      if ($sectionLabel) $sectionLabel.textContent = "Install";
+      if (targets.length === 0) {
+        $providers.innerHTML = "";
+        $providers.hidden = true;
+        return;
+      }
+
+      $providers.hidden = false;
+      $providers.innerHTML = targets
+        .map((target) => {
+          return `
+            <button
+              class="dconnect-provider"
+              type="button"
+              data-action="install-wallet"
+              data-install-url="${escapeHtml(target.url)}"
+            >
+              <span class="dconnect-provider-main">
+                ${renderInstallTargetIcon(target)}
+                <span class="dconnect-provider-copy">
+                  <span class="dconnect-provider-name">${escapeHtml(target.name)}</span>
+                  <span class="dconnect-provider-rdns">${escapeHtml(target.description)}</span>
+                </span>
+              </span>
+              <span class="dconnect-provider-tag">${escapeHtml(target.platformLabel)}</span>
+            </button>
+          `;
+        })
+        .join("");
+      return;
+    }
+
+    if ($sectionLabel) $sectionLabel.textContent = "Wallets";
+
     const providers = st.availableProviders ?? [];
     if (providers.length === 0) {
       $providers.innerHTML = "";
@@ -669,7 +736,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           </div>
           <div class="dconnect-row dconnect-row-data"><div class="dconnect-lab">Network</div><div class="dconnect-val" id="dwcNetwork">—</div></div>
           <div class="dconnect-section">
-            <div class="dconnect-section-label">Wallets</div>
+            <div class="dconnect-section-label" id="dwcSectionLabel">Wallets</div>
             <div class="dconnect-provider-list" id="dwcProviders" hidden></div>
           </div>
           <div class="dconnect-actions">
@@ -686,6 +753,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     $account = root.querySelector("#dwcAccount");
     $network = root.querySelector("#dwcNetwork");
     $copy = root.querySelector("#dwcCopy");
+    $sectionLabel = root.querySelector("#dwcSectionLabel");
     $providers = root.querySelector("#dwcProviders");
     $primary = root.querySelector("#dwcPrimary");
     $hint = root.querySelector("#dwcHint");
@@ -726,9 +794,16 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
         return;
       }
 
+      if (action === "install-wallet") {
+        const url = safeInstallUrl(btn.getAttribute("data-install-url") || "");
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
+        return;
+      }
+
       if (action === "primary") {
         if (status === "missing") {
-          if (options.installUrl) window.open(options.installUrl, "_blank", "noopener,noreferrer");
+          await wallet.discoverProviders({ timeoutMs: 250 }).catch(() => []);
+          toast("Wallets refreshed. Reload this page if you just installed one.");
           return;
         }
 
@@ -798,8 +873,10 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     if ($hint) {
       if (needsSelection) {
         $hint.textContent = "Choose which Dusk wallet this site should use.";
-      } else if (!st.installed && options.installUrl) {
-        $hint.textContent = "Install a compatible Dusk wallet to continue.";
+      } else if (!st.installed) {
+        $hint.textContent = "Install a wallet, then reload this page so it can be detected.";
+      } else {
+        $hint.textContent = "";
       }
     }
 
@@ -863,7 +940,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     root = null;
     $title = $status = $wallet = $account = $network = $hint = null;
     $copy = $primary = null;
-    $providers = null;
+    $sectionLabel = $providers = null;
   };
 
   return {
