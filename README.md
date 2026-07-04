@@ -553,7 +553,7 @@ The package is published as `@dusk/connect` on JSR.
 npm publishing is intentionally separate; do not assume npm availability unless
 a later npm release under an appropriate npm scope is announced.
 
-Before publishing v0.1:
+Before publishing a release:
 
 ```bash
 npm run ci
