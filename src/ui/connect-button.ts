@@ -8,8 +8,6 @@ import { DCONNECT_UI_BASE_CSS } from "./styles.js";
 export type DuskConnectButtonOptions = {
   /** App name shown in the modal header (e.g. "My dApp"). */
   appName?: string;
-  /** Where to send the user if the wallet isn't installed (extension store link). */
-  installUrl?: string;
   /** Close the modal automatically after a successful connect. Default: true. */
   closeOnConnect?: boolean;
   /** Hide the small network badge on the right side of the button. */
@@ -45,7 +43,6 @@ export class DuskConnectButtonElement extends HTMLElement {
   static get observedAttributes(): string[] {
     return [
       "app-name",
-      "install-url",
       "close-on-connect",
       "hide-network",
       "connect-text",
@@ -432,17 +429,6 @@ export class DuskConnectButtonElement extends HTMLElement {
 
   private _onClick(): void {
     this._ensureWalletAndModal();
-    const st = this._wallet?.state ?? this._latest;
-    const status = walletStatus(st);
-
-    // If missing + installUrl, behave like a direct CTA.
-    if (status === "missing") {
-      const url = this.getAttribute("install-url") || "";
-      if (url) {
-        window.open(url, "_blank", "noopener,noreferrer");
-        return;
-      }
-    }
 
     this._modal?.open();
   }
@@ -456,13 +442,11 @@ export class DuskConnectButtonElement extends HTMLElement {
     // Modal
     if (!this._modal && this._wallet) {
       const appName = this.getAttribute("app-name") || "";
-      const installUrl = this.getAttribute("install-url") || "";
       const theme = (this.getAttribute("theme") || "auto").toLowerCase();
 
       // With `exactOptionalPropertyTypes`, do not set optionals to `undefined`.
       const modalOpts: any = {};
       if (appName) modalOpts.appName = appName;
-      if (installUrl) modalOpts.installUrl = installUrl;
       if (theme === "dark" || theme === "light") modalOpts.theme = theme;
       if (this._connectOptions) modalOpts.connectOptions = this._connectOptions;
       if (this.hasAttribute("close-on-connect")) {
@@ -584,7 +568,6 @@ export function createDuskConnectButton(options: DuskConnectButtonOptions = {}):
   const el = document.createElement("dusk-connect-button") as DuskConnectButtonElement;
 
   if (options.appName) el.setAttribute("app-name", options.appName);
-  if (options.installUrl) el.setAttribute("install-url", options.installUrl);
   if (options.closeOnConnect !== undefined) el.setAttribute("close-on-connect", String(options.closeOnConnect));
   if (options.hideNetwork) el.setAttribute("hide-network", "");
   if (options.connectText) el.setAttribute("connect-text", options.connectText);

@@ -7,9 +7,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Added curated Connect UI install options for missing-wallet flows, with browser-specific Dusk Wallet and Piewallet choices.
+- Added known wallet branding for Dusk Wallet and Piewallet rows in the Connect UI.
+
 ### Changed
 
 - Clarified that Dusk Connect is published as `@dusk/connect` on JSR and that npm publishing is intentionally separate.
+- Changed the missing-wallet `<dusk-connect-button />` flow to open the Connect modal instead of directly redirecting.
+
+### Removed
+
+- Removed app-provided `installUrl` / `install-url` support from the optional Connect UI so install destinations stay SDK-owned.
 
 ## [0.1.0] - 2026-05-28
 

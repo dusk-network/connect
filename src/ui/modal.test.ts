@@ -3,12 +3,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDuskConnectModal } from "./modal.js";
+import {
+  DUSK_WALLET_CHROMIUM_URL,
+  DUSK_WALLET_FIREFOX_URL,
+  PIEWALLET_CHROMIUM_URL,
+  PIEWALLET_ICON_URL,
+} from "./installOptions.js";
 import { createMockUiWallet } from "../test/mocks.js";
+
+const originalUserAgent = navigator.userAgent;
+
+function setUserAgent(value: string): void {
+  Object.defineProperty(navigator, "userAgent", {
+    configurable: true,
+    value,
+  });
+}
 
 describe("connect modal", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     vi.stubGlobal("open", vi.fn());
+    setUserAgent("Mozilla/5.0 AppleWebKit/537.36 Chrome/126.0 Safari/537.36");
 
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -20,27 +36,93 @@ describe("connect modal", () => {
 
   afterEach(() => {
     document.body.innerHTML = "";
+    setUserAgent(originalUserAgent);
     vi.unstubAllGlobals();
   });
 
-  it("opens in missing-wallet mode and routes install clicks to the install url", async () => {
+  it("opens in missing-wallet mode with Chromium install options and refreshes discovery", async () => {
     const wallet = createMockUiWallet({ installed: false, authorized: false, accounts: [] });
-    const modal = createDuskConnectModal(wallet as any, {
-      installUrl: "https://wallet.example/install",
-    });
+    const modal = createDuskConnectModal(wallet as any);
 
     modal.open();
 
     const primary = document.querySelector("#dwcPrimary") as HTMLButtonElement;
-    expect(primary.textContent).toBe("Install wallet");
+    const section = document.querySelector("#dwcSectionLabel") as HTMLElement;
+    const installButtons = [
+      ...document.querySelectorAll<HTMLButtonElement>('button[data-action="install-wallet"]'),
+    ];
 
-    primary.click();
+    expect(section.textContent).toBe("Install");
+    expect(primary.textContent).toBe("Refresh wallets");
+    expect(installButtons.map((button) => button.textContent)).toEqual([
+      expect.stringContaining("Dusk Wallet"),
+      expect.stringContaining("Piewallet"),
+    ]);
+    expect(installButtons[1]?.textContent).toContain(
+      "Official Pieswap wallet for DuskDS & DuskEVM."
+    );
+    expect(installButtons[1]?.querySelector("img")?.getAttribute("src")).toBe(PIEWALLET_ICON_URL);
+
+    installButtons[0]!.click();
 
     expect(window.open).toHaveBeenCalledWith(
-      "https://wallet.example/install",
+      DUSK_WALLET_CHROMIUM_URL,
       "_blank",
       "noopener,noreferrer"
     );
+
+    installButtons[1]!.click();
+
+    expect(window.open).toHaveBeenCalledWith(
+      PIEWALLET_CHROMIUM_URL,
+      "_blank",
+      "noopener,noreferrer"
+    );
+
+    primary.click();
+    await Promise.resolve();
+
+    expect(wallet.discoverProviders).toHaveBeenCalledWith({ timeoutMs: 250 });
+  });
+
+  it("shows the Firefox add-ons install option in Firefox", () => {
+    setUserAgent("Mozilla/5.0 Firefox/128.0");
+
+    const wallet = createMockUiWallet({ installed: false, authorized: false, accounts: [] });
+    const modal = createDuskConnectModal(wallet as any);
+
+    modal.open();
+
+    const installButtons = [
+      ...document.querySelectorAll<HTMLButtonElement>('button[data-action="install-wallet"]'),
+    ];
+
+    expect(installButtons).toHaveLength(1);
+    expect(installButtons[0]?.textContent).toContain("Dusk Wallet");
+
+    installButtons[0]!.click();
+
+    expect(window.open).toHaveBeenCalledWith(
+      DUSK_WALLET_FIREFOX_URL,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  });
+
+  it("does not open unsafe tampered install URLs", () => {
+    const wallet = createMockUiWallet({ installed: false, authorized: false, accounts: [] });
+    const modal = createDuskConnectModal(wallet as any);
+
+    modal.open();
+
+    const installButtons = [
+      ...document.querySelectorAll<HTMLButtonElement>('button[data-action="install-wallet"]'),
+    ];
+
+    installButtons[0]!.setAttribute("data-install-url", "data:text/html,blocked");
+    installButtons[0]!.click();
+
+    expect(window.open).not.toHaveBeenCalled();
   });
 
   it("connects and auto-closes when the wallet becomes connected", async () => {
@@ -107,6 +189,29 @@ describe("connect modal", () => {
 
     expect(document.querySelector(".dconnect-provider-mark")).toBeTruthy();
     expect(document.querySelector(".dconnect-provider-icon")).toBeNull();
+  });
+
+  it("uses the Piewallet logo for Piewallet rows even when a generic icon is supplied", () => {
+    const wallet = createMockUiWallet({
+      installed: true,
+      authorized: false,
+      accounts: [],
+      availableProviders: [
+        {
+          uuid: "wallet.piewallet.extension",
+          name: "Piewallet",
+          icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Ctext%3EP%3C/text%3E%3C/svg%3E",
+          rdns: "network.dusk.piewallet",
+        },
+      ],
+    });
+    const modal = createDuskConnectModal(wallet as any);
+
+    modal.open();
+
+    const icon = document.querySelector(".dconnect-provider-icon") as HTMLImageElement | null;
+    expect(icon?.getAttribute("src")).toBe(PIEWALLET_ICON_URL);
+    expect(document.querySelector(".dconnect-provider-initial")).toBeNull();
   });
 
   it("uses provider initials for iconless non-Dusk wallet rows", () => {

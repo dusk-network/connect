@@ -422,7 +422,6 @@ import { createDuskConnectKit } from "@dusk/connect/ui";
 const kit = createDuskConnectKit({
   modal: {
     appName: "My dApp",
-    installUrl: "https://chrome.google.com/webstore/detail/<YOUR-EXTENSION-ID>",
   },
 });
 
@@ -434,6 +433,10 @@ document.getElementById("connect")!.addEventListener("click", () => {
 kit.subscribe((state) => console.log(state));
 ```
 
+When no compatible wallet is detected, the modal shows curated install options
+for the user's browser: Dusk Wallet and Piewallet on Chromium browsers, and
+Dusk Wallet on Firefox.
+
 ## WalletConnect-style connect button (UI)
 
 If you want the common “Connect Wallet” button UX, the SDK ships a small web component:
@@ -441,7 +444,6 @@ If you want the common “Connect Wallet” button UX, the SDK ships a small web
 ```html
 <dusk-connect-button
   app-name="My dApp"
-  install-url="https://chrome.google.com/webstore/detail/<YOUR-EXTENSION-ID>"
   variant="solid"
   theme="auto"
 ></dusk-connect-button>
