@@ -1,6 +1,7 @@
 import type { ConnectOptions, DuskProviderInfo, DuskWalletState } from "../types.js";
 import type { DuskWallet } from "../wallet.js";
 import {
+  PIEWALLET_ICON_URL,
   getDuskWalletInstallTargets,
   type DuskWalletInstallTarget,
 } from "./installOptions.js";
@@ -84,6 +85,20 @@ function isDuskProvider(provider: DuskProviderInfo): boolean {
   return name === "dusk wallet" || rdns === "network.dusk.wallet" || rdns.endsWith(".dusk.wallet");
 }
 
+function isPiewalletProvider(provider: DuskProviderInfo): boolean {
+  const name = String(provider.name || "").trim().toLowerCase();
+  const rdns = String(provider.rdns || "").trim().toLowerCase();
+  const uuid = String(provider.uuid || "").trim().toLowerCase();
+  return (
+    name === "piewallet" ||
+    name === "pie wallet" ||
+    rdns.includes("piewallet") ||
+    rdns.includes("pieswap") ||
+    uuid.includes("piewallet") ||
+    uuid.includes("pieswap")
+  );
+}
+
 function providerInitial(provider: DuskProviderInfo): string {
   const initial = String(provider.name || "Wallet").trim().charAt(0).toUpperCase();
   return /^[A-Z0-9]$/.test(initial) ? initial : "W";
@@ -99,6 +114,9 @@ function renderProviderIcon(provider: DuskProviderInfo): string {
   const icon = String(provider.icon || "").trim();
   if (isDuskProvider(provider)) {
     return `<span class="dconnect-provider-mark dconnect-provider-dusk" aria-hidden="true"></span>`;
+  }
+  if (isPiewalletProvider(provider)) {
+    return `<img class="dconnect-provider-icon" src="${PIEWALLET_ICON_URL}" alt="" />`;
   }
   if (!icon) {
     return `<span class="dconnect-provider-mark dconnect-provider-initial" style="--dconnect-provider-accent: ${providerAccent(provider)}" aria-hidden="true">${providerInitial(provider)}</span>`;

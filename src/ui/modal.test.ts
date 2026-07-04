@@ -191,6 +191,29 @@ describe("connect modal", () => {
     expect(document.querySelector(".dconnect-provider-icon")).toBeNull();
   });
 
+  it("uses the Piewallet logo for Piewallet rows even when a generic icon is supplied", () => {
+    const wallet = createMockUiWallet({
+      installed: true,
+      authorized: false,
+      accounts: [],
+      availableProviders: [
+        {
+          uuid: "wallet.piewallet.extension",
+          name: "Piewallet",
+          icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Ctext%3EP%3C/text%3E%3C/svg%3E",
+          rdns: "network.dusk.piewallet",
+        },
+      ],
+    });
+    const modal = createDuskConnectModal(wallet as any);
+
+    modal.open();
+
+    const icon = document.querySelector(".dconnect-provider-icon") as HTMLImageElement | null;
+    expect(icon?.getAttribute("src")).toBe(PIEWALLET_ICON_URL);
+    expect(document.querySelector(".dconnect-provider-initial")).toBeNull();
+  });
+
   it("uses provider initials for iconless non-Dusk wallet rows", () => {
     const wallet = createMockUiWallet({
       installed: true,
