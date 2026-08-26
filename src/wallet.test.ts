@@ -98,6 +98,27 @@ describe("wallet", () => {
     window.removeEventListener(DUSK_REQUEST_PROVIDER_EVENT, onRequest);
   });
 
+  it("hydrates node state from provider capabilities", async () => {
+    const provider = createMockProvider({
+      authorized: true,
+      chainId: "dusk:0",
+      capabilities: {
+        chainId: "dusk:0",
+        nodeUrl: "http://127.0.0.1:18181",
+        networkName: "Local",
+      },
+    });
+    const wallet = createDuskWallet({ provider, waitForProvider: false });
+
+    await wallet.ready();
+
+    expect(wallet.state.node).toEqual({
+      chainId: "dusk:0",
+      nodeUrl: "http://127.0.0.1:18181",
+      networkName: "Local",
+    });
+  });
+
   it("requires selecting a provider when multiple wallets are discovered", async () => {
     const primary = createMockProvider({ accounts: ["dusk1primary"] });
     const secondary = createMockProvider({ accounts: ["dusk1secondary"] });

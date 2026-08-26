@@ -625,9 +625,17 @@ export class DuskWallet {
     ]);
 
     const nextChainId = typeof chainId === "string" ? chainId : p.chainId ?? null;
+    const nextNode = caps && typeof caps.nodeUrl === "string" && caps.nodeUrl.trim()
+      ? {
+          chainId: nextChainId ?? caps.chainId,
+          nodeUrl: caps.nodeUrl,
+          networkName: caps.networkName,
+        }
+      : this._state.node;
     this._patch(
       {
         chainId: nextChainId,
+        node: nextNode,
         capabilities: caps,
         authorized: Boolean(p.isAuthorized),
       },
