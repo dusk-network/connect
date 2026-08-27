@@ -103,6 +103,18 @@ describe("contract facade", () => {
     expect(tx.fnArgs).toMatch(/^0x/);
   });
 
+  it("does not expose contract facets as promises", async () => {
+    const contract = createDuskContract({
+      contractId: "0x" + "aa".repeat(32),
+      driver: createDriver(),
+    });
+
+    expect((contract.call as any).then).toBeUndefined();
+    expect((contract.tx as any).then).toBeUndefined();
+    expect((contract.write as any).then).toBeUndefined();
+    await expect(Promise.resolve(contract.call)).resolves.toBe(contract.call);
+  });
+
   it("rejects tx params that do not declare privacy", async () => {
     const driver = createDriver();
     const contract = createDuskContract({
