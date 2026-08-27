@@ -14,6 +14,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Fixed
 
 - Made live transaction waits race-safe, exact, and retryable [#27].
+- Bound asynchronous wallet operations and contract writes to the selected provider [#24].
 - Prevented contract proxy facets from being treated as promises [#28].
 - Reported unsupported transaction execution payloads as unknown instead of successful [#26].
 - Preserved explicit wallet selection when a provider UUID collides [#25].
@@ -75,6 +76,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 [#27]: https://github.com/dusk-network/connect/issues/27
 [#26]: https://github.com/dusk-network/connect/issues/26
 [#25]: https://github.com/dusk-network/connect/issues/25
+[#24]: https://github.com/dusk-network/connect/issues/24
 
 [Unreleased]: https://github.com/dusk-network/connect/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/dusk-network/connect/compare/v0.1.0...v0.2.0

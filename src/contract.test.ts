@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createDuskContract } from "./contract.js";
+import { DuskTxTrackingUnavailableError, DuskWalletProviderChangedError } from "./errors.js";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
 
 function createDriver() {
   const enc = new TextEncoder();
@@ -24,12 +31,15 @@ function createWalletStub() {
     accounts: [] as string[],
     profiles: [] as any[],
     chainId: "dusk:1",
+    providerId: null as string | null,
+    node: null as any,
     selectedAddress: null as string | null,
     selectedProfile: null as any,
   };
 
   return {
     state,
+    networkEpoch: 0,
     connect: vi.fn(async () => {
       state.authorized = true;
       state.accounts = ["dusk1writer"];
@@ -48,11 +58,12 @@ function createWalletStub() {
 async function createWaitHandle(waitForTxExecuted: ReturnType<typeof vi.fn>) {
   const wallet = createWalletStub();
   wallet.state.authorized = true;
+  wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node.example" };
   const contract = createDuskContract({
     contractId: "0x" + "33".repeat(32),
     driver: createDriver(),
     wallet,
-    node: { waitForTxExecuted } as any,
+    node: { getBaseUrl: () => "https://node.example", waitForTxExecuted } as any,
     defaultTx: { privacy: "public" },
   });
   return await contract.write["ping"]!();
@@ -143,11 +154,21 @@ describe("contract facade", () => {
   it("writes through the wallet with auto-connect, ensureChain, and tx status updates", async () => {
     const driver = createDriver();
     const wallet = createWalletStub();
+    wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node.example" };
+    wallet.switchChain.mockImplementation(async ({ chainId }: { chainId: string }) => {
+      wallet.networkEpoch++;
+      wallet.state.chainId = chainId;
+      wallet.state.node = { chainId, nodeUrl: "https://node.example" };
+      return null;
+    });
+    const waitForTxExecuted = vi.fn(async () => ({
+      headers: new Headers(),
+      payload: { success: true },
+    }));
     const node = {
-      waitForTxExecuted: vi.fn(async () => ({
-        headers: new Headers(),
-        payload: { success: true },
-      })),
+      getBaseUrl: () => wallet.state.node.nodeUrl,
+      pin: (baseUrl: string) => ({ getBaseUrl: () => baseUrl, waitForTxExecuted }),
+      waitForTxExecuted,
     };
 
     const contract = createDuskContract({
@@ -165,6 +186,9 @@ describe("contract facade", () => {
     handle.onStatus((update) => {
       statuses.push(update.status);
     });
+    wallet.provider = { id: "secondary" };
+    wallet.selectionEpoch++;
+    wallet.state.node = { chainId: "dusk:3", nodeUrl: "https://node-b.example" };
 
     await expect(handle.wait()).resolves.toMatchObject({ status: "executed", ok: true });
     await expect(handle.wait()).resolves.toMatchObject({ status: "executed", ok: true });
@@ -172,7 +196,7 @@ describe("contract facade", () => {
     expect(wallet.connect).toHaveBeenCalledTimes(1);
     expect(wallet.switchChain).toHaveBeenCalledWith({ chainId: "dusk:2" });
     expect(wallet.sendContractCall).toHaveBeenCalledTimes(1);
-    expect(node.waitForTxExecuted).toHaveBeenCalledTimes(1);
+    expect(waitForTxExecuted).toHaveBeenCalledTimes(1);
     expect(statuses).toEqual(["submitted", "executing", "executed"]);
   });
 
@@ -191,6 +215,266 @@ describe("contract facade", () => {
     pending[1]!(null);
     await expect(timeout).resolves.toMatchObject({ status: "executed" });
     expect(statuses).toEqual(["submitted", "executing", "executed"]);
+  });
+
+  it("never tracks a late submission through the replacement provider", async () => {
+    const wallet = createWalletStub();
+    wallet.provider = { id: "primary" };
+    wallet.selectionEpoch = 1;
+    wallet.state.providerId = "wallet.primary";
+    wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node-a.example" };
+    wallet.state.authorized = true;
+    const submitted = deferred<any>();
+    wallet.sendContractCall.mockImplementation(() => submitted.promise);
+    const waitOnA = vi.fn(async () => ({ headers: new Headers(), payload: { success: true } }));
+    const waitDynamic = vi.fn();
+    const node = {
+      getBaseUrl: () => wallet.state.node.nodeUrl,
+      pin: vi.fn((baseUrl: string) => ({ getBaseUrl: () => baseUrl, waitForTxExecuted: waitOnA })),
+      waitForTxExecuted: waitDynamic,
+    };
+    const contract = createDuskContract({
+      contractId: "0x" + "33".repeat(32),
+      driver: createDriver(),
+      wallet,
+      node: node as any,
+      defaultTx: { privacy: "public" },
+    });
+
+    const writing = contract.write["ping"]!();
+    await vi.waitFor(() => expect(wallet.sendContractCall).toHaveBeenCalled());
+    wallet.provider = { id: "secondary" };
+    wallet.selectionEpoch = 2;
+    wallet.state.providerId = "wallet.secondary";
+    wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node-b.example" };
+    submitted.resolve({ hash: "0xsubmitted", nonce: "8" });
+
+    const handle = await writing;
+    await expect(handle.wait()).rejects.toBeInstanceOf(DuskTxTrackingUnavailableError);
+    expect(handle.origin).toMatchObject({ providerId: "wallet.primary", nodeUrl: "https://node-a.example" });
+    expect(Object.isFrozen(handle.origin)).toBe(true);
+    expect(node.pin).toHaveBeenCalledWith("https://node-a.example");
+    expect(waitOnA).not.toHaveBeenCalled();
+    expect(waitDynamic).not.toHaveBeenCalled();
+  });
+
+  it("does not pin stale state while a requested chain update is pending", async () => {
+    const wallet = createWalletStub();
+    wallet.state.authorized = true;
+    wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node-a.example" };
+    const waitForTxExecuted = vi.fn();
+    const node = {
+      getBaseUrl: () => "https://node-a.example",
+      pin: (baseUrl: string) => ({ getBaseUrl: () => baseUrl, waitForTxExecuted }),
+      waitForTxExecuted,
+    };
+    const contract = createDuskContract({
+      contractId: "0x" + "33".repeat(32),
+      driver: createDriver(), wallet, node: node as any,
+      chain: { chainId: "dusk:2" },
+      defaultTx: { privacy: "public" },
+    });
+
+    const handle = await contract.write["ping"]!();
+    await expect(handle.wait()).rejects.toBeInstanceOf(DuskTxTrackingUnavailableError);
+    expect(waitForTxExecuted).not.toHaveBeenCalled();
+  });
+
+  it("does not treat an app fallback as the wallet submission node", async () => {
+    const wallet = createWalletStub();
+    wallet.state.authorized = true;
+    const waitForTxExecuted = vi.fn();
+    const node = {
+      getBaseUrl: () => "https://fallback.example",
+      pin: (baseUrl: string) => ({ getBaseUrl: () => baseUrl, waitForTxExecuted }),
+      waitForTxExecuted,
+    };
+    const contract = createDuskContract({
+      contractId: "0x" + "33".repeat(32),
+      driver: createDriver(), wallet, node: node as any,
+      defaultTx: { privacy: "public" },
+    });
+
+    const handle = await contract.write["ping"]!();
+    await expect(handle.wait()).rejects.toBeInstanceOf(DuskTxTrackingUnavailableError);
+    expect(waitForTxExecuted).not.toHaveBeenCalled();
+  });
+
+  it("refuses to guess when the endpoint changes during submission", async () => {
+    const wallet = createWalletStub();
+    wallet.provider = { id: "primary" };
+    wallet.selectionEpoch = 1;
+    wallet.state.authorized = true;
+    wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node-a.example" };
+    wallet.sendContractCall.mockImplementation(async () => {
+      wallet.networkEpoch++;
+      wallet.state.chainId = "dusk:2";
+      wallet.state.node = { chainId: "dusk:2", nodeUrl: "https://node-b.example" };
+      wallet.networkEpoch++;
+      wallet.state.chainId = "dusk:1";
+      wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node-a.example" };
+      return { hash: "0xsubmitted", nonce: "8" };
+    });
+    const waitForTxExecuted = vi.fn();
+    const node = {
+      getBaseUrl: () => wallet.state.node.nodeUrl,
+      pin: (baseUrl: string) => ({ getBaseUrl: () => baseUrl, waitForTxExecuted }),
+      waitForTxExecuted,
+    };
+    const contract = createDuskContract({
+      contractId: "0x" + "33".repeat(32),
+      driver: createDriver(), wallet, node: node as any,
+      defaultTx: { privacy: "public" },
+    });
+
+    const handle = await contract.write["ping"]!();
+    await expect(handle.wait()).rejects.toBeInstanceOf(DuskTxTrackingUnavailableError);
+    expect(waitForTxExecuted).not.toHaveBeenCalled();
+  });
+
+  it("refuses to track through a changed custom node endpoint", async () => {
+    const wallet = createWalletStub();
+    wallet.state.authorized = true;
+    wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node-a.example" };
+    const node = {
+      getBaseUrl: () => wallet.state.node.nodeUrl,
+      waitForTxExecuted: vi.fn(),
+    };
+    const contract = createDuskContract({
+      contractId: "0x" + "33".repeat(32),
+      driver: createDriver(),
+      wallet,
+      node: node as any,
+      defaultTx: { privacy: "public" },
+    });
+
+    const handle = await contract.write["ping"]!();
+    wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node-b.example" };
+
+    await expect(handle.wait()).rejects.toBeInstanceOf(DuskTxTrackingUnavailableError);
+    expect(node.waitForTxExecuted).not.toHaveBeenCalled();
+  });
+
+  it("captures an existing provider without yielding to readiness", async () => {
+    const wallet = createWalletStub();
+    wallet.provider = { id: "primary" };
+    wallet.selectionEpoch = 1;
+    wallet.state.authorized = true;
+    wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node.example" };
+    wallet.ready = vi.fn(async () => {
+      throw new Error("should not wait");
+    });
+    const contract = createDuskContract({
+      contractId: "0x" + "33".repeat(32),
+      driver: createDriver(),
+      wallet,
+      defaultTx: { privacy: "public" },
+    });
+
+    await expect(contract.write["ping"]!()).resolves.toBeDefined();
+    expect(wallet.ready).not.toHaveBeenCalled();
+  });
+
+  it("waits for node hydration before capturing transaction origin", async () => {
+    const wallet = createWalletStub();
+    wallet.provider = { id: "primary" };
+    wallet.selectionEpoch = 1;
+    wallet.state.authorized = true;
+    wallet.ready = vi.fn(async () => {
+      wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node.example" };
+    });
+    const contract = createDuskContract({
+      contractId: "0x" + "33".repeat(32),
+      driver: createDriver(),
+      wallet,
+      node: { getBaseUrl: () => "https://node.example", waitForTxExecuted: vi.fn() } as any,
+      defaultTx: { privacy: "public" },
+    });
+
+    const handle = await contract.write["ping"]!();
+    expect(handle.origin.nodeUrl).toBe("https://node.example");
+  });
+
+  it("detects a provider changing away and back during encoding", async () => {
+    const wallet = createWalletStub();
+    const primary = { id: "primary" };
+    wallet.provider = primary;
+    wallet.selectionEpoch = 1;
+    const driver = createDriver();
+    let finishEncoding!: () => void;
+    driver.encodeInputFn.mockImplementation(
+      () => new Promise<Uint8Array>((resolve) => {
+        finishEncoding = () => resolve(new Uint8Array([1]));
+      }) as any
+    );
+    const contract = createDuskContract({
+      contractId: "0x" + "33".repeat(32),
+      driver,
+      wallet,
+      defaultTx: { privacy: "public" },
+    });
+
+    const write = contract.write["ping"]!();
+    await vi.waitFor(() => expect(driver.encodeInputFn).toHaveBeenCalled());
+    wallet.provider = { id: "secondary" };
+    wallet.selectionEpoch = 2;
+    wallet.provider = primary;
+    wallet.selectionEpoch = 3;
+    finishEncoding();
+
+    await expect(write).rejects.toBeInstanceOf(DuskWalletProviderChangedError);
+    expect(wallet.sendContractCall).not.toHaveBeenCalled();
+  });
+
+  it("does not submit when the provider changes during chain enforcement", async () => {
+    const wallet = createWalletStub();
+    wallet.provider = { id: "primary" };
+    wallet.switchChain.mockImplementation(async () => {
+      wallet.provider = { id: "secondary" };
+      return null;
+    });
+    const contract = createDuskContract({
+      contractId: "0x" + "33".repeat(32),
+      driver: createDriver(),
+      wallet,
+      chain: { chainId: "dusk:2" },
+      defaultTx: { privacy: "public" },
+    });
+
+    await expect(contract.write["ping"]!()).rejects.toBeInstanceOf(
+      DuskWalletProviderChangedError
+    );
+    expect(wallet.sendContractCall).not.toHaveBeenCalled();
+  });
+
+  it("turns tx wait transport failures into timeout receipts with context", async () => {
+    const contract = createDuskContract({
+      contractId: "0x" + "33".repeat(32),
+      driver: createDriver(),
+      wallet: {
+        state: {
+          authorized: true,
+          accounts: ["dusk1writer"],
+          chainId: "dusk:2",
+          node: { chainId: "dusk:2", nodeUrl: "https://node.example" },
+        },
+        connect: vi.fn(),
+        sendContractCall: vi.fn(async () => ({ hash: "0x" + "ab".repeat(32), nonce: "1" })),
+      } as any,
+      node: {
+        getBaseUrl: () => "https://node.example",
+        waitForTxExecuted: vi.fn(async () => {
+          throw new Error("socket down");
+        }),
+      } as any,
+    });
+
+    const handle = await contract.write["ping"]!(undefined, { privacy: "public" });
+    await expect(handle.wait()).resolves.toMatchObject({
+      status: "timeout",
+      ok: false,
+      error: expect.stringContaining("Unable to track tx execution: socket down"),
+    });
   });
 
   it("keeps executing status while another concurrent wait is active", async () => {

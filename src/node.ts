@@ -39,6 +39,9 @@ export type DuskNodeClient = {
   /** Resolved base URL (no trailing slash) */
   getBaseUrl(): string;
 
+  /** Return an equivalent client pinned to one base URL, when supported. */
+  pin?(baseUrl?: string): DuskNodeClient;
+
   /**
    * Call a contract endpoint via Rusk HTTP.
    *
@@ -355,5 +358,7 @@ return await f(url, init);
     });
   };
 
-  return { getBaseUrl, contractCall, waitForTxExecuted };
+  const pin = (baseUrl = getBaseUrl()) => createDuskNodeClient({ baseUrl, fetch: f });
+
+  return { getBaseUrl, pin, contractCall, waitForTxExecuted };
 }
