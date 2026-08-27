@@ -16,7 +16,7 @@ import { createDuskNodeClient } from "./node.js";
 import { fetchWasmDataDriver } from "./driver.js";
 import { ensureChain, type EnsureChainOptions } from "./ensureChain.js";
 import { normalizeBaseUrl, compact } from "./internal/normalize.js";
-import { toTxWaitReceipt } from "./internal/tx.js";
+import { waitForTxReceipt } from "./internal/tx.js";
 import {
   createDuskContract,
   type DuskContract,
@@ -391,26 +391,8 @@ export function createDuskApp(opts: DuskAppOptions = {}): DuskApp {
     nodeUrl,
     waitForTx: (hash: string, options?: { timeoutMs?: number; signal?: AbortSignal }) =>
       node.waitForTxExecuted(hash, options),
-    waitForTxReceipt: async (hash: string, options?: WaitForTxOptions): Promise<TxWaitReceipt> => {
-      // Best-effort: treat RUES transport failures like a timeout receipt.
-      let ev: any = null;
-      let waitErr: unknown = null;
-      try {
-        ev = await node.waitForTxExecuted(hash, compact({ timeoutMs: options?.timeoutMs, signal: options?.signal }));
-      } catch (e) {
-        // Preserve abort semantics.
-        if (options?.signal?.aborted) throw e;
-        waitErr = e;
-        ev = null;
-      }
-
-      const receipt = toTxWaitReceipt(hash, ev);
-      if (waitErr && receipt.status === "timeout") {
-        const msg = waitErr instanceof Error ? waitErr.message : String(waitErr);
-        receipt.error = `Unable to track tx execution: ${msg}`;
-      }
-      return receipt;
-    },
+    waitForTxReceipt: (hash: string, options?: WaitForTxOptions): Promise<TxWaitReceipt> =>
+      waitForTxReceipt(node, hash, options),
     ensureChain: (target: SwitchChainParams, o?: EnsureChainOptions) => ensureChain(wallet, target, o),
     driver,
     contract,

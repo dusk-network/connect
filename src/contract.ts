@@ -16,7 +16,7 @@ import type { ContractCallOptions, DuskNodeClient } from "./node.js";
 import { bytesToHex, hexToBytes } from "./bytes.js";
 import { ensureChain } from "./ensureChain.js";
 import { compact } from "./internal/normalize.js";
-import { toTxWaitReceipt } from "./internal/tx.js";
+import { waitForTxReceipt } from "./internal/tx.js";
 
 /** Optional wallet transaction fields for a contract call. */
 export type DuskContractTxOverrides = {
@@ -283,26 +283,7 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
             setStatus({ status: "executing", hash });
           }
 
-          // Best-effort: treat RUES transport failures like a timeout receipt.
-          let ev: any = null;
-          let waitErr: unknown = null;
-          try {
-            ev = await opts.node.waitForTxExecuted(
-              hash,
-              compact({ timeoutMs: options?.timeoutMs, signal: options?.signal })
-            );
-          } catch (e) {
-            // Preserve abort semantics.
-            if (options?.signal?.aborted) throw e;
-            waitErr = e;
-            ev = null;
-          }
-
-          const receipt = toTxWaitReceipt(hash, ev);
-          if (waitErr && receipt.status === "timeout") {
-            const msg = waitErr instanceof Error ? waitErr.message : String(waitErr);
-            receipt.error = `Unable to track tx execution: ${msg}`;
-          }
+          const receipt = await waitForTxReceipt(opts.node, hash, options);
 
           setStatus({ status: receipt.status, hash, receipt });
           return receipt;

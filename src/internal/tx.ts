@@ -1,5 +1,5 @@
-import type { TxExecutedEvent } from "../node.js";
-import type { TxWaitReceipt } from "../types.js";
+import type { DuskNodeClient, TxExecutedEvent } from "../node.js";
+import type { TxWaitReceipt, WaitForTxOptions } from "../types.js";
 
 /** Infer whether a RUES transaction event represents successful execution. */
 export function inferTxOk(payload: unknown): boolean {
@@ -64,4 +64,27 @@ export function toTxWaitReceipt(hash: string, executed: TxExecutedEvent | null):
     ...(err ? { error: err } : {}),
     event: executed,
   };
+}
+
+/** Wait for execution and normalize transport failures into timeout receipts. */
+export async function waitForTxReceipt(
+  node: Pick<DuskNodeClient, "waitForTxExecuted">,
+  hash: string,
+  options?: WaitForTxOptions
+): Promise<TxWaitReceipt> {
+  let executed: TxExecutedEvent | null = null;
+  let waitError: unknown = null;
+  try {
+    executed = await node.waitForTxExecuted(hash, options);
+  } catch (error) {
+    if (options?.signal?.aborted) throw error;
+    waitError = error;
+  }
+
+  const receipt = toTxWaitReceipt(hash, executed);
+  if (waitError && receipt.status === "timeout") {
+    const message = waitError instanceof Error ? waitError.message : String(waitError);
+    receipt.error = `Unable to track tx execution: ${message}`;
+  }
+  return receipt;
 }
