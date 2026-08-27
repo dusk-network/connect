@@ -18,7 +18,12 @@ describe("internal tx helpers", () => {
     expect(inferTxError(null)).toBe("");
   });
 
-  it("normalizes transport errors but preserves aborts", async () => {
+  it("waits for success, normalizes transport errors, and preserves aborts", async () => {
+    const event = { headers: new Headers(), payload: { success: true } };
+    await expect(
+      waitForTxReceipt({ waitForTxExecuted: async () => event }, "0xabc")
+    ).resolves.toMatchObject({ status: "executed", ok: true, event });
+
     const node = {
       waitForTxExecuted: async () => {
         throw new Error("socket down");

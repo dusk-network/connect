@@ -1,16 +1,12 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const examples = [
-  "drc20-demo",
-  "drc721-demo",
-  "l1standardbridge-demo",
-  "systemconfig-demo",
-];
-
 describe("example styles", () => {
   it("resolves every local stylesheet reference", async () => {
+    const examples = (await readdir("examples", { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
     for (const example of examples) {
       const htmlPath = path.resolve("examples", example, "index.html");
       const html = await readFile(htmlPath, "utf8");
