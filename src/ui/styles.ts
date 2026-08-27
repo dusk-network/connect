@@ -4,6 +4,48 @@
  * We keep this readable (not minified) and reuse it across UI components
  * to avoid duplicating tokens (fonts, colors, radii) and small resets.
  */
+const DCONNECT_LIGHT_THEME_CSS = `
+  color-scheme: light;
+  --dconnect-background: #F7F6F3;
+  --dconnect-foreground: #101010;
+  --dconnect-card: #FFFFFF;
+  --dconnect-card-foreground: #101010;
+  --dconnect-popover: #FFFFFF;
+  --dconnect-popover-foreground: #101010;
+  --dconnect-primary: #71B1FF;
+  --dconnect-primary-hover: #8EC3FF;
+  --dconnect-primary-foreground: #101010;
+  --dconnect-secondary: #FFFFFF;
+  --dconnect-secondary-foreground: #101010;
+  --dconnect-muted: #EDEAF3;
+  --dconnect-muted-foreground: #636167;
+  --dconnect-accent: rgba(113, 177, 255, 0.14);
+  --dconnect-accent-foreground: #2F86E8;
+  --dconnect-destructive: #C95050;
+  --dconnect-destructive-foreground: #FFFFFF;
+  --dconnect-border: rgba(16, 16, 16, 0.12);
+  --dconnect-border-strong: rgba(16, 16, 16, 0.24);
+  --dconnect-input: #FFFFFF;
+  --dconnect-ring: #2F86E8;
+  --dconnect-shadow: 0 18px 48px rgba(16, 16, 16, 0.16);
+  --dconnect-shadow-soft: 0 5px 18px rgba(16, 16, 16, 0.10);
+  --dconnect-shadow-hover: 0 18px 42px rgba(16, 16, 16, 0.18);
+  --dconnect-shadow-focus: 0 0 0 4px rgba(47, 134, 232, 0.20);
+  --dconnect-overlay-bg: rgba(16, 16, 16, 0.36);
+  --dconnect-button-bg: #FFFFFF;
+  --dconnect-button-border: rgba(16, 16, 16, 0.14);
+  --dconnect-button-hover: #F1F0F4;
+  --dconnect-control-primary-bg: #101010;
+  --dconnect-control-primary-fg: #E2DFE9;
+  --dconnect-control-primary-hover-bg: #1E1E22;
+  --dconnect-avatar-bg: rgba(47, 134, 232, 0.12);
+  --dconnect-avatar-fg: #2F86E8;
+  --dconnect-avatar-border: rgba(47, 134, 232, 0.22);
+  --dconnect-provider-icon-bg: #EDEAF3;
+  --dconnect-provider-icon-fg: #101010;
+  --dconnect-provider-dusk-icon-fg: #101010;
+`;
+
 export const DCONNECT_UI_BASE_CSS = `
   :host, .dconnect-overlay {
     /*
@@ -92,113 +134,13 @@ export const DCONNECT_UI_BASE_CSS = `
 
   :host([theme="light"]),
   .dconnect-overlay[data-theme="light"] {
-    color-scheme: light;
-
-    --dconnect-background: #F7F6F3;
-    --dconnect-foreground: #101010;
-
-    --dconnect-card: #FFFFFF;
-    --dconnect-card-foreground: #101010;
-
-    --dconnect-popover: #FFFFFF;
-    --dconnect-popover-foreground: #101010;
-
-    --dconnect-primary: #71B1FF;
-    --dconnect-primary-hover: #8EC3FF;
-    --dconnect-primary-foreground: #101010;
-
-    --dconnect-secondary: #FFFFFF;
-    --dconnect-secondary-foreground: #101010;
-
-    --dconnect-muted: #EDEAF3;
-    --dconnect-muted-foreground: #636167;
-
-    --dconnect-accent: rgba(113, 177, 255, 0.14);
-    --dconnect-accent-foreground: #2F86E8;
-
-    --dconnect-destructive: #C95050;
-    --dconnect-destructive-foreground: #FFFFFF;
-
-    --dconnect-border: rgba(16, 16, 16, 0.12);
-    --dconnect-border-strong: rgba(16, 16, 16, 0.24);
-    --dconnect-input: #FFFFFF;
-    --dconnect-ring: #2F86E8;
-
-    --dconnect-shadow: 0 18px 48px rgba(16, 16, 16, 0.16);
-    --dconnect-shadow-soft: 0 5px 18px rgba(16, 16, 16, 0.10);
-    --dconnect-shadow-hover: 0 18px 42px rgba(16, 16, 16, 0.18);
-    --dconnect-shadow-focus: 0 0 0 4px rgba(47, 134, 232, 0.20);
-
-    --dconnect-overlay-bg: rgba(16, 16, 16, 0.36);
-    --dconnect-button-bg: #FFFFFF;
-    --dconnect-button-border: rgba(16, 16, 16, 0.14);
-    --dconnect-button-hover: #F1F0F4;
-    --dconnect-control-primary-bg: #101010;
-    --dconnect-control-primary-fg: #E2DFE9;
-    --dconnect-control-primary-hover-bg: #1E1E22;
-
-    --dconnect-avatar-bg: rgba(47, 134, 232, 0.12);
-    --dconnect-avatar-fg: #2F86E8;
-    --dconnect-avatar-border: rgba(47, 134, 232, 0.22);
-    --dconnect-provider-icon-bg: #EDEAF3;
-    --dconnect-provider-icon-fg: #101010;
-    --dconnect-provider-dusk-icon-fg: #101010;
+    ${DCONNECT_LIGHT_THEME_CSS}
   }
 
   @media (prefers-color-scheme: light) {
     :host(:not([theme="dark"])),
     .dconnect-overlay:not([data-theme="dark"]) {
-      color-scheme: light;
-
-      --dconnect-background: #F7F6F3;
-      --dconnect-foreground: #101010;
-
-      --dconnect-card: #FFFFFF;
-      --dconnect-card-foreground: #101010;
-
-      --dconnect-popover: #FFFFFF;
-      --dconnect-popover-foreground: #101010;
-
-      --dconnect-primary: #71B1FF;
-      --dconnect-primary-hover: #8EC3FF;
-      --dconnect-primary-foreground: #101010;
-
-      --dconnect-secondary: #FFFFFF;
-      --dconnect-secondary-foreground: #101010;
-
-      --dconnect-muted: #EDEAF3;
-      --dconnect-muted-foreground: #636167;
-
-      --dconnect-accent: rgba(113, 177, 255, 0.14);
-      --dconnect-accent-foreground: #2F86E8;
-
-      --dconnect-destructive: #C95050;
-      --dconnect-destructive-foreground: #FFFFFF;
-
-      --dconnect-border: rgba(16, 16, 16, 0.12);
-      --dconnect-border-strong: rgba(16, 16, 16, 0.24);
-      --dconnect-input: #FFFFFF;
-      --dconnect-ring: #2F86E8;
-
-      --dconnect-shadow: 0 18px 48px rgba(16, 16, 16, 0.16);
-      --dconnect-shadow-soft: 0 5px 18px rgba(16, 16, 16, 0.10);
-      --dconnect-shadow-hover: 0 18px 42px rgba(16, 16, 16, 0.18);
-      --dconnect-shadow-focus: 0 0 0 4px rgba(47, 134, 232, 0.20);
-
-      --dconnect-overlay-bg: rgba(16, 16, 16, 0.36);
-      --dconnect-button-bg: #FFFFFF;
-      --dconnect-button-border: rgba(16, 16, 16, 0.14);
-      --dconnect-button-hover: #F1F0F4;
-      --dconnect-control-primary-bg: #101010;
-      --dconnect-control-primary-fg: #E2DFE9;
-      --dconnect-control-primary-hover-bg: #1E1E22;
-
-      --dconnect-avatar-bg: rgba(47, 134, 232, 0.12);
-      --dconnect-avatar-fg: #2F86E8;
-      --dconnect-avatar-border: rgba(47, 134, 232, 0.22);
-      --dconnect-provider-icon-bg: #EDEAF3;
-      --dconnect-provider-icon-fg: #101010;
-      --dconnect-provider-dusk-icon-fg: #101010;
+      ${DCONNECT_LIGHT_THEME_CSS}
     }
   }
 

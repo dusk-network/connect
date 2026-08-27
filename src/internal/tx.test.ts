@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inferTxError, inferTxOk, toTxWaitReceipt } from "./tx.js";
+import { inferTxError, inferTxOk, toTxWaitReceipt, waitForTxReceipt } from "./tx.js";
 
 describe("internal tx helpers", () => {
   it("infers tx success from common payload shapes", () => {
@@ -16,6 +16,22 @@ describe("internal tx helpers", () => {
     expect(inferTxError({ error: { message: "nested" } })).toBe("nested");
     expect(inferTxError({ result: { err: { code: 1 } } })).toContain("\"code\":1");
     expect(inferTxError(null)).toBe("");
+  });
+
+  it("normalizes transport errors but preserves aborts", async () => {
+    const node = {
+      waitForTxExecuted: async () => {
+        throw new Error("socket down");
+      },
+    };
+    await expect(waitForTxReceipt(node, "0xabc")).resolves.toMatchObject({
+      status: "timeout",
+      error: "Unable to track tx execution: socket down",
+    });
+
+    const controller = new AbortController();
+    controller.abort();
+    await expect(waitForTxReceipt(node, "0xabc", { signal: controller.signal })).rejects.toThrow("socket down");
   });
 
   it("builds timeout and executed receipts", () => {
