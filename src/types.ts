@@ -397,7 +397,7 @@ export type DuskWalletState = {
   selectedAddress: AccountId | null;
   /** First exposed profile, if any. */
   selectedProfile: DuskProfile | null;
-  /** Last `duskNodeChanged` payload (if any) */
+  /** Current node snapshot from capabilities or `duskNodeChanged`, if available */
   node: DuskNodeChangedPayload | null;
   /** Provider capability snapshot (if supported by the wallet) */
   capabilities: DuskProviderCapabilities | null;

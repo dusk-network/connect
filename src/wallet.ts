@@ -620,14 +620,27 @@ export class DuskWallet {
 
     const [caps, chainId, profiles] = await Promise.all([
       this.request<DuskProviderCapabilities>("dusk_getCapabilities").catch(() => null),
-      this.request<ChainId>("dusk_chainId").catch(() => p.chainId ?? null),
+      this.request<ChainId>("dusk_chainId").catch(() => null),
       this.request<DuskProfile[]>("dusk_profiles").catch(() => []),
     ]);
 
-    const nextChainId = typeof chainId === "string" ? chainId : p.chainId ?? null;
+    const nextChainId = typeof chainId === "string"
+      ? chainId
+      : typeof caps?.chainId === "string"
+        ? caps.chainId
+        : p.chainId ?? null;
+    const nodeUrl = typeof caps?.nodeUrl === "string" ? caps.nodeUrl.trim() : "";
+    const nextNode = caps && nodeUrl
+      ? {
+          chainId: nextChainId ?? caps.chainId,
+          nodeUrl,
+          networkName: caps.networkName,
+        }
+      : this._state.node;
     this._patch(
       {
         chainId: nextChainId,
+        node: nextNode,
         capabilities: caps,
         authorized: Boolean(p.isAuthorized),
       },
