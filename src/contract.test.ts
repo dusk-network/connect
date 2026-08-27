@@ -38,11 +38,24 @@ function createWalletStub() {
       state.selectedProfile = state.profiles[0];
       return [...state.accounts];
     }),
-    sendContractCall: vi.fn(async () => ({ hash: "0xtxhash", nonce: "9" })),
+    sendContractCall: vi.fn(async () => ({ hash: "0x" + "ab".repeat(32), nonce: "9" })),
     refresh: vi.fn(async () => state),
     getChainId: vi.fn(async () => state.chainId),
     switchChain: vi.fn(async () => null),
   } as any;
+}
+
+async function createWaitHandle(waitForTxExecuted: ReturnType<typeof vi.fn>) {
+  const wallet = createWalletStub();
+  wallet.state.authorized = true;
+  const contract = createDuskContract({
+    contractId: "0x" + "33".repeat(32),
+    driver: createDriver(),
+    wallet,
+    node: { waitForTxExecuted } as any,
+    defaultTx: { privacy: "public" },
+  });
+  return await contract.write["ping"]!();
 }
 
 describe("contract facade", () => {
@@ -153,11 +166,8 @@ describe("contract facade", () => {
       statuses.push(update.status);
     });
 
-    const receiptA = handle.wait();
-    const receiptB = handle.wait();
-
-    await expect(receiptA).resolves.toMatchObject({ status: "executed", ok: true });
-    await expect(receiptB).resolves.toMatchObject({ status: "executed", ok: true });
+    await expect(handle.wait()).resolves.toMatchObject({ status: "executed", ok: true });
+    await expect(handle.wait()).resolves.toMatchObject({ status: "executed", ok: true });
 
     expect(wallet.connect).toHaveBeenCalledTimes(1);
     expect(wallet.switchChain).toHaveBeenCalledWith({ chainId: "dusk:2" });
@@ -166,23 +176,133 @@ describe("contract facade", () => {
     expect(statuses).toEqual(["submitted", "executing", "executed"]);
   });
 
-  it("turns tx wait transport failures into timeout receipts with context", async () => {
-    const contract = createDuskContract({
-      contractId: "0x" + "33".repeat(32),
-      driver: createDriver(),
-      wallet: {
-        state: { authorized: true, accounts: ["dusk1writer"], chainId: "dusk:2" },
-        connect: vi.fn(),
-        sendContractCall: vi.fn(async () => ({ hash: "0xlate", nonce: "1" })),
-      } as any,
-      node: {
-        waitForTxExecuted: vi.fn(async () => {
-          throw new Error("socket down");
-        }),
-      } as any,
-    });
+  it("does not let a concurrent timeout overwrite a final receipt", async () => {
+    const pending: Array<(event: any) => void> = [];
+    const waitForTxExecuted = vi.fn(
+      () => new Promise((resolve) => pending.push(resolve))
+    );
+    const handle = await createWaitHandle(waitForTxExecuted);
+    const statuses: string[] = [];
+    handle.onStatus((status) => statuses.push(status.status));
+    const executed = handle.wait();
+    const timeout = handle.wait();
+    pending[0]!({ headers: new Headers(), payload: { success: true } });
+    await expect(executed).resolves.toMatchObject({ status: "executed" });
+    pending[1]!(null);
+    await expect(timeout).resolves.toMatchObject({ status: "executed" });
+    expect(statuses).toEqual(["submitted", "executing", "executed"]);
+  });
 
-    const handle = await contract.write["ping"]!(undefined, { privacy: "public" });
+  it("keeps executing status while another concurrent wait is active", async () => {
+    const pending: Array<{ resolve: (event: any) => void; reject: (error: Error) => void }> = [];
+    const waitForTxExecuted = vi.fn(
+      () => new Promise((resolve, reject) => pending.push({ resolve, reject }))
+    );
+    const handle = await createWaitHandle(waitForTxExecuted);
+    const statuses: string[] = [];
+    handle.onStatus((status) => statuses.push(status.status));
+    const aborted = handle.wait();
+    const executed = handle.wait();
+    pending[0]!.reject(new Error("aborted"));
+    await expect(aborted).resolves.toMatchObject({ status: "timeout" });
+    expect(statuses).toEqual(["submitted", "executing"]);
+    pending[1]!.resolve({ headers: new Headers(), payload: { success: true } });
+    await expect(executed).resolves.toMatchObject({ status: "executed" });
+  });
+
+  it("publishes a pending timeout when the remaining wait aborts", async () => {
+    const pending: Array<{ resolve: (event: any) => void; reject: (error: Error) => void }> = [];
+    const waitForTxExecuted = vi.fn(
+      () => new Promise((resolve, reject) => pending.push({ resolve, reject }))
+    );
+    const handle = await createWaitHandle(waitForTxExecuted);
+    const statuses: string[] = [];
+    handle.onStatus((status) => statuses.push(status.status));
+    const timedOut = handle.wait();
+    const controller = new AbortController();
+    const aborted = handle.wait({ signal: controller.signal });
+    pending[0]!.resolve(null);
+    await expect(timedOut).resolves.toMatchObject({ status: "timeout" });
+    expect(statuses).toEqual(["submitted", "executing"]);
+    controller.abort();
+    pending[1]!.reject(new Error("aborted"));
+    await expect(aborted).rejects.toThrow("aborted");
+    expect(statuses).toEqual(["submitted", "executing", "timeout"]);
+  });
+
+  it("does not reuse a superseded concurrent timeout", async () => {
+    const waitForTxExecuted = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("aborted"));
+    const handle = await createWaitHandle(waitForTxExecuted);
+    const statuses: string[] = [];
+    handle.onStatus((status) => statuses.push(status.status));
+
+    await Promise.all([handle.wait(), handle.wait()]);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(handle.wait({ signal: controller.signal })).rejects.toThrow("aborted");
+    expect(statuses).toEqual(["submitted", "executing", "timeout", "executing", "submitted"]);
+  });
+
+  it("serializes status notifications when a listener retries", async () => {
+    const waitForTxExecuted = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ headers: new Headers(), payload: { success: true } });
+    const handle = await createWaitHandle(waitForTxExecuted);
+    const first: string[] = [];
+    const second: string[] = [];
+    const late: string[] = [];
+    let retry!: Promise<any>;
+    handle.onStatus((status) => {
+      first.push(status.status);
+      if (status.status === "timeout") {
+        retry = handle.wait();
+        handle.onStatus((update) => late.push(update.status));
+      }
+    });
+    handle.onStatus((status) => second.push(status.status));
+
+    await expect(handle.wait()).resolves.toMatchObject({ status: "timeout" });
+    await expect(retry).resolves.toMatchObject({ status: "executed" });
+    expect(first).toEqual(["submitted", "executing", "timeout", "executing", "executed"]);
+    expect(second).toEqual(first);
+    expect(late).toEqual(["executing", "executed"]);
+  });
+
+  it("allows retrying a timed-out wait", async () => {
+    const waitForTxExecuted = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ headers: new Headers(), payload: { success: true } });
+    const handle = await createWaitHandle(waitForTxExecuted);
+    await expect(handle.wait({ timeoutMs: 1 })).resolves.toMatchObject({ status: "timeout" });
+    await expect(handle.wait({ timeoutMs: 500 })).resolves.toMatchObject({ status: "executed" });
+    expect(waitForTxExecuted).toHaveBeenCalledTimes(2);
+  });
+
+  it("allows retrying after an aborted wait", async () => {
+    const waitForTxExecuted = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("aborted"))
+      .mockResolvedValueOnce({ headers: new Headers(), payload: { success: true } });
+    const handle = await createWaitHandle(waitForTxExecuted);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(handle.wait({ signal: controller.signal })).rejects.toThrow("aborted");
+    await expect(handle.wait()).resolves.toMatchObject({ status: "executed" });
+    expect(waitForTxExecuted).toHaveBeenCalledTimes(2);
+  });
+
+  it("turns tx wait transport failures into timeout receipts with context", async () => {
+    const handle = await createWaitHandle(
+      vi.fn(async () => {
+        throw new Error("socket down");
+      })
+    );
     await expect(handle.wait()).resolves.toMatchObject({
       status: "timeout",
       ok: false,

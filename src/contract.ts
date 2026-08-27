@@ -207,23 +207,41 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
 
       const submitted = await wallet.sendContractCall(txParams);
       const hash = String(submitted?.hash ?? "");
+      const submittedNonce = String((submitted as any)?.nonce ?? "");
 
       // Tx lifecycle notifications (best-effort).
       let currentStatus: TxStatusUpdate = {
         status: "submitted",
         hash,
-        nonce: String((submitted as any)?.nonce ?? ""),
+        nonce: submittedNonce,
       };
 
       const listeners = new Set<(u: TxStatusUpdate) => void>();
 
+      const statusQueue: Array<{
+        update: TxStatusUpdate;
+        listeners: Array<(u: TxStatusUpdate) => void>;
+      }> = [];
+      let emitting = false;
       const emit = () => {
-        for (const fn of listeners) {
-          try {
-            fn(currentStatus);
-          } catch {
-            // Ignore handler errors to avoid breaking tx flow.
+        statusQueue.push({ update: currentStatus, listeners: [...listeners] });
+        if (emitting) return;
+        emitting = true;
+        try {
+          for (let i = 0; i < statusQueue.length; i++) {
+            const queued = statusQueue[i]!;
+            for (const fn of queued.listeners) {
+              if (!listeners.has(fn)) continue;
+              try {
+                fn(queued.update);
+              } catch {
+                // Ignore handler errors to avoid breaking tx flow.
+              }
+            }
           }
+        } finally {
+          statusQueue.length = 0;
+          emitting = false;
         }
       };
 
@@ -257,29 +275,51 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
         };
       };
 
-      // Attach a lightweight `wait()` helper when a node client is available.
-      let waited: Promise<TxWaitReceipt> | null = null;
+      // Cache only a definitive execution result. Callers can retry timeouts,
+      // aborts, and transport failures with independent wait options.
+      let finalReceipt: TxWaitReceipt | null = null;
+      let pendingTimeout: TxWaitReceipt | null = null;
+      let activeWaits = 0;
 
       const wait: TxHandle["wait"] = async (options?: WaitForTxOptions) => {
-        if (waited) return waited;
+        if (finalReceipt) return finalReceipt;
+        if (!opts.node) {
+          throw new Error("tx.wait requires a node client (pass `node` when creating the contract facade)");
+        }
 
-        waited = (async () => {
-          if (!opts.node) {
-            throw new Error("tx.wait requires a node client (pass `node` when creating the contract facade)");
-          }
+        if (currentStatus.status === "submitted" || currentStatus.status === "timeout") {
+          setStatus({ status: "executing", hash });
+        }
 
-          // Only transition to executing once.
-          if (currentStatus.status === "submitted") {
-            setStatus({ status: "executing", hash });
-          }
-
+        activeWaits++;
+        try {
           const receipt = await waitForTxReceipt(opts.node, hash, options);
-
+          activeWaits--;
+          if (finalReceipt) return finalReceipt;
+          if (receipt.status === "timeout" && activeWaits > 0) {
+            pendingTimeout = receipt;
+            return receipt;
+          }
+          if (receipt.status === "executed" || receipt.status === "failed") {
+            finalReceipt = receipt;
+            pendingTimeout = null;
+          } else if (receipt.status === "timeout") {
+            pendingTimeout = null;
+          }
           setStatus({ status: receipt.status, hash, receipt });
           return receipt;
-        })();
-
-        return waited;
+        } catch (error) {
+          activeWaits--;
+          if (!finalReceipt && activeWaits === 0 && currentStatus.status === "executing") {
+            if (pendingTimeout) {
+              setStatus({ status: "timeout", hash, receipt: pendingTimeout });
+              pendingTimeout = null;
+            } else {
+              setStatus({ status: "submitted", hash, nonce: submittedNonce });
+            }
+          }
+          throw error;
+        }
       };
 
       const waitExecuted: TxHandle["waitExecuted"] = (options?: WaitForTxOptions) => wait(options);

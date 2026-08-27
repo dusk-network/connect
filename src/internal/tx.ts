@@ -1,5 +1,6 @@
 import type { DuskNodeClient, TxExecutedEvent } from "../node.js";
 import type { TxWaitReceipt, WaitForTxOptions } from "../types.js";
+import { normalizeTxHash } from "./normalize.js";
 
 /** Infer the outcome reported by a RUES transaction event. */
 export function inferTxOk(payload: unknown): boolean | null {
@@ -81,6 +82,7 @@ export async function waitForTxReceipt(
   hash: string,
   options?: WaitForTxOptions
 ): Promise<TxWaitReceipt> {
+  normalizeTxHash(hash);
   let executed: TxExecutedEvent | null;
   try {
     executed = await node.waitForTxExecuted(hash, options);

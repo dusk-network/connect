@@ -28,6 +28,9 @@ function makeRuesFrame(headersInit: Record<string, string>, payload: unknown): A
   return out.buffer;
 }
 
+const TX_HASH = "de".repeat(32);
+const OTHER_TX_HASH = "ad".repeat(32);
+
 type Listener = (event?: any) => void;
 
 class MockWebSocket {
@@ -149,7 +152,7 @@ describe("node client", () => {
       fetch: fetchMock as any,
     });
 
-    const promise = client.waitForTxExecuted("0xdeadbeef", { timeoutMs: 500 });
+    const promise = client.waitForTxExecuted(`0x${TX_HASH}`, { timeoutMs: 500 });
     const ws = MockWebSocket.instances[0];
     expect(ws?.url).toBe("wss://nodes.dusk.network/on");
 
@@ -161,7 +164,7 @@ describe("node client", () => {
     await Promise.resolve();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://nodes.dusk.network/on/transactions:deadbeef/Executed",
+      `https://nodes.dusk.network/on/transactions:${TX_HASH}/Executed`,
       expect.objectContaining({
         method: "GET",
       })
@@ -170,16 +173,124 @@ describe("node client", () => {
     ws!.emit("message", {
       data: makeRuesFrame(
         {
-          "content-location": "/on/transactions:deadbeef/Executed",
-          "content-type": "application/json",
+          "content-location": `/on/transactions:${TX_HASH}/Executed`,
         },
-        { success: true, hash: "0xdeadbeef" }
+        new TextEncoder().encode(JSON.stringify({ err: null, hash: `0x${TX_HASH}` }))
       ),
     });
 
     await expect(promise).resolves.toMatchObject({
-      payload: { success: true, hash: "0xdeadbeef" },
+      payload: { err: null, hash: `0x${TX_HASH}` },
     });
+  });
+
+  it("lets a matching frame beat a stalled subscription request", async () => {
+    let subscriptionSignal!: AbortSignal;
+    const fetchMock = vi.fn((_url, init) => {
+      subscriptionSignal = init!.signal!;
+      return new Promise<Response>(() => {});
+    });
+    vi.stubGlobal("WebSocket", MockWebSocket as any);
+    const client = createDuskNodeClient({ baseUrl: "https://nodes.dusk.network", fetch: fetchMock as any });
+
+    const promise = client.waitForTxExecuted(TX_HASH, { timeoutMs: 500 });
+    const ws = MockWebSocket.instances[0]!;
+    ws.emit("message", { data: "session-123" });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    ws.emit("message", {
+      data: makeRuesFrame(
+        { "content-location": `/on/transactions:${TX_HASH}/Executed`, "content-type": "application/json" },
+        { success: true }
+      ),
+    });
+
+    await expect(promise).resolves.toMatchObject({ payload: { success: true } });
+    expect(subscriptionSignal.aborted).toBe(true);
+  });
+
+  it("lets a matching frame beat a later subscription error", async () => {
+    let rejectSubscription!: (error: Error) => void;
+    const fetchMock = vi.fn(
+      () => new Promise<Response>((_resolve, reject) => { rejectSubscription = reject; })
+    );
+    vi.stubGlobal("WebSocket", MockWebSocket as any);
+    const client = createDuskNodeClient({ baseUrl: "https://nodes.dusk.network", fetch: fetchMock as any });
+
+    const promise = client.waitForTxExecuted(TX_HASH, { timeoutMs: 500 });
+    const ws = MockWebSocket.instances[0]!;
+    ws.emit("message", { data: "session-123" });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    ws.emit("message", {
+      data: makeRuesFrame(
+        { "content-location": `/on/transactions:${TX_HASH}/Executed`, "content-type": "application/json" },
+        { success: true }
+      ),
+    });
+    rejectSubscription(new Error("ack lost"));
+
+    await expect(promise).resolves.toMatchObject({ payload: { success: true } });
+  });
+
+  it("reports subscription errors after unrelated frames", async () => {
+    let rejectSubscription!: (error: Error) => void;
+    const fetchMock = vi.fn(
+      () => new Promise<Response>((_resolve, reject) => { rejectSubscription = reject; })
+    );
+    vi.stubGlobal("WebSocket", MockWebSocket as any);
+    const client = createDuskNodeClient({ baseUrl: "https://nodes.dusk.network", fetch: fetchMock as any });
+
+    const promise = client.waitForTxExecuted(TX_HASH, { timeoutMs: 500 });
+    const ws = MockWebSocket.instances[0]!;
+    ws.emit("message", { data: "session-123" });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    ws.emit("message", {
+      data: makeRuesFrame(
+        { "content-location": `/on/transactions:${OTHER_TX_HASH}/Executed`, "content-type": "application/json" },
+        { success: true }
+      ),
+    });
+    rejectSubscription(new Error("ack lost"));
+
+    await expect(promise).rejects.toThrow("ack lost");
+  });
+
+  it("requires an exact canonical transaction location", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket as any);
+    const client = createDuskNodeClient({
+      baseUrl: "https://nodes.dusk.network",
+      fetch: vi.fn(async () => new Response(null, { status: 200 })) as any,
+    });
+
+    const promise = client.waitForTxExecuted(TX_HASH, { timeoutMs: 500 });
+    const ws = MockWebSocket.instances[0]!;
+    ws.emit("message", { data: "session-123" });
+    await Promise.resolve();
+    await Promise.resolve();
+    ws.emit("message", {
+      data: makeRuesFrame(
+        {
+          "content-location": `/on/transactions:${OTHER_TX_HASH}/Executed?tx=${TX_HASH}`,
+          "content-type": "application/json",
+        },
+        { success: true }
+      ),
+    });
+    ws.emit("message", {
+      data: makeRuesFrame(
+        {
+          "content-location": `/on/transactions:${TX_HASH}/Executed`,
+          "content-type": "application/json",
+        },
+        { success: true }
+      ),
+    });
+
+    await expect(promise).resolves.toMatchObject({ payload: { success: true } });
+  });
+
+  it("rejects malformed transaction hashes", async () => {
+    const client = createDuskNodeClient({ baseUrl: "https://nodes.dusk.network" });
+    await expect(client.waitForTxExecuted("abc")).rejects.toThrow(/64 hex characters/);
   });
 
   it("returns null on tx wait timeout", async () => {
@@ -191,7 +302,7 @@ describe("node client", () => {
       fetch: vi.fn(async () => new Response(null, { status: 200 })) as any,
     });
 
-    const promise = client.waitForTxExecuted("0xabc", { timeoutMs: 50 });
+    const promise = client.waitForTxExecuted(TX_HASH, { timeoutMs: 50 });
     vi.advanceTimersByTime(50);
 
     await expect(promise).resolves.toBeNull();
@@ -206,7 +317,7 @@ describe("node client", () => {
     });
 
     const controller = new AbortController();
-    const promise = client.waitForTxExecuted("0xabc", {
+    const promise = client.waitForTxExecuted(TX_HASH, {
       timeoutMs: 500,
       signal: controller.signal,
     });

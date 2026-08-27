@@ -13,6 +13,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Made live transaction waits race-safe, exact, and retryable [#27].
 - Prevented contract proxy facets from being treated as promises [#28].
 - Reported unsupported transaction execution payloads as unknown instead of successful [#26].
 - Preserved explicit wallet selection when a provider UUID collides [#25].
@@ -71,6 +72,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
 [#28]: https://github.com/dusk-network/connect/issues/28
+[#27]: https://github.com/dusk-network/connect/issues/27
 [#26]: https://github.com/dusk-network/connect/issues/26
 [#25]: https://github.com/dusk-network/connect/issues/25
 

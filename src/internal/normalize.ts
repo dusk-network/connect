@@ -33,6 +33,15 @@ export function strip0x(hex: string): string {
   return String(hex || "").replace(/^0x/i, "");
 }
 
+/** Normalize a 32-byte transaction hash or throw. */
+export function normalizeTxHash(hash: string): string {
+  const value = strip0x(String(hash || "").trim()).toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(value)) {
+    throw new TypeError("Transaction hash must be 64 hex characters (optional 0x prefix)");
+  }
+  return value;
+}
+
 /** Shallowly remove keys with `undefined` values. */
 export function compact(obj: Record<string, any>): any {
   return Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined));

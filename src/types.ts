@@ -81,7 +81,8 @@ export type TxWaitReceipt = {
  *
  * - `submitted`: the wallet returned a tx hash (tx accepted for processing)
  * - `executing`: we've started waiting for the node's `Executed` event
- * - `executed` / `failed` / `timeout`: final status (includes a receipt)
+ * - `executed` / `failed`: definitive cached outcomes
+ * - `timeout`: one wait attempt timed out; a retry transitions back to `executing`
  */
 export type TxStatus = "submitted" | "executing" | "executed" | "failed" | "timeout";
 
