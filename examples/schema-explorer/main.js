@@ -261,8 +261,10 @@ function createMethodCard(methodName, methodInfo, contract, wallet) {
         const tx = await contract.write[methodName](args, { amount: "0", deposit: "0" });
         schemaLog(`✓ ${methodName} tx submitted: ${tx.hash}`);
         const receipt = await tx.wait({ timeoutMs: 60_000 });
-        if (receipt.ok) {
+        if (receipt.ok === true) {
           schemaLog(`✓ ${methodName} confirmed!`);
+        } else if (receipt.ok === null) {
+          schemaLog(`? ${methodName} execution outcome is unknown`);
         } else {
           schemaLog(`✗ ${methodName} failed: ${receipt.error || "unknown"}`);
         }

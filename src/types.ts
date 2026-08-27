@@ -64,8 +64,13 @@ export type WaitForTxOptions = {
 export type TxWaitReceipt = {
   hash: string;
   status: TxWaitStatus;
-  ok: boolean;
-  /** Optional error string when `ok === false` */
+  /**
+   * `true` for recognized success, `false` for recognized failure or timeout,
+   * and `null` when an execution event has an unrecognized payload.
+   * Use `status` to distinguish failure from timeout.
+   */
+  ok: boolean | null;
+  /** Optional error string when execution is not known to have succeeded. */
   error?: string;
   /** Raw executed event (headers + payload) when available */
   event?: unknown;
