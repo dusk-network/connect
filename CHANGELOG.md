@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserved explicit wallet selection when a provider UUID collides [#25].
+
 ## [0.2.0] - 2026-07-04
 
 ### Added
@@ -59,6 +63,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed disconnect/revocation state handling in the wallet integration helpers.
 - Fixed provider event normalization for profile and chain changes.
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
+
+[#25]: https://github.com/dusk-network/connect/issues/25
 
 [Unreleased]: https://github.com/dusk-network/connect/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/dusk-network/connect/compare/v0.1.0...v0.2.0

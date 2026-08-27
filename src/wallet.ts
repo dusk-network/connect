@@ -389,14 +389,14 @@ export class DuskWallet {
   private _registerDiscoveredProvider(detail: DuskProviderDetail, opts: { notify?: boolean } = {}): boolean {
     const info = cloneProviderInfo(detail.info);
     const current = this._providers.get(info.uuid);
-    const same = current && current.provider === detail.provider && providerInfoEq(current.info, info);
-    if (same) return false;
+    const sameProvider = current?.provider === detail.provider;
+    if (current && !sameProvider) return false;
+    if (sameProvider && providerInfoEq(current.info, info)) return false;
 
     this._providers.set(info.uuid, { info, provider: detail.provider });
     this._syncAvailableProviders({ notify: false });
-
-    if (this._state.providerId === info.uuid && this._provider !== detail.provider) {
-      this._applySelectedProvider({ info, provider: detail.provider }, { notify: false, persist: false });
+    if (sameProvider && this._provider === detail.provider) {
+      this._patch({ providerInfo: info }, { notify: false });
     }
 
     if (opts.notify !== false) this._notify();
