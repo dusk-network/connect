@@ -30,8 +30,6 @@ export type DuskConnectButtonOptions = {
   connectOptions?: ConnectOptions;
 };
 
-type Status = ReturnType<typeof walletStatus>;
-
 function boolAttr(v: string | null): boolean {
   return v !== null && v.toLowerCase() !== "false";
 }

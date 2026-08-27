@@ -13,8 +13,9 @@ import type { DuskWallet } from "./wallet.js";
 import type { DuskDataDriver } from "./driver.js";
 import type { ContractCallOptions, DuskNodeClient } from "./node.js";
 
-import { bytesToHex, hexToBytes } from "./bytes.js";
+import { bytesToHex } from "./bytes.js";
 import { ensureChain } from "./ensureChain.js";
+import { normalizeContractId0x } from "./internal/contractId.js";
 import { compact } from "./internal/normalize.js";
 import { waitForTxReceipt } from "./internal/tx.js";
 
@@ -91,22 +92,6 @@ function jsonWithBigInts(value: unknown): string {
   return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
 }
 
-function normalizeContractId(input: string | Uint8Array | number[]): { idHexNo0x: string; idHex0x: string } {
-  const bytes =
-    typeof input === "string"
-      ? hexToBytes(input)
-      : input instanceof Uint8Array
-      ? input
-      : new Uint8Array(input);
-
-  if (bytes.length !== 32) {
-    throw new TypeError("contractId must be 32 bytes (0x + 64 hex chars)");
-  }
-
-  const idHexNo0x = bytesToHex(bytes).toLowerCase();
-  return { idHexNo0x, idHex0x: "0x" + idHexNo0x };
-}
-
 function buildDisplay(
   fnName: string,
   opts: { name?: string; methodSigs?: Record<string, string> },
@@ -133,7 +118,8 @@ function createFnProxy<T extends Record<string, any>>(factory: (fnName: string) 
 
 /** Create a data-driver-backed contract facade. */
 export function createDuskContract(opts: CreateDuskContractOptions): DuskContract {
-  const { idHex0x, idHexNo0x } = normalizeContractId(opts.contractId);
+  const idHex0x = normalizeContractId0x(opts.contractId);
+  const idHexNo0x = idHex0x.slice(2);
   const driverPromise = Promise.resolve(opts.driver);
   const displayMeta = compact({
     name: opts.name,
