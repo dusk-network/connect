@@ -295,7 +295,7 @@ async function sendEvent(ev) {
       unsubscribe();
     }
 
-    if (!receipt.ok && receipt.error) model.error = receipt.error;
+    if (receipt.ok === false && receipt.error) model.error = receipt.error;
 
     // One final sync to refresh state/revive_count from chain.
     await sync();

@@ -3,12 +3,20 @@ import { describe, expect, it } from "vitest";
 import { inferTxError, inferTxOk, toTxWaitReceipt, waitForTxReceipt } from "./tx.js";
 
 describe("internal tx helpers", () => {
-  it("infers tx success from common payload shapes", () => {
+  it("only reports success for recognized payloads", () => {
     expect(inferTxOk({ success: true })).toBe(true);
+    expect(inferTxOk({ err: null, gas_spent: 100 })).toBe(true);
+    expect(inferTxOk({ err: undefined })).toBeNull();
+    expect(inferTxOk({ err: null, success: false })).toBe(false);
+    expect(inferTxOk({ result: { success: true } })).toBe(true);
     expect(inferTxOk({ success: false })).toBe(false);
+    expect(inferTxOk({ result: { success: false } })).toBe(false);
     expect(inferTxOk({ err: "bad" })).toBe(false);
     expect(inferTxOk({ result: { error: "bad" } })).toBe(false);
-    expect(inferTxOk("opaque")).toBe(true);
+    expect(inferTxOk(null)).toBeNull();
+    expect(inferTxOk(new Uint8Array([1]))).toBeNull();
+    expect(inferTxOk({})).toBeNull();
+    expect(inferTxOk("opaque")).toBeNull();
   });
 
   it("extracts nested error text best-effort", () => {
@@ -51,6 +59,16 @@ describe("internal tx helpers", () => {
     });
     expect(executed.status).toBe("executed");
     expect(executed.ok).toBe(true);
+
+    const unknown = toTxWaitReceipt("0xunknown", {
+      headers: new Headers(),
+      payload: new Uint8Array([1, 2, 3]),
+    });
+    expect(unknown).toMatchObject({
+      status: "executed",
+      ok: null,
+      error: "Unrecognized transaction execution payload",
+    });
 
     const failed = toTxWaitReceipt("0xghi", {
       headers: new Headers(),

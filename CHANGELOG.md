@@ -7,9 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Made `TxWaitReceipt.ok` nullable for unrecognized execution payloads [#26].
+
 ### Fixed
 
+- Reported unsupported transaction execution payloads as unknown instead of successful [#26].
 - Prevented contract proxy facets from being treated as promises [#28].
+
 
 ## [0.2.0] - 2026-07-04
 
@@ -65,6 +71,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
 [#28]: https://github.com/dusk-network/connect/issues/28
+[#26]: https://github.com/dusk-network/connect/issues/26
 
 [Unreleased]: https://github.com/dusk-network/connect/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/dusk-network/connect/compare/v0.1.0...v0.2.0
