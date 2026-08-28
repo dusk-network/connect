@@ -111,7 +111,11 @@ function createFnProxy<T extends Record<string, any>>(factory: (fnName: string) 
   return new Proxy(
     {},
     {
-      get: (_t, prop) => factory(String(prop)),
+      get: (target, prop, receiver) => {
+        if (prop === "then") return undefined;
+        if (typeof prop === "symbol") return Reflect.get(target, prop, receiver);
+        return factory(prop);
+      },
     }
   ) as any;
 }
