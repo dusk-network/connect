@@ -72,19 +72,15 @@ export async function waitForTxReceipt(
   hash: string,
   options?: WaitForTxOptions
 ): Promise<TxWaitReceipt> {
-  let executed: TxExecutedEvent | null = null;
-  let waitError: unknown = null;
+  let executed: TxExecutedEvent | null;
   try {
     executed = await node.waitForTxExecuted(hash, options);
   } catch (error) {
     if (options?.signal?.aborted) throw error;
-    waitError = error;
-  }
-
-  const receipt = toTxWaitReceipt(hash, executed);
-  if (waitError && receipt.status === "timeout") {
-    const message = waitError instanceof Error ? waitError.message : String(waitError);
+    const receipt = toTxWaitReceipt(hash, null);
+    const message = error instanceof Error ? error.message : String(error);
     receipt.error = `Unable to track tx execution: ${message}`;
+    return receipt;
   }
-  return receipt;
+  return toTxWaitReceipt(hash, executed);
 }

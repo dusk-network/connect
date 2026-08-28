@@ -35,9 +35,5 @@ export function strip0x(hex: string): string {
 
 /** Shallowly remove keys with `undefined` values. */
 export function compact(obj: Record<string, any>): any {
-  const out: any = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) out[k] = v;
-  }
-  return out;
+  return Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined));
 }
