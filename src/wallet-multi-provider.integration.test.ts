@@ -15,6 +15,45 @@ describe("integration: multi-provider wallet selection", () => {
     window.localStorage.clear();
   });
 
+  it("does not replace a selected provider with a UUID collision", async () => {
+    const selected = installReferenceWallet({
+      info: {
+        uuid: "com.example.wallet",
+        name: "Selected Wallet",
+        rdns: "com.example.wallet",
+      },
+      accounts: ["dusk1selected111111111111111111111111111111111111111"],
+      announceOnStart: false,
+    });
+    const wallet = createDuskWallet();
+    await wallet.ready();
+    expect(wallet.provider).toBe(selected.provider);
+
+    const collision = installReferenceWallet({
+      info: {
+        uuid: "com.example.wallet",
+        name: "Colliding Wallet",
+        rdns: "com.example.collision",
+      },
+      accounts: ["dusk1collision1111111111111111111111111111111111111"],
+      announceOnStart: false,
+    });
+    collision.announce();
+    await Promise.resolve();
+
+    expect(wallet.provider).toBe(selected.provider);
+    expect(wallet.providerInfo?.name).toBe("Selected Wallet");
+
+    selected.info.name = "Updated Selected Wallet";
+    selected.announce();
+    await Promise.resolve();
+    expect(wallet.providerInfo?.name).toBe("Updated Selected Wallet");
+
+    wallet.destroy();
+    selected.cleanup();
+    collision.cleanup();
+  });
+
   it("keeps provider selection deterministic when multiple wallets coexist", async () => {
     const primary = installReferenceWallet({
       info: {

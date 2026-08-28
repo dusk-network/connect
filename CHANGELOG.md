@@ -13,9 +13,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
-- Reported unsupported transaction execution payloads as unknown instead of successful [#26].
 - Prevented contract proxy facets from being treated as promises [#28].
-
+- Reported unsupported transaction execution payloads as unknown instead of successful [#26].
+- Preserved explicit wallet selection when a provider UUID collides [#25].
 
 ## [0.2.0] - 2026-07-04
 
@@ -72,6 +72,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 [#28]: https://github.com/dusk-network/connect/issues/28
 [#26]: https://github.com/dusk-network/connect/issues/26
+[#25]: https://github.com/dusk-network/connect/issues/25
 
 [Unreleased]: https://github.com/dusk-network/connect/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/dusk-network/connect/compare/v0.1.0...v0.2.0

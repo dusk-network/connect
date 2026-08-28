@@ -51,7 +51,8 @@ export function isDuskProvider(value: any): value is DuskProvider {
     typeof value === "object" &&
     (value as any).isDusk === true &&
     typeof (value as any).request === "function" &&
-    typeof (value as any).on === "function"
+    typeof (value as any).on === "function" &&
+    typeof (value as any).off === "function"
   );
 }
 
