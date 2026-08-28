@@ -1,26 +1,31 @@
 import type { DuskNodeClient, TxExecutedEvent } from "../node.js";
 import type { TxWaitReceipt, WaitForTxOptions } from "../types.js";
 
-/** Infer whether a RUES transaction event represents successful execution. */
-export function inferTxOk(payload: unknown): boolean {
-  // Best-effort: node/w3sper versions vary.
-  // Common patterns:
-  // - { success: false }
-  // - { err: ... }
-  // - { error: ... }
-  // - { result: { err/error } }
-  try {
-    if (!payload || typeof payload !== "object") return true;
-    const p: any = payload;
-    if (p.success === false) return false;
-    if (p.err) return false;
-    if (p.error) return false;
-    if (p.result?.err) return false;
-    if (p.result?.error) return false;
-    return true;
-  } catch {
+/** Infer the outcome reported by a RUES transaction event. */
+export function inferTxOk(payload: unknown): boolean | null {
+  if (!payload || typeof payload !== "object" || payload instanceof Uint8Array) {
+    return null;
+  }
+
+  const value = payload as any;
+  if (
+    value.success === false ||
+    value.result?.success === false ||
+    value.error ||
+    value.result?.err ||
+    value.result?.error
+  ) {
+    return false;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, "err")) {
+    if (value.err === null) return true;
+    if (value.err !== undefined) return false;
+    return null;
+  }
+  if (value.success === true || value.result?.success === true) {
     return true;
   }
+  return null;
 }
 
 /** Extract a best-effort error message from a RUES transaction event payload. */
@@ -55,13 +60,17 @@ export function toTxWaitReceipt(hash: string, executed: TxExecutedEvent | null):
   }
 
   const ok = inferTxOk(executed.payload);
-  const err = ok ? "" : inferTxError(executed.payload);
+  const error = ok === false
+    ? inferTxError(executed.payload)
+    : ok === null
+      ? "Unrecognized transaction execution payload"
+      : "";
 
   return {
     hash: h,
-    status: ok ? "executed" : "failed",
+    status: ok === false ? "failed" : "executed",
     ok,
-    ...(err ? { error: err } : {}),
+    ...(error ? { error } : {}),
     event: executed,
   };
 }
@@ -72,19 +81,15 @@ export async function waitForTxReceipt(
   hash: string,
   options?: WaitForTxOptions
 ): Promise<TxWaitReceipt> {
-  let executed: TxExecutedEvent | null = null;
-  let waitError: unknown = null;
+  let executed: TxExecutedEvent | null;
   try {
     executed = await node.waitForTxExecuted(hash, options);
   } catch (error) {
     if (options?.signal?.aborted) throw error;
-    waitError = error;
-  }
-
-  const receipt = toTxWaitReceipt(hash, executed);
-  if (waitError && receipt.status === "timeout") {
-    const message = waitError instanceof Error ? waitError.message : String(waitError);
+    const receipt = toTxWaitReceipt(hash, null);
+    const message = error instanceof Error ? error.message : String(error);
     receipt.error = `Unable to track tx execution: ${message}`;
+    return receipt;
   }
-  return receipt;
+  return toTxWaitReceipt(hash, executed);
 }

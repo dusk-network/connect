@@ -540,21 +540,23 @@ async function sendTx(fnName, args) {
         log(`executing: ${u.hash}`);
       } else {
         const ok = u.receipt?.ok;
-        setBadge(ui.txBadge, ok ? "ok" : "err", u.status);
-        log(`${u.status}: ${u.hash}`);
-        if (!ok && u.receipt?.error) log(`error: ${u.receipt.error}`);
+        setBadge(ui.txBadge, ok === null ? "warn" : ok ? "ok" : "err", ok === null ? "unknown" : u.status);
+        log(`${ok === null ? "unknown" : u.status}: ${u.hash}`);
+        if (ok !== true && u.receipt?.error) log(`error: ${u.receipt.error}`);
       }
     });
 
     const receipt = await tx.wait({ timeoutMs: 90_000 });
     unsub?.();
 
-    if (receipt.ok) {
+    if (receipt.ok === true) {
       log("executed ✅");
-      await syncLight();
+    } else if (receipt.ok === null) {
+      log("execution outcome is unknown");
     } else {
       log("tx failed ❌");
     }
+    if (receipt.ok !== false) await syncLight();
   } catch (e) {
     setBadge(ui.txBadge, "err", "error");
     log(`tx error: ${fmtError(e)}`);
