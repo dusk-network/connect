@@ -98,7 +98,18 @@ export type TxStatusUpdate =
  * This is similar to `viem`'s `waitForTransactionReceipt`, but bundled with
  * the tx hash so examples can stay tight.
  */
+export type TxOrigin = {
+  readonly providerId: string | null;
+  readonly selectionEpoch: number;
+  readonly networkEpoch: number;
+  readonly chainId: ChainId | null;
+  readonly nodeUrl: string;
+};
+
 export type TxHandle = TxResult & {
+  /** Immutable submission context used for execution tracking. */
+  readonly origin: TxOrigin;
+
   /** Wait until the tx is executed (or timeout). */
   wait(options?: WaitForTxOptions): Promise<TxWaitReceipt>;
   /** Alias for `wait()` */

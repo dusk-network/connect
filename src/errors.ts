@@ -1,3 +1,5 @@
+import type { TxOrigin } from "./types.js";
+
 /**
  * Minimal EIP-1193-ish / JSON-RPC-ish error helpers.
  *
@@ -89,6 +91,27 @@ export class DuskWalletProviderSelectionError extends DuskSdkError {
   constructor(message = "Select a Dusk wallet provider before making requests") {
     super(message, { code: ERROR_CODES.UNSUPPORTED });
     this.name = "DuskWalletProviderSelectionError";
+  }
+}
+
+/** Raised when an operation's selected provider changes before it completes. */
+export class DuskWalletProviderChangedError extends DuskSdkError {
+  constructor(message = "Selected Dusk wallet provider changed during the operation") {
+    super(message, { code: ERROR_CODES.DISCONNECTED });
+    this.name = "DuskWalletProviderChangedError";
+  }
+}
+
+/** Raised when a submitted transaction cannot safely be tracked on its origin node. */
+export class DuskTxTrackingUnavailableError extends DuskSdkError {
+  readonly hash: string;
+  readonly origin: TxOrigin;
+
+  constructor(hash: string, origin: TxOrigin) {
+    super("Transaction execution cannot be safely tracked on its submission node", { data: { hash, origin } });
+    this.name = "DuskTxTrackingUnavailableError";
+    this.hash = hash;
+    this.origin = origin;
   }
 }
 

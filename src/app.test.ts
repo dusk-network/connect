@@ -90,7 +90,7 @@ describe("app facade", () => {
       autoRefresh: false,
     });
     const nodeClient = {
-      getBaseUrl: vi.fn(() => "https://nodes.dusk.network"),
+      getBaseUrl: vi.fn(() => "https://testnet.nodes.dusk.network"),
       contractCall: vi.fn(async () => new TextEncoder().encode("node-result")),
       waitForTxExecuted: vi.fn(async () => ({
         headers: new Headers(),

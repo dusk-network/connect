@@ -5,6 +5,7 @@ import type {
   PrivacyMode,
   SwitchChainParams,
   TxHandle,
+  TxOrigin,
   TxStatusUpdate,
   TxWaitReceipt,
   WaitForTxOptions,
@@ -14,9 +15,10 @@ import type { DuskDataDriver } from "./driver.js";
 import type { ContractCallOptions, DuskNodeClient } from "./node.js";
 
 import { bytesToHex } from "./bytes.js";
+import { DuskTxTrackingUnavailableError, DuskWalletProviderChangedError } from "./errors.js";
 import { ensureChain } from "./ensureChain.js";
 import { normalizeContractId0x } from "./internal/contractId.js";
-import { compact } from "./internal/normalize.js";
+import { compact, normalizeBaseUrl, normalizeCaip2ChainId } from "./internal/normalize.js";
 import { waitForTxReceipt } from "./internal/tx.js";
 
 /** Optional wallet transaction fields for a contract call. */
@@ -192,20 +194,60 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
 
       const autoConnect = writeOpts?.autoConnect ?? opts.autoConnect ?? true;
       const chainTarget = writeOpts?.chain ?? opts.chain;
+      let provider = wallet.provider;
+      if (!provider) {
+        await wallet.ready?.();
+        provider = wallet.provider;
+      }
+      const selection = { provider, epoch: wallet.selectionEpoch };
+      const assertSelection = () => {
+        if (wallet.provider !== selection.provider || wallet.selectionEpoch !== selection.epoch) {
+          throw new DuskWalletProviderChangedError();
+        }
+      };
+
+      if (!wallet.state.node) {
+        await wallet.ready?.();
+        assertSelection();
+      }
 
       if (autoConnect && !wallet.state.authorized) {
         await wallet.connect();
+        assertSelection();
       }
 
       if (chainTarget) {
-        await ensureChain(wallet, chainTarget);
+        await ensureChain(wallet, chainTarget, { selection });
       }
 
       // `writeOpts` can include non-tx fields (autoConnect/chain). Strip them.
       const { autoConnect: _ac, chain: _chain, ...txOverrides } = (writeOpts ?? {}) as any;
       const txParams = await (tx as any)[fnName](args, txOverrides);
+      assertSelection();
 
+      const walletNode = wallet.state.node;
+      const walletNodeUrl = walletNode?.chainId === wallet.state.chainId ? walletNode.nodeUrl : "";
+      const nodeUrl = walletNodeUrl ? normalizeBaseUrl(walletNodeUrl) : "";
+      const targetConfirmed =
+        (!chainTarget?.chainId ||
+          normalizeCaip2ChainId(chainTarget.chainId) === normalizeCaip2ChainId(wallet.state.chainId ?? "")) &&
+        (!chainTarget?.nodeUrl || normalizeBaseUrl(chainTarget.nodeUrl) === nodeUrl);
+      const origin: TxOrigin = Object.freeze({
+        providerId: wallet.state.providerId ?? null,
+        selectionEpoch: selection.epoch,
+        networkEpoch: wallet.networkEpoch ?? 0,
+        chainId: wallet.state.chainId ?? null,
+        nodeUrl: targetConfirmed ? nodeUrl : "",
+      });
+      const nodeMatchesOrigin = Boolean(
+        origin.nodeUrl && opts.node?.getBaseUrl?.() === origin.nodeUrl
+      );
+      const trackingNode = nodeMatchesOrigin ? opts.node?.pin?.(origin.nodeUrl) ?? opts.node : opts.node;
       const submitted = await wallet.sendContractCall(txParams);
+      const submissionContextChanged =
+        wallet.provider !== selection.provider ||
+        wallet.selectionEpoch !== selection.epoch ||
+        (wallet.networkEpoch ?? 0) !== origin.networkEpoch;
       const hash = String(submitted?.hash ?? "");
       const submittedNonce = String((submitted as any)?.nonce ?? "");
 
@@ -283,8 +325,13 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
 
       const wait: TxHandle["wait"] = async (options?: WaitForTxOptions) => {
         if (finalReceipt) return finalReceipt;
-        if (!opts.node) {
+        if (!trackingNode) {
           throw new Error("tx.wait requires a node client (pass `node` when creating the contract facade)");
+        }
+        const unpinnedEndpointChanged =
+          trackingNode === opts.node && origin.nodeUrl && opts.node!.getBaseUrl() !== origin.nodeUrl;
+        if (!nodeMatchesOrigin || submissionContextChanged || unpinnedEndpointChanged) {
+          throw new DuskTxTrackingUnavailableError(hash, origin);
         }
 
         if (currentStatus.status === "submitted" || currentStatus.status === "timeout") {
@@ -293,7 +340,7 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
 
         activeWaits++;
         try {
-          const receipt = await waitForTxReceipt(opts.node, hash, options);
+          const receipt = await waitForTxReceipt(trackingNode, hash, options);
           activeWaits--;
           if (finalReceipt) return finalReceipt;
           if (receipt.status === "timeout" && activeWaits > 0) {
@@ -324,7 +371,7 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
 
       const waitExecuted: TxHandle["waitExecuted"] = (options?: WaitForTxOptions) => wait(options);
 
-      return Object.assign(submitted, { wait, waitExecuted, onStatus });
+      return Object.assign(submitted, { origin, wait, waitExecuted, onStatus });
     };
   });
 
