@@ -35,6 +35,10 @@
     "./ui": {
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"
+    },
+    "./typed-data": {
+      "types": "./dist/typed-data/index.d.ts",
+      "import": "./dist/typed-data/index.js"
     }
   },
   "files": [
@@ -45,6 +49,9 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.8.0"
   },
   "scripts": {
     "clean": "rm -rf dist",
