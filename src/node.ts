@@ -1,5 +1,5 @@
 import { toBytes } from "./bytes.js";
-import { normalizeBaseUrl, strip0x } from "./internal/normalize.js";
+import { normalizeBaseUrl, normalizeTxHash, strip0x } from "./internal/normalize.js";
 
 /** Options for low-level read-only contract calls through Rusk HTTP. */
 export type ContractCallOptions = {
@@ -109,8 +109,8 @@ function parseRuesFrame(data: ArrayBuffer): { headers: Headers; payload: unknown
   const body = new Uint8Array(data, 4 + headersLen);
   const ct = String(headers.get("content-type") || "");
 
-  // Try to decode JSON payloads, otherwise return bytes.
-  if (/json/i.test(ct)) {
+  // Rusk may omit the content type for JSON execution events.
+  if (/json/i.test(ct) || body[0] === 0x7b || body[0] === 0x5b) {
     try {
       return { headers, payload: JSON.parse(new TextDecoder().decode(body)) };
     } catch {
@@ -241,8 +241,7 @@ return await f(url, init);
     const base = getBaseUrl();
     if (!base) throw new Error("DuskNodeClient: baseUrl is empty");
 
-    const tx = strip0x(String(hash || "").trim()).toLowerCase();
-    if (!tx) return null;
+    const tx = normalizeTxHash(hash);
 
     if (typeof WebSocket === "undefined") {
       throw new Error("waitForTxExecuted requires WebSocket support (browser environment)");
@@ -259,11 +258,11 @@ return await f(url, init);
     return await new Promise<TxExecutedEvent | null>((resolve, reject) => {
       let finished = false;
       let sessionId: string | null = null;
-      let subscribed = false;
       let keepAliveId: any;
       let timeoutId: any;
 
       const ws = new WebSocket(wsUrl);
+      const subscriptionController = new AbortController();
       ws.binaryType = "arraybuffer";
 
       const cleanup = () => {
@@ -272,6 +271,7 @@ return await f(url, init);
 
         if (timeoutId) clearTimeout(timeoutId);
         if (keepAliveId) clearInterval(keepAliveId);
+        subscriptionController.abort();
 
         try {
           ws.close();
@@ -311,7 +311,25 @@ return await f(url, init);
         fail(new Error("RUES websocket closed"));
       });
 
+      const handleFrame = (data: ArrayBuffer) => {
+        const { headers, payload } = parseRuesFrame(data);
+        const location = headers.get("content-location");
+        if (!location) return;
+
+        let pathname: string;
+        try {
+          pathname = new URL(location, base).pathname.toLowerCase();
+        } catch {
+          return;
+        }
+        if (pathname !== `/on/transactions:${tx}/executed`) return;
+
+        cleanup();
+        resolve({ headers, payload });
+      };
+
       ws.addEventListener("message", async (ev) => {
+        if (finished) return;
         try {
           // The first ws message is the session id (string) in RUES.
           if (!sessionId) {
@@ -325,23 +343,11 @@ return await f(url, init);
               }
             }, RUES_KEEP_ALIVE_MS);
 
-            await subscribeRues(f, topicUrl, sessionId, signal);
-            subscribed = true;
+            await subscribeRues(f, topicUrl, sessionId, subscriptionController.signal);
             return;
           }
 
-          if (!subscribed) return;
-          if (!(ev.data instanceof ArrayBuffer)) return;
-
-          const { headers, payload } = parseRuesFrame(ev.data);
-          const loc = String(headers.get("content-location") || "").toLowerCase();
-
-          // When subscribed to `/transactions:<id>/Executed` we *should* only get this tx,
-          // but keep a small guard so we don't resolve on unrelated frames.
-          if (!loc || !loc.includes(tx)) return;
-
-          cleanup();
-          resolve({ headers, payload });
+          if (ev.data instanceof ArrayBuffer) handleFrame(ev.data);
         } catch (e) {
           fail(e);
         }

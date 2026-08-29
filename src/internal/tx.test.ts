@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { inferTxError, inferTxOk, toTxWaitReceipt, waitForTxReceipt } from "./tx.js";
+
+const txHash = "0x" + "ab".repeat(32);
 
 describe("internal tx helpers", () => {
   it("only reports success for recognized payloads", () => {
@@ -29,7 +31,7 @@ describe("internal tx helpers", () => {
   it("waits for success, normalizes transport errors, and preserves aborts", async () => {
     const event = { headers: new Headers(), payload: { success: true } };
     await expect(
-      waitForTxReceipt({ waitForTxExecuted: async () => event }, "0xabc")
+      waitForTxReceipt({ waitForTxExecuted: async () => event }, txHash)
     ).resolves.toMatchObject({ status: "executed", ok: true, event });
 
     const node = {
@@ -37,14 +39,18 @@ describe("internal tx helpers", () => {
         throw new Error("socket down");
       },
     };
-    await expect(waitForTxReceipt(node, "0xabc")).resolves.toMatchObject({
+    await expect(waitForTxReceipt(node, txHash)).resolves.toMatchObject({
       status: "timeout",
       error: "Unable to track tx execution: socket down",
     });
 
     const controller = new AbortController();
     controller.abort();
-    await expect(waitForTxReceipt(node, "0xabc", { signal: controller.signal })).rejects.toThrow("socket down");
+    await expect(waitForTxReceipt(node, txHash, { signal: controller.signal })).rejects.toThrow("socket down");
+
+    const waitForTxExecuted = vi.fn();
+    await expect(waitForTxReceipt({ waitForTxExecuted }, "abc")).rejects.toThrow(/64 hex characters/);
+    expect(waitForTxExecuted).not.toHaveBeenCalled();
   });
 
   it("builds timeout and executed receipts", () => {

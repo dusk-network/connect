@@ -80,6 +80,9 @@ describe("app facade", () => {
       accounts: ["dusk1appacct"],
       authorized: false,
       chainId: "dusk:2",
+      responses: {
+        dusk_sendTransaction: () => ({ hash: "0x" + "ab".repeat(32), nonce: "7" }),
+      },
     });
     const wallet = createDuskWallet({
       provider,
@@ -205,7 +208,7 @@ describe("app facade", () => {
     fetchWasmDataDriverMock.mockResolvedValue(createDriverStub());
 
     const app = createDuskApp();
-    await expect(app.waitForTxReceipt("0xdeadbeef")).resolves.toMatchObject({
+    await expect(app.waitForTxReceipt("0x" + "ab".repeat(32))).resolves.toMatchObject({
       status: "timeout",
       ok: false,
       error: expect.stringContaining("Unable to track tx execution: rues unavailable"),
