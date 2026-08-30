@@ -39,6 +39,10 @@
     "./typed-data": {
       "types": "./dist/typed-data/index.d.ts",
       "import": "./dist/typed-data/index.js"
+    },
+    "./bls": {
+      "types": "./dist/bls/index.d.ts",
+      "import": "./dist/bls/index.js"
     }
   },
   "files": [
@@ -51,6 +55,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0"
   },
   "scripts": {
@@ -60,6 +65,7 @@
     "test:watch": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "generate:typed-data-vectors": "node scripts/generate-typed-data-vectors.ts",
     "ci": "npm run build && npm run test:coverage",
     "prepack": "npm run build"
   },
