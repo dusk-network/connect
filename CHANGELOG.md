@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Added validated conversion between Base58 Moonlight accounts and `0x` public-key hex [#92].
+
 ### Changed
 
 - Made `TxWaitReceipt.ok` nullable for unrecognized execution payloads [#26].
@@ -77,6 +81,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 [#26]: https://github.com/dusk-network/connect/issues/26
 [#25]: https://github.com/dusk-network/connect/issues/25
 [#24]: https://github.com/dusk-network/connect/issues/24
+[#92]: https://github.com/dusk-network/wallet/issues/92
 
 [Unreleased]: https://github.com/dusk-network/connect/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/dusk-network/connect/compare/v0.1.0...v0.2.0

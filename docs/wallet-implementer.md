@@ -64,6 +64,11 @@ type DuskProfile = {
 };
 ```
 
+`account` is the Base58 encoding of the profile's 96-byte compressed Moonlight
+BLS public key. Connect exposes `accountToHex(account)` and
+`hexToAccount(publicKey)` for validated conversion without a second profile
+disclosure.
+
 ## RPC Method Summary
 
 The wallet repo's provider API is the canonical source for method parameters,

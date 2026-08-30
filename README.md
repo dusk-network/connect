@@ -50,6 +50,10 @@ Wallet discovery is **event-based**, not singleton-based:
   contract digest. See the
   [wallet provider documentation](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md#dusk_signmessage)
   and [wallet issue #90](https://github.com/dusk-network/wallet/issues/90).
+- A connected profile's Base58 `account` is its 96-byte compressed Moonlight
+  public key. Use `accountToHex(account)` for contract-ready `0x` hex and
+  `hexToAccount(publicKey)` for the reverse conversion; neither requires
+  another wallet permission.
 - `wallet.sendContractCall()` accepts the documented `ByteLike` inputs and
   normalizes `fnArgs` to `0x`-hex before crossing the extension provider
   boundary. Site-provided `display` metadata is unverified approval context;
