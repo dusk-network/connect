@@ -16,5 +16,5 @@
     "useUnknownInCatchVariables": true,
     "skipLibCheck": true
   },
-  "files": ["src/index.ts", "src/testing.ts", "src/ui.ts"]
+  "files": ["src/index.ts", "src/testing.ts", "src/ui.ts", "src/typed-data/index.ts", "src/bls/index.ts"]
 }
