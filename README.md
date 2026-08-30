@@ -38,6 +38,23 @@ Wallet discovery is **event-based**, not singleton-based:
 - `dusk_signAuth`
 - `dusk_disconnect`
 
+## Provider integration notes
+
+- Chain IDs are CAIP-2 strings such as `dusk:2`, not bare decimal or
+  hexadecimal numbers. Parse the numeric component with
+  `/^dusk:(\d+)$/i.exec(chainId.trim())` only when a numeric protocol value is
+  required.
+- `wallet.signMessage()` and `wallet.signAuth()` request domain-separated
+  Moonlight memo signatures from the selected provider. They do not produce a
+  raw BLS short-signature over caller bytes and cannot verify against a raw
+  contract digest. See the
+  [wallet provider documentation](https://github.com/dusk-network/wallet/blob/main/docs/provider-api.md#dusk_signmessage)
+  and [wallet issue #90](https://github.com/dusk-network/wallet/issues/90).
+- `wallet.sendContractCall()` accepts the documented `ByteLike` inputs and
+  normalizes `fnArgs` to `0x`-hex before crossing the extension provider
+  boundary. Site-provided `display` metadata is unverified approval context;
+  contract IDs, amounts, and opaque arguments still require user verification.
+
 ## Vanilla demo
 
 A no-bundler demo lives at `examples/vanilla/` and imports the SDK directly from `dist/`.
@@ -267,8 +284,10 @@ const tx = await wallet.sendContractCall({
   privacy: "public",
   contractId: "0x" + "02".padEnd(64, "0"), // 32 bytes
   fnName: "get_version",
-  fnArgs: "0x", // opaque bytes (hex/number[]/Uint8Array/ArrayBuffer supported)
-  display: { contractName: "Example", methodSig: "get_version()" },
+  // Connect accepts ByteLike here and sends transport-safe 0x-hex to the wallet.
+  fnArgs: new Uint8Array(),
+  // Shown as site-provided, unverified approval context.
+  display: { label: "Read contract version" },
 });
 
 console.log("tx", tx.hash);
