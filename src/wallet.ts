@@ -274,7 +274,12 @@ export class DuskWallet {
 
   private _onProfilesChanged = (profiles: DuskProviderEventMap["profilesChanged"]) => {
     // A locked provider may clear profiles without revoking site permission.
-    if (Array.isArray(profiles) && profiles.length === 0 && (this._state.authorized || this._provider?.isAuthorized)) this._sessionEpoch++;
+    if (
+      Array.isArray(profiles) && profiles.length === 0 &&
+      (this._state.authorized || this._provider?.isAuthorized)
+    ) {
+      this._sessionEpoch++;
+    }
     this._setProfiles(profiles);
   };
 
