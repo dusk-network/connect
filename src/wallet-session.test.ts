@@ -31,6 +31,69 @@ describe("same-provider session and network changes", () => {
     }
   );
 
+  it.each(["getProfiles", "connect"] as const)("an old disconnect response does not invalidate a newer %s", async (method) => {
+    const provider = createMockProvider({ authorized: true });
+    const wallet = createDuskWallet({ provider, autoRefresh: false });
+    await wallet.ready();
+    let releaseDisconnect!: (value: boolean) => void;
+    provider.setResponse("dusk_disconnect", () => {
+      provider.setAuthorized(false);
+      return new Promise<boolean>(resolve => { releaseDisconnect = resolve; });
+    });
+    const disconnect = wallet.disconnect();
+    let releaseProfiles: (value: DuskProfile[]) => void = () => {};
+    try {
+      if (method === "getProfiles") {
+        provider.setResponse("dusk_profiles", () => new Promise<DuskProfile[]>(resolve => { releaseProfiles = resolve; }));
+      }
+      const fresh = wallet[method]();
+      // Attach the expectation before delivering either late response.
+      const expectation = expect(fresh).resolves.toBeInstanceOf(Array);
+      if (method === "connect") await fresh;
+      releaseDisconnect(true);
+      await disconnect;
+      releaseProfiles([]);
+      await expectation;
+      expect(wallet.state.authorized).toBe(method === "connect");
+    } finally { releaseDisconnect(true); releaseProfiles([]); await disconnect; wallet.destroy(); }
+  });
+
+  it("discards older reads on a failed disconnect intent without claiming permission was revoked", async () => {
+    const provider = createMockProvider({ authorized: true });
+    const wallet = createDuskWallet({ provider, autoRefresh: false });
+    await wallet.ready();
+    const snapshot = wallet.state.profiles;
+    let release!: (profiles: DuskProfile[]) => void;
+    provider.setResponse("dusk_profiles", () => new Promise<DuskProfile[]>(resolve => { release = resolve; }));
+    provider.setResponse("dusk_disconnect", () => { throw new Error("Offline"); });
+    const pending = wallet.getProfiles();
+    const rejected = expect(pending).rejects.toThrow("session changed");
+    try {
+      await expect(wallet.disconnect()).rejects.toThrow("Offline");
+      release(snapshot);
+      await rejected;
+      expect(wallet.state.authorized).toBe(true);
+      provider.setResponse("dusk_profiles", undefined);
+      await expect(wallet.getProfiles()).resolves.toEqual(snapshot);
+    } finally { release(snapshot); await pending.catch(() => {}); wallet.destroy(); }
+  });
+
+  it("a disconnect event invalidates a pending first connection even if state was already empty", async () => {
+    const provider = createMockProvider();
+    const wallet = createDuskWallet({ provider, autoRefresh: false });
+    await wallet.ready();
+    let release!: (profiles: DuskProfile[]) => void;
+    provider.setResponse("dusk_requestProfiles", () => new Promise<DuskProfile[]>(resolve => { release = resolve; }));
+    const pending = wallet.connect();
+    const expectation = expect(pending).rejects.toThrow("session changed");
+    try {
+      provider.emit("disconnect", { code: 4900, message: "Disconnected" });
+      release([{ profileId: "profile:0", account: "old-account" }]);
+      await expectation;
+      expect(wallet.state).toMatchObject({ authorized: false, profiles: [] });
+    } finally { release([]); await pending.catch(() => {}); wallet.destroy(); }
+  });
+
   it("keeps profiles cleared when a provider locks without revoking permission", async () => {
     const provider = createMockProvider({ authorized: true });
     const wallet = createDuskWallet({ provider, autoRefresh: false });

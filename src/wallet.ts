@@ -234,7 +234,6 @@ export class DuskWallet {
   }
 
   private _setDisconnected() {
-    this._sessionEpoch++;
     if (
       !this._state.authorized &&
       this._state.accounts.length === 0 &&
@@ -268,12 +267,13 @@ export class DuskWallet {
   };
 
   private _onDisconnect = (_payload: DuskProviderEventMap["disconnect"]) => {
+    this._sessionEpoch++;
     this._setDisconnected();
   };
 
   private _onProfilesChanged = (profiles: DuskProviderEventMap["profilesChanged"]) => {
     // A locked provider may clear profiles without revoking site permission.
-    if (Array.isArray(profiles) && profiles.length === 0) this._sessionEpoch++;
+    if (Array.isArray(profiles) && profiles.length === 0 && (this._state.authorized || this._provider?.isAuthorized)) this._sessionEpoch++;
     this._setProfiles(profiles);
   };
 
@@ -769,7 +769,7 @@ export class DuskWallet {
   /** Prompt the user to connect and return approved profile pairs. */
   async requestProfiles(options?: ConnectOptions): Promise<DuskProfile[]> {
     const { provider, epoch } = this._captureSelection();
-    const sessionEpoch = this._sessionEpoch;
+    const sessionEpoch = ++this._sessionEpoch;
     const params = options && Object.keys(options).length > 0 ? options : undefined;
     const profilesRaw = await this._requestForSelection<DuskProfile[]>(
       provider,
@@ -791,10 +791,12 @@ export class DuskWallet {
   /** Revoke the site's connection permission. */
   async disconnect(): Promise<boolean> {
     const { provider, epoch } = this._captureSelection();
-    this._sessionEpoch++;
+    // Discard older reads as soon as revocation is requested, even if the RPC
+    // later fails. Do not let its delayed completion clear a newer connection.
+    const sessionEpoch = ++this._sessionEpoch;
     const res = await this._requestForSelection<boolean>(provider, epoch, "dusk_disconnect");
     this._assertCurrentSelection(provider, epoch);
-    this._setDisconnected();
+    if (sessionEpoch === this._sessionEpoch) this._setDisconnected();
     this._assertCurrentSelection(provider, epoch);
     return Boolean(res);
   }
