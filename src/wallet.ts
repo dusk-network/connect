@@ -183,6 +183,7 @@ export class DuskWallet {
   private _preferredProviderId: string | null = null;
   private _readySettled = false;
   private _selectionEpoch = 0;
+  private _sessionEpoch = 0;
   private _networkEpoch = 0;
   private _appEventHandlers = new Map<keyof DuskProviderEventMap, Set<(payload: any) => void>>();
 
@@ -233,6 +234,7 @@ export class DuskWallet {
   }
 
   private _setDisconnected() {
+    this._sessionEpoch++;
     if (
       !this._state.authorized &&
       this._state.accounts.length === 0 &&
@@ -270,6 +272,8 @@ export class DuskWallet {
   };
 
   private _onProfilesChanged = (profiles: DuskProviderEventMap["profilesChanged"]) => {
+    // A locked provider may clear profiles without revoking site permission.
+    if (Array.isArray(profiles) && profiles.length === 0) this._sessionEpoch++;
     this._setProfiles(profiles);
   };
 
@@ -533,9 +537,12 @@ export class DuskWallet {
     return { provider: this._requireProvider(), epoch: this._selectionEpoch };
   }
 
-  private _assertCurrentSelection(provider: DuskProvider, epoch: number): void {
+  private _assertCurrentSelection(provider: DuskProvider, epoch: number, sessionEpoch?: number): void {
     if (this._destroyed || provider !== this._provider || epoch !== this._selectionEpoch) {
       throw new DuskWalletProviderChangedError();
+    }
+    if (sessionEpoch !== undefined && sessionEpoch !== this._sessionEpoch) {
+      throw new DuskWalletDisconnectedError("Wallet session changed during request");
     }
   }
 
@@ -713,12 +720,17 @@ export class DuskWallet {
     }
 
     const epoch = this._selectionEpoch;
+    const sessionEpoch = this._sessionEpoch;
+    const networkEpoch = this._networkEpoch;
     const [caps, chainId, profiles] = await Promise.all([
       this._requestProvider<DuskProviderCapabilities>(p, "dusk_getCapabilities").catch(() => null),
       this._requestProvider<ChainId>(p, "dusk_chainId").catch(() => null),
       this._requestProvider<DuskProfile[]>(p, "dusk_profiles").catch(() => []),
     ]);
-    this._assertCurrentSelection(p, epoch);
+    this._assertCurrentSelection(p, epoch, sessionEpoch);
+    if (networkEpoch !== this._networkEpoch) {
+      throw new DuskWalletProviderChangedError("Wallet network changed during refresh");
+    }
 
     const nextChainId = typeof chainId === "string"
       ? chainId
@@ -744,7 +756,7 @@ export class DuskWallet {
     );
     this._setProfiles(profiles, { notify: false });
     this._notify();
-    this._assertCurrentSelection(p, epoch);
+    this._assertCurrentSelection(p, epoch, sessionEpoch);
 
     return this.state;
   }
@@ -757,6 +769,7 @@ export class DuskWallet {
   /** Prompt the user to connect and return approved profile pairs. */
   async requestProfiles(options?: ConnectOptions): Promise<DuskProfile[]> {
     const { provider, epoch } = this._captureSelection();
+    const sessionEpoch = this._sessionEpoch;
     const params = options && Object.keys(options).length > 0 ? options : undefined;
     const profilesRaw = await this._requestForSelection<DuskProfile[]>(
       provider,
@@ -764,13 +777,13 @@ export class DuskWallet {
       "dusk_requestProfiles",
       params
     );
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
     const profiles = this._profilesFrom(profilesRaw);
 
     this._patch({ authorized: true, chainId: this._provider?.chainId ?? this._state.chainId }, { notify: false });
     this._setProfiles(profiles, { notify: false });
     this._notify();
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
 
     return profiles;
   }
@@ -778,6 +791,7 @@ export class DuskWallet {
   /** Revoke the site's connection permission. */
   async disconnect(): Promise<boolean> {
     const { provider, epoch } = this._captureSelection();
+    this._sessionEpoch++;
     const res = await this._requestForSelection<boolean>(provider, epoch, "dusk_disconnect");
     this._assertCurrentSelection(provider, epoch);
     this._setDisconnected();
@@ -787,12 +801,13 @@ export class DuskWallet {
 
   async getProfiles(): Promise<DuskProfile[]> {
     const { provider, epoch } = this._captureSelection();
+    const sessionEpoch = this._sessionEpoch;
     const profiles = await this._requestForSelection<DuskProfile[]>(provider, epoch, "dusk_profiles");
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
     const next = this._profilesFrom(profiles);
     this._setProfiles(next, { notify: false });
     this._notify();
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
     return next;
   }
 
@@ -822,13 +837,14 @@ export class DuskWallet {
    */
   async requestShieldedAddress(params: RequestShieldedAddressParams = {}): Promise<Address> {
     const { provider, epoch } = this._captureSelection();
+    const sessionEpoch = this._sessionEpoch;
     const result = await this._requestForSelection<RequestShieldedAddressResponse>(
       provider,
       epoch,
       "dusk_requestShieldedAddress",
       params
     );
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
     const address = typeof result === "string" ? result : result?.address;
     const trimmed = typeof address === "string" ? address.trim() : "";
     if (!trimmed) {
@@ -879,7 +895,7 @@ export class DuskWallet {
       this._notify();
     }
 
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
     return trimmed;
   }
 
