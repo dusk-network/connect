@@ -15,13 +15,13 @@ describe("same-provider session and network changes", () => {
       let release!: (profiles: DuskProfile[]) => void;
       const delayed = new Promise<DuskProfile[]>((resolve) => { release = resolve; });
       provider.setResponse(method === "connect" ? "dusk_requestProfiles" : "dusk_profiles", () => delayed);
-      const pending = wallet[method]().catch(() => undefined);
+      const pending = wallet[method]().catch(error => error);
       try {
         await wallet.disconnect();
         expect(wallet.state.accounts).toEqual([]);
         expect(provider.isAuthorized).toBe(false);
         release(snapshot);
-        await pending;
+        expect(await pending).toMatchObject({ name: "DuskSdkError", data: { reason: "session_changed" } });
         expect(wallet.state).toMatchObject({ authorized: false, accounts: [], profiles: [] });
       } finally {
         release(snapshot);
@@ -138,13 +138,13 @@ describe("same-provider session and network changes", () => {
     await wallet.ready();
     let release!: (chain: string) => void;
     provider.setResponse("dusk_chainId", () => new Promise<string>((resolve) => { release = resolve; }));
-    const pending = wallet.refresh().catch(() => undefined);
+    const pending = wallet.refresh().catch(error => error);
     try {
       provider.setChainId("dusk:3");
       provider.emit("duskNodeChanged", { chainId: "dusk:3", nodeUrl: "https://nodes.dusk.network", networkName: "Mainnet" });
       expect(wallet.state.chainId).toBe("dusk:3");
       release("dusk:2");
-      await pending;
+      expect(await pending).toMatchObject({ name: "DuskSdkError", data: { reason: "network_changed" } });
       expect(wallet.state).toMatchObject({
         chainId: "dusk:3",
         node: { nodeUrl: "https://nodes.dusk.network" },

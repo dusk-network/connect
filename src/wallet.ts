@@ -25,6 +25,7 @@ import type {
 } from "./types.js";
 
 import {
+  DuskSdkError,
   DuskWalletDisconnectedError,
   DuskWalletNotInstalledError,
   DuskWalletProviderChangedError,
@@ -542,7 +543,7 @@ export class DuskWallet {
       throw new DuskWalletProviderChangedError();
     }
     if (sessionEpoch !== undefined && sessionEpoch !== this._sessionEpoch) {
-      throw new DuskWalletDisconnectedError("Wallet session changed during request");
+      throw new DuskSdkError("Wallet session changed during request", { data: { reason: "session_changed" } });
     }
   }
 
@@ -729,7 +730,7 @@ export class DuskWallet {
     ]);
     this._assertCurrentSelection(p, epoch, sessionEpoch);
     if (networkEpoch !== this._networkEpoch) {
-      throw new DuskWalletProviderChangedError("Wallet network changed during refresh");
+      throw new DuskSdkError("Wallet network changed during refresh", { data: { reason: "network_changed" } });
     }
 
     const nextChainId = typeof chainId === "string"
