@@ -35,47 +35,7 @@ import {
   type HashTypedDataInput,
   type TypedDataErrorCode,
 } from "../src/typed-data/hash.ts";
-import { bytesToHex, hexToBytes } from "../src/bytes.ts";
-import { register } from "node:module";
-
-// src/bls/sig.ts (which exports the SIG_TAG constant this generator reuses,
-// per spec 12.1) is itself written with `.js`-suffixed relative specifiers
-// (e.g. `from "../bytes.js"`), the convention `src/` uses for tsc/bundler
-// (Bundler moduleResolution) consumers - both this repo's own build and the
-// vitest-based regeneration test (vectors.generated.test.ts) understand that
-// convention. Node's native TypeScript execution, used when this file is run
-// directly (`node scripts/generate-typed-data-vectors.ts`), does not: it
-// resolves specifiers literally, so `sig.ts`'s own `"../bytes.js"` fails to
-// resolve (no `bytes.js` file exists, only `bytes.ts`). Rather than editing
-// sig.ts's specifiers (out of scope - it's shared, tsc/bundler-consumed
-// source), register a narrow resolution hook that retries a relative `.js`
-// specifier as `.ts` only when the literal `.js` file doesn't exist. This
-// only affects resolution performed by Node's own ESM loader, so it is a
-// no-op under vitest, which resolves this file's imports through Vite's own
-// module graph rather than Node's loader.
-register(
-  `data:text/javascript,${encodeURIComponent(`
-    export async function resolve(specifier, context, nextResolve) {
-      if (specifier.startsWith(".") && specifier.endsWith(".js")) {
-        try {
-          return await nextResolve(specifier, context);
-        } catch (err) {
-          if (err && err.code === "ERR_MODULE_NOT_FOUND") {
-            return nextResolve(specifier.slice(0, -3) + ".ts", context);
-          }
-          throw err;
-        }
-      }
-      return nextResolve(specifier, context);
-    }
-  `)}`,
-  import.meta.url
-);
-
-// Dynamic + awaited so it runs after the resolution hook above is
-// registered - a static `import ... from "../src/bls/sig.ts"` would resolve
-// (and fail) before this module's body ever runs.
-const { TYPED_DATA_SIG_TAG }: { TYPED_DATA_SIG_TAG: string } = await import("../src/bls/sig.ts");
+import { bytesToHex } from "../src/bytes.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ACCEPT_DIR = path.join(ROOT, "vectors/typed-data-v1");
@@ -83,20 +43,8 @@ const REJECT_DIR = path.join(ACCEPT_DIR, "reject");
 
 const ZERO32 = `0x${"00".repeat(32)}`;
 
-// Spec section 12.1: signedMessage = SIG_TAG || digest (55 bytes). Reuses the
-// single source of truth for SIG_TAG (src/bls/sig.ts) rather than
-// re-declaring the tag string here, so there is exactly one definition of
-// the tag in the repo.
-const SIG_TAG_BYTES = new TextEncoder().encode(TYPED_DATA_SIG_TAG);
-
-/** `0x` + 110 lowercase hex chars: "0x" || hex(SIG_TAG || digest) (spec 12.1). */
-function signedMessageHexFromDigestHex(digestHex: `0x${string}`): `0x${string}` {
-  const digestBytes = hexToBytes(digestHex);
-  const signedMessageBytes = new Uint8Array(SIG_TAG_BYTES.length + digestBytes.length);
-  signedMessageBytes.set(SIG_TAG_BYTES, 0);
-  signedMessageBytes.set(digestBytes, SIG_TAG_BYTES.length);
-  return `0x${bytesToHex(signedMessageBytes)}`;
-}
+// Pin the v1 tag from spec 12.1 independently of the verifier's constant.
+const SIG_TAG_HEX = bytesToHex(new TextEncoder().encode("DUSK_TYPED_DATA_SIG_V1\0"));
 
 const DOMAIN_TYPES = {
   DuskTypedDataDomain: [
@@ -662,7 +610,7 @@ export function buildAcceptVectorFiles(): Record<string, string> {
       originBind: debug.originBind,
       structHash: debug.structHash,
       digestHex: debug.digestHex,
-      signedMessageHex: signedMessageHexFromDigestHex(debug.digestHex),
+      signedMessageHex: `0x${SIG_TAG_HEX}${debug.digestHex.slice(2)}`,
     });
   }
   return out;
@@ -751,9 +699,7 @@ function main(): void {
     writeFileSync(path.join(REJECT_DIR, name), contents);
   }
 
-  // Remove stale accept-vector files that are no longer in ACCEPT_VECTORS, so
-  // the directory listing never silently retains a vector nothing generates
-  // anymore. (Never touches src/, only vectors/typed-data-v1/**.)
+  // Warn about stale files; the regeneration test rejects them.
   const acceptNames = new Set(Object.keys(acceptFiles));
   for (const entry of readdirSync(ACCEPT_DIR, { withFileTypes: true })) {
     if (entry.isFile() && entry.name.endsWith(".json") && !acceptNames.has(entry.name)) {

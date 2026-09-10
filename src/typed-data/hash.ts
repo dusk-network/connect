@@ -14,7 +14,8 @@
  * 11). Resource limits are a separate, signer-side policy - see
  * `checkPolicyLimits`, which is never called from the hashing path.
  */
-import { sha256 as nobleSha256 } from "@noble/hashes/sha2";
+import { sha256 } from "@noble/hashes/sha2";
+import { bytesToHex, concatBytes as concat } from "@noble/hashes/utils";
 
 export type FieldDef = { name: string; type: string };
 
@@ -99,10 +100,6 @@ const POLICY_LIMITS = {
 
 function fail(code: TypedDataErrorCode, message: string): never {
   throw new TypedDataError(code, message);
-}
-
-function hasOwn(obj: object, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -215,7 +212,7 @@ function walkValueForPolicy(
   }
   const fields = types[t.name] ?? [];
   for (const f of fields) {
-    if (hasOwn(value, f.name)) {
+    if (Object.hasOwn(value, f.name)) {
       walkValueForPolicy(f.type, value[f.name], types, depth + 1);
     }
   }
@@ -318,7 +315,7 @@ function domainMessage(domain: HashTypedDataInput["domain"]): Record<string, unk
 }
 
 function requireDomainType(types: Record<string, FieldDef[]>): void {
-  if (!hasOwn(types, DOMAIN_TYPE)) {
+  if (!Object.hasOwn(types, DOMAIN_TYPE)) {
     fail("E_DOMAIN_TYPE", "types must include DuskTypedDataDomain");
   }
   const fields = types[DOMAIN_TYPE];
@@ -356,7 +353,7 @@ function validatePrimaryType(primaryType: unknown, types: Record<string, FieldDe
   if (!IDENT.test(primaryType)) {
     fail("E_PRIMARY_INVALID", "primaryType must be a valid identifier");
   }
-  if (!hasOwn(types, primaryType)) {
+  if (!Object.hasOwn(types, primaryType)) {
     fail("E_PRIMARY_MISSING", "primaryType missing from types");
   }
 }
@@ -396,7 +393,7 @@ function classifyType(typeExpr: string): TypeClassification {
 }
 
 function structFields(typeName: string, types: Record<string, FieldDef[]>): FieldDef[] {
-  if (!hasOwn(types, typeName)) {
+  if (!Object.hasOwn(types, typeName)) {
     fail("E_TYPE_UNKNOWN", `unknown type: ${typeName}`);
   }
   const fields = types[typeName];
@@ -478,7 +475,8 @@ function encodeType(typeName: string, types: Record<string, FieldDef[]>): string
       deps.push(name);
     }
   }
-  deps.sort(compareUtf8);
+  // ASCII identifiers have the same native and UTF-8 ordering.
+  deps.sort();
   const parts = [encodeTypeLocal(typeName, types[typeName]!)];
   for (const d of deps) {
     parts.push(encodeTypeLocal(d, types[d]!));
@@ -503,7 +501,7 @@ function structHash(
   const parts: Uint8Array[] = [th];
   const seen = new Set<string>();
   for (const f of fields) {
-    if (!hasOwn(values, f.name)) {
+    if (!Object.hasOwn(values, f.name)) {
       fail("E_FIELD_MISSING", `missing field ${typeName}.${f.name}`);
     }
     seen.add(f.name);
@@ -635,37 +633,6 @@ function utf8(s: string): Uint8Array {
   return new TextEncoder().encode(s);
 }
 
-function concat(...parts: Uint8Array[]): Uint8Array {
-  const n = parts.reduce((a, p) => a + p.length, 0);
-  const out = new Uint8Array(n);
-  let o = 0;
-  for (const p of parts) {
-    out.set(p, o);
-    o += p.length;
-  }
-  return out;
-}
-
-function sha256(data: Uint8Array): Uint8Array {
-  return nobleSha256(data);
-}
-
 function toHex(bytes: Uint8Array): `0x${string}` {
-  let s = "0x";
-  for (const b of bytes) {
-    s += b.toString(16).padStart(2, "0");
-  }
-  return s as `0x${string}`;
-}
-
-function compareUtf8(a: string, b: string): number {
-  const ba = utf8(a);
-  const bb = utf8(b);
-  const n = Math.min(ba.length, bb.length);
-  for (let i = 0; i < n; i++) {
-    if (ba[i] !== bb[i]) {
-      return ba[i]! - bb[i]!;
-    }
-  }
-  return ba.length - bb.length;
+  return `0x${bytesToHex(bytes)}`;
 }
