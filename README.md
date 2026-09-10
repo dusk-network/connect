@@ -4,7 +4,7 @@
 
 A tiny, framework-agnostic SDK for **Dusk wallet discovery + dApp integration**.
 
-- **Lightweight** (no runtime deps)
+- **Lightweight** (the root entrypoint loads no cryptography)
 - **Typed** (TypeScript types for the provider + RPC methods)
 - Includes an **optional connect modal** (conceptually similar to a very small Reown/AppKit)
 - Includes an optional **connect button** (`<dusk-connect-button />`) for drop-in UI
@@ -134,7 +134,13 @@ Optional entrypoints:
 ```ts
 import { runWalletConformance } from "@dusk/connect/testing";
 import { defineDuskConnectButton } from "@dusk/connect/ui";
+import { hashTypedDataHex } from "@dusk/connect/typed-data";
+import { verifyTypedDataSignature } from "@dusk/connect/bls";
 ```
+
+The cryptographic dependencies are imported only by `./typed-data` and `./bls`,
+not by the root entrypoint. See the [typed-data v1 specification](./docs/typed-data-v1.md)
+for the encoding and the verifier's required chain/origin policy checks.
 
 ## Which entrypoint should I use?
 

@@ -149,6 +149,11 @@ Strings are hashed over their UTF-8 bytes with **no normalization**. Implementat
 MUST NOT apply NFC, NFD, case folding, or whitespace trimming. Two strings that
 differ by a combining-character sequence are different values.
 
+Every string passed to `utf8`, including domain fields and origin, MUST contain
+only Unicode scalar values. An unpaired UTF-16 surrogate, including one introduced
+by a JSON escape, MUST be rejected with `E_UTF8`, never replaced with U+FFFD.
+Valid surrogate pairs and a literal U+FFFD remain valid.
+
 `sha256("")` is a well-defined constant, so an empty `string` and an empty `bytes`
 both encode to `e3b0c442...b855`. This is not a collision: field types are pinned
 by `typeHash` (§6.2), which is the first 32 bytes of every struct preimage.
@@ -191,7 +196,8 @@ S(t1 n1,t2 n2,...,tk nk)
 
 where `ti`/`ni` are the declared type and name of the `i`-th field of `S`, in
 declaration order, joined by `,` with no spaces except the single space between
-each type and name.
+each type and name. Field names MUST match the identifier grammar in §2;
+non-identifiers MUST be rejected before encoding, so names cannot inject delimiters.
 
 `deps(S)` is the set of struct type names reachable from `S` by following field
 types, unwrapping array types, transitively, **including `S` itself**.
@@ -331,7 +337,7 @@ implementations disagreeing can be diagnosed.
 | `E_TYPE_CYCLE` | The struct dependency graph reachable from `primaryType` or `DuskTypedDataDomain` contains a cycle |
 | `E_FIELD_DUP` | Two fields of one struct share a name |
 | `E_FIELD_RESERVED` | A field is named `__proto__`, `constructor`, or `prototype` |
-| `E_FIELD_DEF` | A field definition's `name` or `type` is not a string |
+| `E_FIELD_DEF` | A field definition's `name` is not an identifier or its `type` is not a string |
 | `E_FIELD_MISSING` | A declared field is not an own property of the value |
 | `E_FIELD_EXTRA` | The value has an own property not declared by its struct type |
 | `E_VALUE_TYPE` | Value's JSON type does not match the declared type (§5.1) |
@@ -341,6 +347,7 @@ implementations disagreeing can be diagnosed.
 | `E_HEX_FORMAT` | Hex string has odd length or non-hex characters |
 | `E_BYTES32_LENGTH` | `bytes32` value does not decode to exactly 32 bytes |
 | `E_ORIGIN_TYPE` | `origin` is not a string |
+| `E_UTF8` | A string passed to `utf8` contains an unpaired UTF-16 surrogate |
 
 Type cycles (`E_TYPE_CYCLE`) admit no finite value, so they were previously
 unreachable in practice. They are rejected explicitly so that validity does not

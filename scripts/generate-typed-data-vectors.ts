@@ -500,6 +500,33 @@ const REJECT_VECTORS: RejectSpec[] = [
     error: "E_FIELD_DEF",
   },
   {
+    file: "e_field_identifier.json",
+    description: "field names cannot inject delimiters into encodeType",
+    input: {
+      domain: BASE_DOMAIN,
+      types: typesWith({ S: [
+        { name: "a,uint8 b", type: "uint8" },
+        { name: "c", type: "uint8" },
+      ] }),
+      primaryType: "S",
+      message: { "a,uint8 b": 1, c: 2 },
+      origin: BASE_ORIGIN,
+    },
+    error: "E_FIELD_DEF",
+  },
+  {
+    file: "e_utf8.json",
+    description: "unpaired surrogates must not be replaced with U+FFFD before hashing",
+    input: {
+      domain: BASE_DOMAIN,
+      types: typesWith({ S: [{ name: "text", type: "string" }] }),
+      primaryType: "S",
+      message: { text: "\ud800" },
+      origin: BASE_ORIGIN,
+    },
+    error: "E_UTF8",
+  },
+  {
     file: "e_field_missing.json",
     description: "a declared field is not present on the message value",
     input: {
@@ -675,7 +702,7 @@ export function buildRejectVectorFiles(): Record<string, string> {
   return out;
 }
 
-/** Every §10 error code must have exactly one reject vector. Guards against silent gaps. */
+/** Every §10 error code must have at least one reject vector. */
 const ALL_CODES: TypedDataErrorCode[] = [
   "E_PARAMS_SHAPE",
   "E_PRIMARY_MISSING",
@@ -697,6 +724,7 @@ const ALL_CODES: TypedDataErrorCode[] = [
   "E_HEX_FORMAT",
   "E_BYTES32_LENGTH",
   "E_ORIGIN_TYPE",
+  "E_UTF8",
 ];
 
 export function checkRejectCoverage(): void {

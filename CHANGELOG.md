@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Added opt-in typed-data v1 hashing with strict identifier and Unicode validation [wallet#22].
+- Added opt-in tagged BLS signature verification [wallet#22].
+
 ### Changed
 
 - Made `TxWaitReceipt.ok` nullable for unrecognized execution payloads [#26].
@@ -72,6 +77,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed provider event normalization for profile and chain changes.
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
+[wallet#22]: https://github.com/dusk-network/wallet/issues/22
 [#28]: https://github.com/dusk-network/connect/issues/28
 [#27]: https://github.com/dusk-network/connect/issues/27
 [#26]: https://github.com/dusk-network/connect/issues/26

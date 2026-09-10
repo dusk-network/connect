@@ -53,6 +53,7 @@ export type TypedDataErrorCode =
   | "E_HEX_FORMAT"
   | "E_BYTES32_LENGTH"
   | "E_ORIGIN_TYPE"
+  | "E_UTF8"
   | "E_POLICY_LIMIT";
 
 /** Error raised by the typed-data hash/validation/policy paths; carries a stable `.code`. */
@@ -257,7 +258,7 @@ export function hashTypedDataDebug(input: HashTypedDataInput): HashTypedDataDebu
   const reachable = new Set<string>();
   collectStructDeps(DOMAIN_TYPE, types, reachable, new Set());
   collectStructDeps(input.primaryType, types, reachable, new Set());
-  const typeHashes: Record<string, `0x${string}`> = {};
+  const typeHashes: Record<string, `0x${string}`> = Object.create(null);
   for (const name of reachable) {
     typeHashes[name] = toHex(typeHash(name, types));
   }
@@ -408,7 +409,7 @@ function structFields(typeName: string, types: Record<string, FieldDef[]>): Fiel
 function checkFieldDefs(typeName: string, fields: FieldDef[]): void {
   const names = new Set<string>();
   for (const f of fields) {
-    if (!f || typeof f !== "object" || typeof f.name !== "string" || typeof f.type !== "string") {
+    if (!f || typeof f !== "object" || typeof f.name !== "string" || !IDENT.test(f.name) || typeof f.type !== "string") {
       fail("E_FIELD_DEF", `${typeName}: bad field definition`);
     }
     if (RESERVED_FIELD_NAMES.has(f.name)) {
@@ -627,6 +628,10 @@ function decodeHex(value: unknown, label: string): Uint8Array {
 }
 
 function utf8(s: string): Uint8Array {
+  // Unicode mode matches lone surrogates, not valid surrogate pairs.
+  if (/[\uD800-\uDFFF]/u.test(s)) {
+    fail("E_UTF8", "UTF-8 input contains an unpaired surrogate");
+  }
   return new TextEncoder().encode(s);
 }
 
