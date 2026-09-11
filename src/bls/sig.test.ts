@@ -82,6 +82,34 @@ describe("./bls: TYPED_DATA_SIG_TAG (spec 12.1)", () => {
   it("BLS_SIGN_DST matches the unchanged, standard Dusk V2 DST", () => {
     expect(BLS_SIGN_DST).toBe("BLS_SIG_BLS12381G1_XMD:SHA-256_DUSK_V2");
   });
+
+  it("exposes no way to select a BLS scheme version", async () => {
+    // On chain the version is height-dependent (V1 before Aegis, V2 after).
+    // Typed data does not inherit that: it postdates the fork, so it has no
+    // pre-V2 history to stay compatible with, and a selectable version would
+    // put the insecure V1 path within reach (spec section 12.4).
+    const blsModule = await import("./index.js");
+
+    expect(Object.keys(blsModule).sort()).toEqual([
+      "BLS_SIGN_DST",
+      "TYPED_DATA_SIG_TAG",
+      "verifyBlsDigest",
+      "verifyTypedDataSignature",
+    ]);
+
+    for (const name of Object.keys(blsModule)) {
+      expect(name).not.toMatch(/insecure|v1\b|version|legacy/i);
+    }
+  });
+
+  it("pins the V2 tag by value, not by reference to a library default", () => {
+    // @noble/curves defaults G1 short signatures to the IETF ciphersuite
+    // BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_. Signing and verifying under
+    // that default is self-consistent and rejected by the chain, so every
+    // round-trip test would still pass. Assert the value, not the variable.
+    expect(BLS_SIGN_DST).not.toContain("SSWU_RO_NUL");
+    expect(BLS_SIGN_DST).toContain("DUSK_V2");
+  });
 });
 
 describe("./bls: verifyTypedDataSignature", () => {
