@@ -252,6 +252,13 @@ export function hashTypedDataDebug(input: HashTypedDataInput): HashTypedDataDebu
   const types = input.types;
   const domainValues = domainMessage(input.domain);
 
+  // Compute the digest stages in the same order as `typedDigest`, so that an
+  // input violating several rules at once reports the same error code from
+  // both entry points (spec section 10, "Reporting order").
+  const domainSeparator = structHash(DOMAIN_TYPE, domainValues, types);
+  const originBind = originBindHash(input.origin);
+  const structHashPrimary = structHash(input.primaryType, input.message, types);
+
   const reachable = new Set<string>();
   collectStructDeps(DOMAIN_TYPE, types, reachable, new Set());
   collectStructDeps(input.primaryType, types, reachable, new Set());
@@ -259,10 +266,6 @@ export function hashTypedDataDebug(input: HashTypedDataInput): HashTypedDataDebu
   for (const name of reachable) {
     typeHashes[name] = toHex(typeHash(name, types));
   }
-
-  const domainSeparator = structHash(DOMAIN_TYPE, domainValues, types);
-  const originBind = originBindHash(input.origin);
-  const structHashPrimary = structHash(input.primaryType, input.message, types);
   const digest = sha256(concat(PREAMBLE, domainSeparator, originBind, structHashPrimary));
 
   return {
