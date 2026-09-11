@@ -10,8 +10,8 @@
     "./bls": "./src/bls/index.ts"
   },
   "imports": {
-    "@noble/curves": "npm:@noble/curves@^1.9.7",
-    "@noble/hashes": "npm:@noble/hashes@^1.8.0"
+    "@noble/curves": "npm:@noble/curves@1.9.7",
+    "@noble/hashes": "npm:@noble/hashes@1.8.0"
   },
   "publish": {
     "include": [
