@@ -1,0 +1,11 @@
+[package]
+name = "dusk-bls-vectors"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bls12_381-bls = { version = "0.6.0", features = ["insecure-v1-signing"] }
+dusk-bls12_381 = "0.14"
+dusk-bytes = "0.1"
+rand_chacha = "0.3"
+sha2 = "0.10"
