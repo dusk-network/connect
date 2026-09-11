@@ -423,7 +423,8 @@ signature = sk · hashToCurve_G1(signedMessage, DST)      // 48-byte compressed 
 publicKey = 96-byte compressed G2 point
 ```
 
-The DST is the standard Dusk `BlsVersion::V2` domain separation tag, unchanged.
+The DST is the standard Dusk `BlsVersion::V2` domain separation tag, unchanged,
+and is fixed for all typed-data signatures regardless of chain state (§12.4).
 This keeps signatures verifiable by the stock dusk-core verification path, which
 does not accept a caller-supplied DST. `hashToCurve` accepts arbitrary-length
 input, so the 55-byte tagged message needs no special handling.
@@ -442,6 +443,41 @@ A verifier MUST:
 
 A verifier MUST NOT verify over the bare digest. Doing so would accept signatures
 produced by any raw-32-byte signing path.
+
+### 12.4 Signature scheme version
+
+Typed-data signatures are **V2-only, unconditionally**.
+
+A signer MUST sign under `BlsVersion::V2`. A verifier MUST verify under
+`BlsVersion::V2`. Neither MUST dispatch on block height, fork state, or any
+chain-provided version signal, and an implementation MUST NOT expose V1 for
+typed data even when the BLS library it uses offers it.
+
+This is a deliberate departure from how the chain itself treats the BLS version.
+On chain the scheme is height-dependent — `bls_version_at(block_height)` resolves
+to V1 before the Aegis activation height and V2 from Aegis onwards — because
+blocks and transactions signed before the fork must stay verifiable. Typed data
+has no such history: the scheme was introduced after Aegis, so no typed-data
+signature predates V2 and there is nothing to remain compatible with.
+
+Rationale for pinning rather than inheriting:
+
+- V1 is the insecure path (`verify_insecure` / `sign_insecure`), which does not
+  use RFC 9380 hash-to-curve. A height-dependent typed-data path would add a
+  downgrade surface to a scheme that never needs one.
+- A verifier is not necessarily a node. A dApp checking a signature has no
+  reliable notion of "the block height this was signed at", so a
+  height-dependent rule would be unimplementable off-chain without inventing one.
+- Digests are computed and approved by a user at a point in time, but may be
+  verified arbitrarily later. A rule that varied with chain state would make the
+  validity of an already-approved signature time-dependent.
+
+Accept vectors carry `params.blsVersion` so this is asserted rather than assumed
+(§15).
+
+If Dusk introduces a future BLS version, typed-data v1 stays on V2. Adopting a
+new signature scheme version is a change to §12 and therefore requires a new
+scheme identifier under the freeze rule (§14).
 
 ---
 
