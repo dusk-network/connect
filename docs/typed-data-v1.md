@@ -358,6 +358,47 @@ Reserved field names (`E_FIELD_RESERVED`) are rejected because prototype-chain
 lookup for those names succeeds on an empty object in several languages,
 which would let a declared field appear present when it is absent.
 
+### 10.1 Validation scope
+
+Validation applies to the types the message actually uses: the struct types
+reached from `primaryType` and from `DuskTypedDataDomain` by following field
+types, together with their transitive dependencies.
+
+An entry of `types` that is not reachable that way is not validated, and MUST
+NOT cause a reject. Such an entry cannot affect the digest. `encodeType` (§6.1)
+emits the primary type and its transitive dependencies only, so an unreferenced
+type contributes to no type hash, to no struct hash, and to no field a signer
+displays for approval.
+
+This lets a caller send one `types` dictionary covering several different
+messages and select among them with `primaryType`, without every unused entry
+having to satisfy every rule.
+
+Implementations MUST NOT reject an input because an unreachable entry is
+malformed, and MUST NOT accept an input because a malformed reachable type
+also appears, well-formed, under another name.
+
+### 10.2 Reporting the code
+
+An input may break several rules at once. Such an input MUST be rejected, but
+this specification does not fix which code is reported for it: two
+implementations MAY report different codes for the same multi-violation input,
+and both are conformant. Test vectors therefore pin an error code only for an
+input that breaks exactly one rule.
+
+Within one implementation the reported code MUST be stable. An implementation
+that exposes more than one validating entry point — for example one returning
+the digest alone and one also returning the intermediates of §9 — MUST report
+the same code from each for the same input. Otherwise a consumer diagnosing a
+disagreement between two implementations gets a different answer depending on
+which function it happened to call.
+
+An implementation SHOULD document the order in which it checks. The reference
+implementation validates the input shape first, then computes the digest stages
+of §9 in order, so defects in the domain are reported before defects in the
+message, and defects in a type expression are reported when that type is first
+used.
+
 ---
 
 ## 11. Limits
