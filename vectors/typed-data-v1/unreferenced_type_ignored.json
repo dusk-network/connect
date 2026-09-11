@@ -1,0 +1,68 @@
+{
+  "description": "unreachable entries of `types` are not validated and cannot affect the digest: `UnusedDangling` is malformed but unreferenced (spec section 10, \"Validation scope\")",
+  "input": {
+    "domain": {
+      "name": "Scoped",
+      "version": "1",
+      "chainId": "dusk:1"
+    },
+    "types": {
+      "DuskTypedDataDomain": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "chainId",
+          "type": "string"
+        },
+        {
+          "name": "verifyingContract",
+          "type": "bytes32"
+        }
+      ],
+      "Note": [
+        {
+          "name": "body",
+          "type": "string"
+        }
+      ],
+      "UnusedDangling": [
+        {
+          "name": "items",
+          "type": "Missing[]"
+        },
+        {
+          "name": "dup",
+          "type": "string"
+        },
+        {
+          "name": "dup",
+          "type": "string"
+        },
+        {
+          "name": "__proto__",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "Note",
+    "message": {
+      "body": "reachable types only"
+    },
+    "origin": "https://example.test"
+  },
+  "typeHashes": {
+    "DuskTypedDataDomain": "0x41724a131dca5eeeaab4ab1579c1fd55df38a48cf919e7fa61035c89c3b443ed",
+    "Note": "0x9fe8d50e60fdf22bccd67a206c44eaf0a6fa200c620c58eddcb59859cb9b1ad1"
+  },
+  "domainSeparator": "0x3513888e4d6358942c791f832ead4216507394f26aec9fc0f0b17512d45852d7",
+  "originBind": "0x1dd242a626a78bdfacedc8c8fe2adc971e77a2a958e4a9ad30ed3b9f7c24d6f7",
+  "structHash": "0x0aca446006da41991a64c44c40a9faa027aaaa17af4064b07d4b3edd4396e85c",
+  "digestHex": "0x93e18405e70cd412f75831d7da8e4f805ad3856aa70eb0ae1e4717ccca315436",
+  "signedMessageHex": "0x4455534b5f54595045445f444154415f5349475f56310093e18405e70cd412f75831d7da8e4f805ad3856aa70eb0ae1e4717ccca315436"
+}

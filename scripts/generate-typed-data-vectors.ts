@@ -293,6 +293,31 @@ const ACCEPT_VECTORS: AcceptSpec[] = [
       origin: "",
     },
   },
+  {
+    file: "unreferenced_type_ignored.json",
+    description:
+      "unreachable entries of `types` are not validated and cannot affect the digest: `UnusedDangling` is malformed but unreferenced (spec section 10, \"Validation scope\")",
+    input: {
+      domain: { name: "Scoped", version: "1", chainId: "dusk:1" },
+      types: {
+        ...DOMAIN_TYPES,
+        Note: [{ name: "body", type: "string" }],
+        // Not reachable from primaryType or DuskTypedDataDomain, and malformed
+        // several times over: an unsized array type, a duplicate field name and
+        // a reserved field name. None of it is validated; none of it reaches
+        // the digest.
+        UnusedDangling: [
+          { name: "items", type: "Missing[]" },
+          { name: "dup", type: "string" },
+          { name: "dup", type: "string" },
+          { name: "__proto__", type: "string" },
+        ],
+      },
+      primaryType: "Note",
+      message: { body: "reachable types only" },
+      origin: "https://example.test",
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
