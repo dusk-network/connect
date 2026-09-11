@@ -11,9 +11,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Added opt-in typed-data v1 hashing with strict identifier and Unicode validation [wallet#22].
 - Added opt-in tagged BLS signature verification [wallet#22].
+- Added cross-implementation BLS vectors covering key derivation, the tagged
+  signed message and signature bytes [wallet#22].
 
 ### Changed
 
+- Pinned typed-data signatures to the V2 BLS scheme regardless of chain height [wallet#22].
+- Scoped typed-data validation to reachable types and made error codes consistent
+  across hashing entry points [wallet#22].
+- Pinned `@noble/curves` and `@noble/hashes` to exact versions.
 - Made `TxWaitReceipt.ok` nullable for unrecognized execution payloads [#26].
 
 ### Fixed
