@@ -20,5 +20,4 @@ export {
   hashTypedDataHex,
   hashTypedDataDebug,
   validateTypedDataParams,
-  checkPolicyLimits,
 } from "@dusk/typed-data";

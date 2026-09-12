@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
 import { expect, it } from "vitest";
 import { hashTypedDataHex } from "./typed-data/index.js";
 import { verifyTypedDataSignature } from "./bls/index.js";
@@ -30,6 +29,7 @@ it("pins the same shared protocol version for npm and JSR", () => {
 
 it("exposes shared-package re-exports through the Connect subpaths", () => {
   expect(typedData).toEqual(shared);
+  expect(typedData).not.toHaveProperty("checkPolicyLimits");
   expect({ ...bls }).toEqual({
     BLS_SIGN_DST: sharedBls.BLS_SIGN_DST,
     TYPED_DATA_SIG_TAG: sharedBls.TYPED_DATA_SIG_TAG,
@@ -40,8 +40,9 @@ it("exposes shared-package re-exports through the Connect subpaths", () => {
 
 it("verifies a packaged frozen signature with the required policy and structured result", () => {
   const require = createRequire(import.meta.url);
-  const vectors = dirname(require.resolve("@dusk/typed-data/vectors/nested_struct.json"));
-  const vector = JSON.parse(readFileSync(join(vectors, "../bls-v1/typed_data_digest_nested_struct.json"), "utf8"));
+  const vector = JSON.parse(readFileSync(require.resolve(
+    "@dusk/typed-data/vectors/bls-signing/typed_data_digest_nested_struct.json"
+  ), "utf8"));
   const input = vector.input.typedData;
   const { signatureG1Hex, publicKeyG2Hex } = vector.expected;
   const policy = { chainId: "dusk:1", origin: "https://app.example" };

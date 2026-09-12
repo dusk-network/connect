@@ -15,6 +15,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **Breaking:** Removed signer resource limits from `./typed-data`; use `@dusk/typed-data/policy` instead [typed-data#2].
 - Made `TxWaitReceipt.ok` nullable for unrecognized execution payloads [#26].
 
 ### Fixed
@@ -78,6 +79,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed provider event normalization for profile and chain changes.
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
+[typed-data#2]: https://github.com/dusk-network/typed-data/issues/2
 [wallet#22]: https://github.com/dusk-network/wallet/issues/22
 [#28]: https://github.com/dusk-network/connect/issues/28
 [#27]: https://github.com/dusk-network/connect/issues/27
