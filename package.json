@@ -65,7 +65,8 @@
     "test:watch": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "ci": "npm run build && npm run test:coverage",
+    "test:package": "npm run build && node scripts/check-package.mjs",
+    "ci": "npm run test:package && npm run test:coverage",
     "prepack": "npm run build"
   },
   "devDependencies": {

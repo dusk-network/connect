@@ -593,6 +593,8 @@ npm run build
 
 Produces ESM + types in `dist/`.
 `npm pack` and `npm publish` run this automatically via `prepack`.
+`npm run test:package` also checks packed entrypoint files and imports the built
+package through its public exports; it is included in `npm run ci`.
 
 ## Publishing
 
