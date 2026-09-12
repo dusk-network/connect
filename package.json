@@ -35,16 +35,28 @@
     "./ui": {
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"
+    },
+    "./typed-data": {
+      "types": "./dist/typed-data/index.d.ts",
+      "import": "./dist/typed-data/index.js"
+    },
+    "./bls": {
+      "types": "./dist/bls/index.d.ts",
+      "import": "./dist/bls/index.js"
     }
   },
   "files": [
     "dist/**/*",
+    "docs/typed-data-v1.md",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@dusk/typed-data": "0.1.0-next.0"
   },
   "scripts": {
     "clean": "rm -rf dist",

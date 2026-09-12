@@ -4,7 +4,7 @@
 
 A tiny, framework-agnostic SDK for **Dusk wallet discovery + dApp integration**.
 
-- **Lightweight** (no runtime deps)
+- **Lightweight** (the root entrypoint loads no cryptography)
 - **Typed** (TypeScript types for the provider + RPC methods)
 - Includes an **optional connect modal** (conceptually similar to a very small Reown/AppKit)
 - Includes an optional **connect button** (`<dusk-connect-button />`) for drop-in UI
@@ -155,7 +155,32 @@ Optional entrypoints:
 ```ts
 import { runWalletConformance } from "@dusk/connect/testing";
 import { defineDuskConnectButton } from "@dusk/connect/ui";
+import { hashTypedDataHex } from "@dusk/connect/typed-data";
+import { verifyTypedDataSignature } from "@dusk/connect/bls";
 ```
+
+The unreleased `./typed-data` and `./bls` entrypoints use
+[`@dusk/typed-data`](https://github.com/dusk-network/typed-data). The root entrypoint
+loads no cryptography. These integrations currently require the unpublished
+`0.1.0-next.0` package; registry publication and lockfiles must be completed before release.
+
+Verification requires trusted chain/origin expectations and an explicit `result.ok`
+check. Given the original typed input and the Wallet response:
+
+```ts
+const result = verifyTypedDataSignature(
+  { ...input, origin: response.origin },
+  response.signature,
+  response.publicKeyHex,
+  { chainId: "dusk:2", origin: "https://app.example" },
+);
+if (!result.ok) throw new Error(result.code);
+```
+
+The response supplies the origin Wallet signed; the policy supplies the origin the
+application expects. Applications must also check the signer, authorization and
+replay protection. `verifyBlsDigest` is not a typed-data verifier. See the
+[typed-data specification and usage](./docs/typed-data-v1.md).
 
 ## Which entrypoint should I use?
 
