@@ -44,7 +44,10 @@ Wallet discovery is **event-based**, not singleton-based:
   Explicit selections now persist a versioned `rdns` product hint; restoration
   requires a unique match. Old raw-ID preferences still work when that ID is
   present, and migrate on the next explicit selection. `preferredProviderId`
-  and `selectProvider(uuid)` remain current-page selectors.
+  and `selectProvider(uuid)` remain current-page selectors. An unmatched saved
+  preference or `preferredProviderId` leaves selection empty until a match
+  arrives or the user explicitly selects another instance. Constructor-supplied
+  providers are explicit choices, not restored product hints.
 - Conflicting UUID claims appear as `conflicted: true` and cannot be selected;
   the optional modal shows the conflict and disables the entry. Low-level
   `requestDuskProviders()` users must check this flag and handle later changes.

@@ -174,6 +174,77 @@ describe("integration: multi-provider wallet selection", () => {
     } finally { legacy.destroy(); explicit.destroy(); disabled.destroy(); one.cleanup(); two.cleanup(); }
   });
 
+  it.each([true, false])("ignores explicit metadata conflict flags (%s), not actual collisions", async conflicted => {
+    const first = installReferenceWallet({ info: { uuid: "explicit" }, announceOnStart: false });
+    const wallet = createDuskWallet({ provider: first.provider, providerInfo: { ...first.info, conflicted }, autoRefresh: false });
+    let collision: ReturnType<typeof installReferenceWallet> | undefined;
+    try {
+      await wallet.ready();
+      expect(wallet.provider).toBe(first.provider);
+      expect(wallet.providers[0]?.conflicted).toBeUndefined();
+      collision = installReferenceWallet({ info: { uuid: first.info.uuid }, announceOnStart: false });
+      collision.announce();
+      expect(wallet.provider).toBeNull();
+      expect(wallet.providers[0]?.conflicted).toBe(true);
+      await expect(wallet.selectProvider(first.info.uuid)).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
+      first.announce();
+      expect(wallet.providers[0]?.conflicted).toBe(true);
+    } finally { wallet.destroy(); first.cleanup(); collision?.cleanup(); }
+  });
+
+  it.each([
+    ["legacy", "preferred", undefined],
+    ["product", JSON.stringify({ version: 1, rdns: "com.example.preferred" }), undefined],
+    ["current-page", undefined, "preferred"],
+  ] as const)("does not substitute a lone provider for an unmatched %s preference", async (_name, stored, preferredProviderId) => {
+    if (stored) localStorage.setItem(DUSK_SELECTED_PROVIDER_STORAGE_KEY, stored);
+    const other = installReferenceWallet({ info: { uuid: "other", rdns: "com.example.other" }, announceOnStart: false });
+    const wallet = createDuskWallet({ autoRefresh: false, waitForProvider: false, preferredProviderId: preferredProviderId ?? null });
+    let preferred: ReturnType<typeof installReferenceWallet> | undefined;
+    try {
+      await wallet.ready();
+      expect(wallet.providers).toHaveLength(1);
+      await expect(wallet.getChainId()).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
+      expect(wallet.provider).toBeNull();
+      preferred = installReferenceWallet({ info: { uuid: "preferred", rdns: "com.example.preferred" }, announceOnStart: false });
+      preferred.announce();
+      expect(wallet.provider).toBe(preferred.provider);
+      await expect(wallet.getChainId()).resolves.toBe("dusk:2");
+      await wallet.selectProvider(other.info.uuid);
+      expect(wallet.provider).toBe(other.provider);
+    } finally { wallet.destroy(); other.cleanup(); preferred?.cleanup(); }
+  });
+
+  it.each(["{legacy-wallet}", '{"legacy":"wallet"}', '{"version":1,"rdns":""}'])(
+    "preserves the legacy raw-ID preference %s", async uuid => {
+      localStorage.setItem(DUSK_SELECTED_PROVIDER_STORAGE_KEY, uuid);
+      const legacy = installReferenceWallet({ info: { uuid }, announceOnStart: false });
+      const other = installReferenceWallet({ info: { uuid: "other" }, announceOnStart: false });
+      const wallet = createDuskWallet({ autoRefresh: false, waitForProvider: false });
+      try {
+        await wallet.ready();
+        expect(wallet.providers).toHaveLength(2); // A lone-provider fallback must not mask a dropped preference.
+        expect(wallet.provider).toBe(legacy.provider);
+      } finally { wallet.destroy(); legacy.cleanup(); other.cleanup(); }
+    },
+  );
+
+  it("does not apply stored-product ambiguity to an explicit constructor selection", async () => {
+    localStorage.setItem(DUSK_SELECTED_PROVIDER_STORAGE_KEY, JSON.stringify({ version: 1, rdns: "com.example.product" }));
+    const first = installReferenceWallet({ info: { uuid: "explicit", rdns: "com.example.product" }, announceOnStart: false });
+    const wallet = createDuskWallet({ provider: first.provider, providerInfo: first.info, autoRefresh: false });
+    let other: ReturnType<typeof installReferenceWallet> | undefined;
+    try {
+      await wallet.ready();
+      expect(wallet.provider).toBe(first.provider);
+      other = installReferenceWallet({ info: { uuid: "other", rdns: first.info.rdns }, announceOnStart: false });
+      other.announce();
+      expect(wallet.providers).toHaveLength(2);
+      expect(wallet.providers.every(info => !info.conflicted)).toBe(true);
+      expect(wallet.provider).toBe(first.provider);
+    } finally { wallet.destroy(); first.cleanup(); other?.cleanup(); }
+  });
+
   it("keeps provider selection deterministic when multiple wallets coexist", async () => {
     const primary = installReferenceWallet({
       info: {

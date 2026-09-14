@@ -64,7 +64,7 @@ export type DuskWalletOptions = {
   /** Metadata for an explicitly provided provider. */
   providerInfo?: DuskProviderInfo | null;
 
-  /** Preferred current-page provider UUID, not a cross-page product identifier. */
+  /** Preferred current-page provider UUID; an unmatched ID requires explicit selection. */
   preferredProviderId?: string | null;
 
   /** If no provider is selected synchronously, wait briefly for discovery. Default: true. */
@@ -302,7 +302,7 @@ export class DuskWallet {
     this._rememberLastUsed = opts.rememberLastUsedProvider !== false;
     this._providerStorageKey = opts.providerStorageKey || DUSK_SELECTED_PROVIDER_STORAGE_KEY;
     this._preferredProviderId = (opts.preferredProviderId && String(opts.preferredProviderId).trim()) || null;
-    if (!this._preferredProviderId && this._rememberLastUsed) {
+    if (!this._explicitProvider && !this._preferredProviderId && this._rememberLastUsed) {
       const stored = this._readStoredProvider();
       this._preferredProviderId = stored?.uuid ?? null;
       this._preferredProviderRdns = stored?.rdns ?? null;
@@ -426,13 +426,17 @@ export class DuskWallet {
       if (typeof localStorage === "undefined") return null;
       const value = localStorage.getItem(this._providerStorageKey)?.trim();
       if (!value) return null;
-      if (!value.startsWith("{")) return { uuid: value }; // Legacy raw-ID preference.
-      const stored = JSON.parse(value);
-      if (stored?.version === 1 && typeof stored.rdns === "string" && stored.rdns.trim()) {
-        return { rdns: stored.rdns.trim().toLowerCase() };
+      try {
+        const stored = JSON.parse(value);
+        if (stored?.version === 1 && typeof stored.rdns === "string" && stored.rdns.trim()) {
+          return { rdns: stored.rdns.trim().toLowerCase() };
+        }
+      } catch {
+        // Not a structured preference; preserve the legacy raw ID below.
       }
+      return { uuid: value };
     } catch {
-      // Unavailable storage or an invalid preference must not prevent discovery.
+      // Unavailable storage must not prevent discovery.
     }
     return null;
   }
@@ -521,8 +525,8 @@ export class DuskWallet {
         const applyOpts: { notify?: boolean; persist?: boolean } = { persist: false };
         if (opts.notify !== undefined) applyOpts.notify = opts.notify;
         this._applySelectedProvider(preferred, applyOpts);
-        return;
       }
+      return; // Never substitute another provider for an unmatched preference.
     }
 
     if (this._providers.size === 1) {

@@ -136,18 +136,24 @@ The Connect collector and wrapper expose a single diagnostic entry with
 The collector remembers conflicts for its collection cycle; the wrapper retains
 them for its lifetime, clears a conflicting selection through its existing
 selection-change handling, and refuses selection of that UUID. Re-announcements
-cannot clear a conflict. The optional modal displays and disables conflicted
-entries. Raw-provider users must handle later announcements/selection changes;
-a one-shot collector is not a lifetime monitor or an authentication mechanism.
+cannot clear a conflict. Caller-supplied `conflicted` metadata cannot create a
+conflict, including with an explicit `providerInfo`. The optional modal displays
+and disables conflicted entries. Raw-provider users must handle later
+announcements/selection changes; a one-shot collector is not a lifetime monitor or an authentication mechanism.
 
 Connect stores explicit product choices as `{ "version": 1, "rdns": "…" }` under
 `dusk.connect.selectedProvider` (or `providerStorageKey`). A saved product hint
 restores only when exactly one discovered entry matches; a later duplicate
-match clears automatic restoration, but not an explicit instance choice.
-Legacy raw-ID preferences still match an existing unconflicted UUID; the next
-explicit selection writes the new format. Unmatched legacy IDs cannot identify
-a new session. `preferredProviderId` and `selectProvider(uuid)` remain current-page
-instance selectors. `rememberLastUsedProvider: false` disables storage reads and
+match clears automatic restoration, but not an explicit instance choice (including
+constructor-supplied `provider`/`providerInfo`, which ignore stored preferences).
+Legacy raw-ID preferences still match an existing unconflicted UUID; values that
+are not valid version-1 product records remain raw IDs, including brace-prefixed
+IDs. The next explicit selection writes the new format. Unmatched legacy IDs
+cannot identify a new session. An unmatched saved preference or current-page
+`preferredProviderId` leaves selection empty until a match arrives or the user
+chooses another instance with `selectProvider(uuid)`; it does not select an
+unrelated lone provider. Without a preference, a lone unconflicted provider can
+still auto-select. `rememberLastUsedProvider: false` disables storage reads and
 writes. Legacy non-UUID identifiers remain accepted for interoperability, but
 new wallet implementations must follow the UUIDv4 rule above.
 

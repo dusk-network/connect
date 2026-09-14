@@ -13,11 +13,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Required explicit choice for unmatched saved preferences or `preferredProviderId` [#42].
 - Made `TxWaitReceipt.ok` nullable for unrecognized execution payloads [#26].
 - Separated per-page discovery UUIDs from saved product preferences, with legacy-ID compatibility [#42].
 
 ### Fixed
 
+- Kept caller-supplied metadata from creating discovery conflicts [#42].
+- Preserved explicit constructor selections when saved product hints become ambiguous [#42].
+- Preserved brace-prefixed legacy provider preferences [#42].
 - Made live transaction waits race-safe, exact, and retryable [#27].
 - Bound asynchronous wallet operations and contract writes to the selected provider [#24].
 - Prevented contract proxy facets from being treated as promises [#28].

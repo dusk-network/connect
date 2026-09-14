@@ -50,7 +50,7 @@ export function registerDiscoveredProvider(providers: Map<string, DuskProviderDe
   const current = providers.get(detail.info.uuid);
   const different = Boolean(current && current.provider !== detail.provider);
   const retained = different ? current! : detail;
-  const conflicted = Boolean(current?.info.conflicted || detail.info.conflicted || different);
+  const conflicted = Boolean(current?.info.conflicted || different);
   if (current && current.provider === retained.provider &&
       Boolean(current.info.conflicted) === conflicted &&
       DUSK_PROVIDER_INFO_FIELDS.every(key => current.info[key] === retained.info[key])) return false;

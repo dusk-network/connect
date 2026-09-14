@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { createDuskConnectModal } from "./modal.js";
 import {
@@ -145,6 +145,7 @@ describe("connect modal", () => {
     const modal = createDuskConnectModal(wallet as any, {
       appName: "My <b>dApp</b>",
     });
+    onTestFinished(() => modal.destroy()); // Cancel the pending close timer before jsdom teardown.
 
     modal.open();
     expect((document.querySelector("#dconnectTitle") as HTMLElement).textContent).toBe(
