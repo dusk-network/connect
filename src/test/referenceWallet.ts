@@ -23,8 +23,7 @@ import type {
 type EventName = keyof DuskProviderEventMap | (string & {});
 type EventHandler = (...args: any[]) => void;
 
-const DEFAULT_INFO: DuskProviderInfo = {
-  uuid: "dev.reference.wallet",
+const DEFAULT_INFO = {
   name: "Reference Wallet",
   icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E",
   rdns: "dev.reference.wallet",
@@ -124,6 +123,7 @@ export function installReferenceWallet(
   const info = normalizeDuskProviderInfo({
     ...DEFAULT_INFO,
     ...options.info,
+    uuid: options.info?.uuid ?? crypto.randomUUID(),
   });
 
   let accounts = [...(options.accounts ?? ["dusk1referenceaccount1111111111111111111111111111111"])];

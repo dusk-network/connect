@@ -40,6 +40,16 @@ Wallet discovery is **event-based**, not singleton-based:
 
 ## Provider integration notes
 
+- Discovery UUIDs identify provider instances on the current page, not products.
+  Explicit selections now persist a versioned `rdns` product hint; restoration
+  requires a unique match. Old raw-ID preferences still work when that ID is
+  present, and migrate on the next explicit selection. `preferredProviderId`
+  and `selectProvider(uuid)` remain current-page selectors.
+- Conflicting UUID claims appear as `conflicted: true` and cannot be selected;
+  the optional modal shows the conflict and disables the entry. Low-level
+  `requestDuskProviders()` users must check this flag and handle later changes.
+  UUIDs and `rdns` are self-attested, not authentication. See the
+  [discovery rules](./docs/wallet-discovery.md#selection-rules).
 - Chain IDs are CAIP-2 strings such as `dusk:2`, not bare decimal or
   hexadecimal numbers. Parse the numeric component with
   `/^dusk:(\d+)$/i.exec(chainId.trim())` only when a numeric protocol value is
@@ -176,8 +186,9 @@ import { createDuskWallet } from "@dusk/connect";
 const wallet = createDuskWallet();
 await wallet.ready();
 
-if (wallet.state.availableProviders.length > 1 && !wallet.state.providerId) {
-  await wallet.selectProvider(wallet.state.availableProviders[0]!.uuid);
+if (!wallet.provider) {
+  // Use your picker or the optional Connect modal, not the first list entry.
+  throw new Error("Select an unconflicted wallet first");
 }
 
 await wallet.connect();
@@ -243,9 +254,9 @@ if (!wallet.state.installed) {
   // show "Install Dusk Wallet" UI
 }
 
-if (wallet.state.availableProviders.length > 1 && !wallet.state.providerId) {
-  // or show your own wallet picker UI
-  await wallet.selectProvider(wallet.state.availableProviders[0]!.uuid);
+if (!wallet.provider) {
+  // Show a picker, then pass the user's chosen UUID to wallet.selectProvider().
+  throw new Error("Select an unconflicted wallet first");
 }
 
 // Prompt connection (opens wallet approval)
