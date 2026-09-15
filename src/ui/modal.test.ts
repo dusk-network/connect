@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { createDuskConnectModal } from "./modal.js";
 import {
@@ -85,6 +85,21 @@ describe("connect modal", () => {
     expect(wallet.discoverProviders).toHaveBeenCalledWith({ timeoutMs: 250 });
   });
 
+  it("visibly disables conflicting provider IDs", () => {
+    const wallet = createMockUiWallet({ installed: true, providerId: null, authorized: false,
+      availableProviders: [{ uuid: "duplicate", name: "Wallet", icon: "", rdns: "com.example.wallet", conflicted: true }] });
+    const modal = createDuskConnectModal(wallet as any);
+    try {
+      modal.open();
+      const row = document.querySelector<HTMLButtonElement>('[data-provider-id="duplicate"]')!;
+      expect(row.disabled).toBe(true);
+      expect(row.textContent).toContain("Conflict");
+      expect(document.querySelector('[role="alert"]')?.textContent).toContain("Conflicting wallet identifiers");
+      row.click();
+      expect(wallet.selectProvider).not.toHaveBeenCalled();
+    } finally { modal.destroy(); }
+  });
+
   it("shows the Firefox add-ons install option in Firefox", () => {
     setUserAgent("Mozilla/5.0 Firefox/128.0");
 
@@ -130,6 +145,7 @@ describe("connect modal", () => {
     const modal = createDuskConnectModal(wallet as any, {
       appName: "My <b>dApp</b>",
     });
+    onTestFinished(() => modal.destroy()); // Cancel the pending close timer before jsdom teardown.
 
     modal.open();
     expect((document.querySelector("#dconnectTitle") as HTMLElement).textContent).toBe(

@@ -204,7 +204,7 @@ function createMockProvider({ info, account, chainId, networkName, balance }) {
 
 createMockProvider({
   info: {
-    uuid: "demo.aurora.wallet",
+    uuid: crypto.randomUUID(),
     name: "Aurora Wallet",
     icon: "",
     rdns: "demo.aurora.wallet",
@@ -217,7 +217,7 @@ createMockProvider({
 
 createMockProvider({
   info: {
-    uuid: "demo.harbor.wallet",
+    uuid: crypto.randomUUID(),
     name: "Harbor Wallet",
     icon: "",
     rdns: "demo.harbor.wallet",
@@ -310,7 +310,8 @@ function renderProviders(state) {
     button.className = "providerUse";
     button.type = "button";
     button.dataset.providerId = provider.uuid;
-    button.textContent = provider.uuid === state.providerId ? "Selected" : "Use Wallet";
+    button.disabled = Boolean(provider.conflicted);
+    button.textContent = provider.conflicted ? "Conflict" : provider.uuid === state.providerId ? "Selected" : "Use Wallet";
 
     copy.append(name, uuid, rdns);
     main.append(providerIcon(provider), copy);
@@ -321,7 +322,7 @@ function renderProviders(state) {
 
 function render(state) {
   const installed = !!state.installed;
-  const needsSelection = installed && (state.availableProviders?.length ?? 0) > 1 && !state.providerId;
+  const needsSelection = installed && !state.providerId;
   const connected = !!state.authorized && (state.profiles?.length ?? 0) > 0;
 
   elStatus.textContent = !installed
@@ -347,7 +348,7 @@ wallet.subscribe((state) => {
 
 elProviderList.addEventListener("click", async (event) => {
   const target = event.target.closest("[data-provider-id]");
-  if (!target) return;
+  if (!target || target.disabled) return;
   const providerId = target.getAttribute("data-provider-id");
   if (!providerId) return;
   await wallet.selectProvider(providerId);

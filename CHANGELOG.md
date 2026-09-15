@@ -13,15 +13,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Required explicit choice for unmatched saved preferences or `preferredProviderId` [#42].
 - Made `TxWaitReceipt.ok` nullable for unrecognized execution payloads [#26].
+- Separated per-page discovery UUIDs from saved product preferences, with legacy-ID compatibility [#42].
 
 ### Fixed
 
+- Cleared metadata-less explicit providers participating in UUID conflicts, including during discovery initialization [#42].
+- Kept caller-supplied metadata from creating discovery conflicts [#42].
+- Preserved explicit constructor selections when saved product hints become ambiguous [#42].
+- Preserved brace-prefixed legacy provider preferences [#42].
 - Made live transaction waits race-safe, exact, and retryable [#27].
 - Bound asynchronous wallet operations and contract writes to the selected provider [#24].
 - Prevented contract proxy facets from being treated as promises [#28].
 - Reported unsupported transaction execution payloads as unknown instead of successful [#26].
-- Preserved explicit wallet selection when a provider UUID collides [#25].
+- Replaced first/last-wins UUID collisions with visible, unselectable conflict entries [#25], [#42].
 
 ## [0.2.0] - 2026-07-04
 
@@ -76,6 +82,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed provider event normalization for profile and chain changes.
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
+[#42]: https://github.com/dusk-network/connect/issues/42
 [#28]: https://github.com/dusk-network/connect/issues/28
 [#27]: https://github.com/dusk-network/connect/issues/27
 [#26]: https://github.com/dusk-network/connect/issues/26

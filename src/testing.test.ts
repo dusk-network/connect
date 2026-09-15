@@ -79,9 +79,13 @@ describe("testing helpers", () => {
     });
   });
 
-  it("fails with a clear provider mismatch error", async () => {
+  it.each([
+    [null, "none"],
+    ["dev.reference.wallet", "dev.reference.wallet"],
+  ])("reports a provider mismatch with preferred ID %s", async (preferredProviderId, selectedId) => {
     await expect(
       runWalletConformance({
+        preferredProviderId,
         installWallet: () =>
           installReferenceWallet({
             info: {
@@ -93,7 +97,7 @@ describe("testing helpers", () => {
         },
       })
     ).rejects.toThrow(
-      'Wallet conformance failed: expected provider id "com.example.wallet" but found "dev.reference.wallet"'
+      `Wallet conformance failed: expected provider id "com.example.wallet" but found "${selectedId}"`
     );
   });
 

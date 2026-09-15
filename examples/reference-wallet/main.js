@@ -23,7 +23,7 @@ function hexOf(value) {
 
 function createReferenceWallet() {
   const info = {
-    uuid: "dev.reference.wallet",
+    uuid: crypto.randomUUID(),
     name: "Reference Wallet",
     icon: svgIcon(),
     rdns: "dev.reference.wallet",

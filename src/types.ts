@@ -296,14 +296,16 @@ export type DuskRpcRequest = {
 
 /** Wallet metadata advertised during provider discovery. */
 export type DuskProviderInfo = {
-  /** Stable wallet id (UUID recommended). */
+  /** Provider-instance UUIDv4, stable only for this page/provider lifetime. */
   uuid: string;
   /** Human-friendly wallet name shown in pickers. */
   name: string;
   /** Icon URL/data URI shown in pickers. */
   icon: string;
-  /** Reverse-DNS identifier, e.g. "network.dusk.wallet". */
+  /** Stable, self-attested product identifier, e.g. "network.dusk.wallet". */
   rdns: string;
+  /** Discovery result only: distinct provider objects claimed this UUID. Do not select it. */
+  conflicted?: boolean;
 };
 
 /** Injected wallet provider interface used by dApps. */
