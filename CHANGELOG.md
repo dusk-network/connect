@@ -25,6 +25,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Discard delayed profile and shielded-address responses after disconnect without disabling provider events [#37].
 - Preserve valid overlapping connections and reads in an unchanged wallet session [#37].
+- Keep refresh results current across authorization and profile changes [#37].
 - Prevent stale refresh results from overwriting newer chain/node events [#38].
 - Coalesce overlapping refreshes within the same wallet context [#38].
 - Declared optional typed-data signing support and protocol versions in provider capabilities [wallet#22].

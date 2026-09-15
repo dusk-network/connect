@@ -189,14 +189,16 @@ export class DuskWallet {
   private _readySettled = false;
   private _selectionEpoch = 0;
   private _sessionEpoch = 0;
+  private _profilesEpoch = 0;
   private _connectionIntent = 0;
   private _networkEpoch = 0;
   private _refreshing: {
     provider: DuskProvider;
     epoch: number;
     sessionEpoch: number;
+    profilesEpoch: number;
     networkEpoch: number;
-    promise: Promise<DuskWalletState>;
+    promise: Promise<{ state: DuskWalletState; profilesEpoch: number }>;
   } | null = null;
   private _appEventHandlers = new Map<keyof DuskProviderEventMap, Set<(payload: any) => void>>();
 
@@ -583,11 +585,16 @@ export class DuskWallet {
     return { provider: this._requireProvider(), epoch: this._selectionEpoch };
   }
 
-  private _assertCurrentSelection(provider: DuskProvider, epoch: number, sessionEpoch?: number): void {
+  private _assertCurrentSelection(
+    provider: DuskProvider, epoch: number, sessionEpoch?: number, profilesEpoch?: number
+  ): void {
     if (this._destroyed || provider !== this._provider || epoch !== this._selectionEpoch) {
       throw new DuskWalletProviderChangedError();
     }
-    if (sessionEpoch !== undefined && sessionEpoch !== this._sessionEpoch) {
+    if (
+      (sessionEpoch !== undefined && sessionEpoch !== this._sessionEpoch) ||
+      (profilesEpoch !== undefined && profilesEpoch !== this._profilesEpoch)
+    ) {
       throw new DuskSdkError("Wallet session changed during request", { data: { reason: "session_changed" } });
     }
   }
@@ -743,7 +750,7 @@ export class DuskWallet {
 
   /**
    * Refresh capabilities, chain id, and approved profiles without prompting.
-   * Overlapping refreshes share requests within the same provider/session/network context.
+   * Overlapping refreshes share requests within the same provider/session/profile/network context.
    */
   async refresh(): Promise<DuskWalletState> {
     if (this._destroyed) throw new DuskWalletProviderChangedError("Dusk wallet has been destroyed");
@@ -771,27 +778,30 @@ export class DuskWallet {
 
     const epoch = this._selectionEpoch;
     const sessionEpoch = this._sessionEpoch;
+    const profilesEpoch = this._profilesEpoch;
     const networkEpoch = this._networkEpoch;
     let pending = this._refreshing;
     if (
       !pending ||
       pending.provider !== p || pending.epoch !== epoch ||
-      pending.sessionEpoch !== sessionEpoch || pending.networkEpoch !== networkEpoch
+      pending.sessionEpoch !== sessionEpoch || pending.profilesEpoch !== profilesEpoch ||
+      pending.networkEpoch !== networkEpoch
     ) {
       let start!: () => void;
-      const promise = new Promise<DuskWalletState>((resolve, reject) => {
+      const promise = new Promise<{ state: DuskWalletState; profilesEpoch: number }>((resolve, reject) => {
         start = () => {
-          this._refreshState(p, epoch, sessionEpoch, networkEpoch).then(resolve, reject);
+          this._refreshState(p, epoch, sessionEpoch, profilesEpoch, networkEpoch).then(resolve, reject);
         };
       });
       // Register the refresh before provider calls can synchronously emit events.
-      pending = this._refreshing = { provider: p, epoch, sessionEpoch, networkEpoch, promise };
+      pending = this._refreshing = { provider: p, epoch, sessionEpoch, profilesEpoch, networkEpoch, promise };
       start();
     }
     try {
-      const state = await pending.promise;
-      this._assertCurrentSelection(p, epoch, sessionEpoch);
-      return cloneState(state);
+      const result = await pending.promise;
+      // Publishing fresh profiles can advance the revision; validate the returned snapshot's revision.
+      this._assertCurrentSelection(p, epoch, sessionEpoch, result.profilesEpoch);
+      return cloneState(result.state);
     } finally {
       if (this._refreshing === pending) this._refreshing = null;
     }
@@ -801,14 +811,15 @@ export class DuskWallet {
     p: DuskProvider,
     epoch: number,
     sessionEpoch: number,
+    profilesEpoch: number,
     networkEpoch: number
-  ): Promise<DuskWalletState> {
+  ): Promise<{ state: DuskWalletState; profilesEpoch: number }> {
     const [caps, chainId, profiles] = await Promise.all([
       this._requestProvider<DuskProviderCapabilities>(p, "dusk_getCapabilities").catch(() => null),
       this._requestProvider<ChainId>(p, "dusk_chainId").catch(() => null),
       this._requestProvider<DuskProfile[]>(p, "dusk_profiles").catch(() => []),
     ]);
-    this._assertCurrentSelection(p, epoch, sessionEpoch);
+    this._assertCurrentSelection(p, epoch, sessionEpoch, profilesEpoch);
     if (networkEpoch !== this._networkEpoch) {
       throw new DuskSdkError("Wallet network changed during refresh", { data: { reason: "network_changed" } });
     }
@@ -838,7 +849,7 @@ export class DuskWallet {
     this._setProfiles(profiles, { notify: false });
     this._notify();
 
-    return this._state;
+    return { state: this._state, profilesEpoch: this._profilesEpoch };
   }
 
   /** Prompt the user to connect (permission grant). */
@@ -1146,6 +1157,13 @@ export class DuskWallet {
   }
 
   private _patch(partial: Partial<DuskWalletState>, opts: { notify?: boolean } = {}) {
+    // _setProfiles preserves the array for equivalent profile lists.
+    if (
+      (partial.authorized !== undefined && partial.authorized !== this._state.authorized) ||
+      (partial.profiles !== undefined && partial.profiles !== this._state.profiles)
+    ) {
+      this._profilesEpoch++;
+    }
     const chainId = partial.chainId !== undefined ? partial.chainId : this._state.chainId;
     const nodeUrl = normalizeBaseUrl(
       partial.node !== undefined ? partial.node?.nodeUrl ?? "" : this._state.node?.nodeUrl ?? ""

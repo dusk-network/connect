@@ -222,6 +222,107 @@ describe("same-provider session and network changes", () => {
     }
   );
 
+  describe.each(["connect", "profilesChanged", "authorization"] as const)("refresh after %s", (change) => {
+    it.each([false, true])("keeps the current profiles with newerFirst=%s", async (newerFirst) => {
+      const provider = createMockProvider({
+        authorized: change === "profilesChanged",
+        accounts: change === "connect" ? ["connected-account"] : [],
+      });
+      const wallet = createDuskWallet({ provider, autoRefresh: false });
+      await wallet.ready();
+      await wallet.refresh(); // Keep network-cache hydration separate from the profile transition.
+      const caps = wallet.state.capabilities!;
+      const networkEpoch = wallet.networkEpoch;
+      const selectionEpoch = wallet.selectionEpoch;
+      const old = deferred<typeof caps>();
+      const fresh = deferred<typeof caps>();
+      let capabilityReads = 0;
+      provider.setResponse("dusk_getCapabilities", () => ++capabilityReads === 1 ? old.promise : fresh.promise);
+      provider.request.mockClear();
+      const stale = Promise.allSettled([wallet.refresh()]);
+      let current: ReturnType<typeof Promise.allSettled> | undefined;
+      try {
+        const index = provider.request.mock.calls.findIndex(([arg]) => arg.method === "dusk_profiles");
+        expect(index).toBeGreaterThanOrEqual(0);
+        await expect(provider.request.mock.results[index]!.value).resolves.toEqual([]);
+        if (change === "connect") await wallet.connect();
+        if (change === "profilesChanged") provider.setProfiles([{ profileId: "restored", account: "restored-account" }]);
+        if (change === "authorization") {
+          provider.setAuthorized(true);
+          provider.emit("connect", { chainId: "dusk:2" });
+        }
+        const profiles = provider.profiles;
+        expect(profiles).toHaveLength(change === "authorization" ? 0 : 1);
+        const expected = {
+          authorized: true, profiles, accounts: profiles.map(profile => profile.account),
+          selectedProfile: profiles[0] ?? null, selectedAddress: profiles[0]?.account ?? null,
+        };
+        expect(wallet.state).toMatchObject(expected);
+        expect(wallet.networkEpoch).toBe(networkEpoch);
+        expect(wallet.selectionEpoch).toBe(selectionEpoch);
+        current = Promise.allSettled([wallet.refresh()]);
+        if (newerFirst) {
+          // Fail instead of hanging if the newer refresh incorrectly joined the old one.
+          expect(capabilityReads).toBe(2);
+          fresh.resolve(caps);
+          expect(await current).toMatchObject([{ status: "fulfilled", value: expected }]);
+          old.resolve(caps);
+        } else {
+          old.resolve(caps);
+          await stale;
+          // The stale refresh must not erase the transition, even temporarily.
+          expect(wallet.state).toMatchObject(expected);
+          fresh.resolve(caps);
+        }
+        expect(await stale).toMatchObject([
+          { status: "rejected", reason: { name: "DuskSdkError", data: { reason: "session_changed" } } },
+        ]);
+        expect(await current).toMatchObject([{ status: "fulfilled", value: expected }]);
+        expect(wallet.state).toMatchObject(expected);
+        expect(capabilityReads).toBe(2);
+      } finally {
+        old.resolve(caps); fresh.resolve(caps);
+        await stale; await current; wallet.destroy();
+      }
+    });
+  });
+
+  it("allows shared refreshes to publish newly read authorization and profiles", async () => {
+    const provider = createMockProvider();
+    const wallet = createDuskWallet({ provider, autoRefresh: false });
+    await wallet.ready();
+    expect(wallet.state).toMatchObject({ authorized: false, profiles: [] });
+    provider.setAuthorized(true); // No event: these changes will be discovered by refresh itself.
+    provider.request.mockClear();
+    try {
+      const states = await Promise.all([wallet.refresh(), wallet.refresh()]);
+      const expected = { authorized: true, profiles: provider.profiles, accounts: ["dusk1mockaccount"] };
+      expect(states).toMatchObject([expected, expected]);
+      expect(wallet.state).toMatchObject(expected);
+      expect(provider.request).toHaveBeenCalledTimes(3);
+    } finally { wallet.destroy(); }
+  });
+
+  it("rechecks shared refresh snapshots when profiles change after publication", async () => {
+    const provider = createMockProvider({ authorized: true });
+    const wallet = createDuskWallet({ provider, autoRefresh: false });
+    await wallet.ready();
+    let changed = false;
+    wallet.subscribe(state => {
+      if (state.node && !changed) {
+        changed = true;
+        queueMicrotask(() => provider.setAccounts(["new-account"]));
+      }
+    });
+    try {
+      expect(await Promise.allSettled([wallet.refresh(), wallet.refresh()])).toMatchObject([
+        { status: "rejected", reason: { name: "DuskSdkError", data: { reason: "session_changed" } } },
+        { status: "rejected", reason: { name: "DuskSdkError", data: { reason: "session_changed" } } },
+      ]);
+      expect(wallet.state.accounts).toEqual(["new-account"]);
+    } finally { wallet.destroy(); }
+  });
+
   it.each([false, true])("coalesces initial refreshes with autoRefresh=%s without caching settled results", async (autoRefresh) => {
     const provider = createMockProvider({ authorized: true });
     const wallet = createDuskWallet({ provider, autoRefresh });
