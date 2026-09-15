@@ -34,8 +34,12 @@ The canonical discovery event spec lives in
 - `icon`
 - `rdns`
 
-`uuid` should be stable across product versions and page loads. `rdns` should
-identify the wallet product, for example `com.example.wallet`.
+Generate a random UUIDv4 once per provider instance/page, and reuse it with the
+same provider object for all announcements. Keep `rdns` stable across versions
+as a self-attested product hint, for example `com.example.wallet`. Neither field
+authenticates a wallet. Keep discovery UUIDs separate from internal bridge routing
+IDs. See the [collision and preference rules](./wallet-discovery.md#selection-rules).
+The snippets below use `crypto.randomUUID()` in a secure context or on localhost.
 
 ## Provider Surface
 
@@ -118,7 +122,7 @@ const DUSK_REQUEST_PROVIDER_EVENT = "dusk:requestProvider";
 const DUSK_ANNOUNCE_PROVIDER_EVENT = "dusk:announceProvider";
 
 const info = {
-  uuid: "com.example.wallet",
+  uuid: crypto.randomUUID(),
   name: "Example Wallet",
   icon: "data:image/svg+xml,...",
   rdns: "com.example.wallet",

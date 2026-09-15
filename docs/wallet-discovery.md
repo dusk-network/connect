@@ -74,12 +74,22 @@ type DuskProviderDetail = {
 
 Expected semantics:
 
-- `uuid`: stable wallet identifier used for de-duplication and persisted selection
+- `uuid`: random UUIDv4 identifying one provider instance for the current page
 - `name`: human-readable wallet name shown in pickers
 - `icon`: URL or data URI usable in wallet selection UIs
-- `rdns`: reverse-DNS identifier such as `network.dusk.wallet`
+- `rdns`: stable, self-attested product identifier such as `network.dusk.wallet`
 
-Wallets should keep `uuid` stable across page loads and product versions. dApps should de-duplicate discovered wallets by `uuid`.
+Wallets MUST generate a fresh UUIDv4 for each provider instance/page, and MUST
+reuse that UUID and provider object on subsequent announcements. Do not reuse a
+product constant, or regenerate the UUID on each request event. This follows
+[EIP-6963's session UUID convention](https://eips.ethereum.org/EIPS/eip-6963).
+`crypto.randomUUID()` is suitable in secure contexts; extension injection on HTTP
+pages can use `crypto.getRandomValues()` with UUIDv4 version/variant bits instead.
+A wallet's internal bridge routing identifier is separate from its discovery UUID.
+
+Neither UUID, `rdns`, name nor icon authenticates a wallet. All announcement
+metadata is self-attested; matching a familiar product string is not proof of
+ownership or a substitute for application authorization.
 
 ## Provider Summary
 
@@ -112,11 +122,47 @@ dApps must not rely on wallet injection order.
 Recommended behavior:
 
 - if zero wallets are discovered, show install/help UI
-- if exactly one wallet is discovered, auto-select it
-- if multiple wallets are discovered, require explicit user selection
-- persist the last selected wallet keyed by `info.uuid` if desired
+- if exactly one non-conflicting wallet is discovered, it may be auto-selected
+- if multiple wallets are discovered, require explicit selection or an unambiguous saved product hint
+- persist `rdns` as a product preference if desired, never a session UUID as product identity
 
-dApps should not silently switch providers after the user has selected one.
+The same UUID and same provider object may update display metadata. Distinct
+provider objects claiming the same UUID are a conflict, not first-wins or
+last-wins ownership: dApps MUST make the conflict visible and MUST NOT select
+that UUID. Do not silently switch to another provider after a collision.
+
+The Connect collector and wrapper expose a single diagnostic entry with
+`info.conflicted: true`, retaining the first object's metadata for display only.
+The collector remembers conflicts for its collection cycle; the wrapper retains
+them for its lifetime, clears a conflicting selection through its existing
+selection-change handling, and refuses selection of that UUID. Re-announcements
+cannot clear a conflict. This also applies to constructor-supplied providers without
+`providerInfo`: once observed claiming a conflicted UUID, their selection is cleared
+regardless of announcement order, including during initialization. Explicit providers
+not observed participating in the conflict remain usable.
+Caller-supplied `conflicted` metadata cannot create a conflict, including with an
+explicit `providerInfo`. The optional modal displays
+and disables conflicted entries. Raw-provider users must handle later
+announcements/selection changes; a one-shot collector is not a lifetime monitor or an authentication mechanism.
+
+Connect stores explicit product choices as `{ "version": 1, "rdns": "…" }` under
+`dusk.connect.selectedProvider` (or `providerStorageKey`). A saved product hint
+restores only when exactly one discovered entry matches; a later duplicate
+match clears automatic restoration, but not an explicit instance choice (including
+constructor-supplied `provider`/`providerInfo`, which ignore stored preferences).
+Legacy raw-ID preferences still match an existing unconflicted UUID; values that
+are not valid version-1 product records remain raw IDs, including brace-prefixed
+IDs. The next explicit selection writes the new format. Unmatched legacy IDs
+cannot identify a new session. An unmatched saved preference or current-page
+`preferredProviderId` leaves selection empty until a match arrives or the user
+chooses another instance with `selectProvider(uuid)`; it does not select an
+unrelated lone provider. Without a preference, a lone unconflicted provider can
+still auto-select. `rememberLastUsedProvider: false` disables storage reads and
+writes. Legacy non-UUID identifiers remain accepted for interoperability, but
+new wallet implementations must follow the UUIDv4 rule above.
+
+Discovery is not authentication, and dApps should not silently switch providers
+after the user has selected one.
 
 ## Load-Order Rules
 
@@ -132,7 +178,7 @@ This makes discovery work whether the wallet or the dApp loads first.
 
 ```js
 const info = {
-  uuid: "wallet.example",
+  uuid: crypto.randomUUID(), // Generate once, not inside announce().
   name: "Example Wallet",
   icon: "data:image/svg+xml,...",
   rdns: "com.example.wallet",
@@ -155,17 +201,12 @@ announce();
 ## dApp Example
 
 ```js
-const providers = new Map();
+import { createDuskWallet } from "@dusk/connect";
 
-window.addEventListener("dusk:announceProvider", (event) => {
-  const { info, provider } = event.detail;
-  providers.set(info.uuid, { info, provider });
-});
-
-window.dispatchEvent(new Event("dusk:requestProvider"));
-
-if (providers.size === 1) {
-  const [{ provider }] = [...providers.values()];
-  await provider.request({ method: "dusk_requestProfiles" });
-}
+const wallet = createDuskWallet();
+await wallet.ready();
+// With multiple or conflicted entries, use a wallet picker / Connect modal.
+// Pass the user's chosen unconflicted current-page UUID to selectProvider().
+if (!wallet.provider) throw new Error("Select an unconflicted wallet first");
+await wallet.connect();
 ```
