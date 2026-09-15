@@ -23,6 +23,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Discard delayed profile and shielded-address responses after disconnect without disabling provider events [#37].
+- Preserve valid overlapping connections and reads in an unchanged wallet session [#37].
+- Keep refresh results current across authorization and profile changes [#37].
+- Prevent stale refresh results from overwriting newer chain/node events [#38].
+- Coalesce overlapping refreshes within the same wallet context [#38].
 - Declared optional typed-data signing support and protocol versions in provider capabilities [wallet#22].
 - Cleared metadata-less explicit providers participating in UUID conflicts, including during discovery initialization [#42].
 - Kept caller-supplied metadata from creating discovery conflicts [#42].
@@ -87,6 +92,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed provider event normalization for profile and chain changes.
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
+[#38]: https://github.com/dusk-network/connect/issues/38
+[#37]: https://github.com/dusk-network/connect/issues/37
 [typed-data#2]: https://github.com/dusk-network/typed-data/issues/2
 [wallet#22]: https://github.com/dusk-network/wallet/issues/22
 [#42]: https://github.com/dusk-network/connect/issues/42
