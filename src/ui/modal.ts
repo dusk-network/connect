@@ -648,6 +648,8 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
 
   const renderProviders = (st: DuskWalletState) => {
     if (!$providers) return;
+    const warning = root?.querySelector<HTMLElement>("#dwcConflicts");
+    if (warning) warning.hidden = !st.availableProviders.some(provider => provider.conflicted);
 
     if (walletStatus(st) === "missing") {
       const targets = getDuskWalletInstallTargets();
@@ -704,6 +706,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
             data-action="select-provider"
             data-provider-id="${escapeHtml(provider.uuid)}"
             data-selected="${selected ? "true" : "false"}"
+            ${provider.conflicted ? "disabled" : ""}
           >
             <span class="dconnect-provider-main">
               ${renderProviderIcon(provider)}
@@ -712,7 +715,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
                 <span class="dconnect-provider-rdns">${escapeHtml(provider.rdns)}</span>
               </span>
             </span>
-            <span class="dconnect-provider-tag">${selected ? "Selected" : "Available"}</span>
+            <span class="dconnect-provider-tag">${provider.conflicted ? "Conflict" : selected ? "Selected" : "Available"}</span>
           </button>
         `;
       })
@@ -756,6 +759,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           <div class="dconnect-section">
             <div class="dconnect-section-label" id="dwcSectionLabel">Wallets</div>
             <div class="dconnect-provider-list" id="dwcProviders" hidden></div>
+            <div class="dconnect-hint" id="dwcConflicts" role="alert" hidden>Conflicting wallet identifiers detected. Conflicting entries are disabled; resolve the conflict and reload, or choose another wallet.</div>
           </div>
           <div class="dconnect-actions">
             <button class="dconnect-btn dconnect-btn-primary" id="dwcPrimary" type="button" data-action="primary">—</button>
@@ -786,7 +790,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
       }
 
       const btn = target.closest("button[data-action]") as HTMLButtonElement | null;
-      if (!btn) return;
+      if (!btn || btn.disabled) return;
 
       const action = btn.getAttribute("data-action") || "";
       if (action === "close") {

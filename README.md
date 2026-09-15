@@ -4,7 +4,7 @@
 
 A tiny, framework-agnostic SDK for **Dusk wallet discovery + dApp integration**.
 
-- **Lightweight** (no runtime deps)
+- **Lightweight** (the root entrypoint loads no cryptography)
 - **Typed** (TypeScript types for the provider + RPC methods)
 - Includes an **optional connect modal** (conceptually similar to a very small Reown/AppKit)
 - Includes an optional **connect button** (`<dusk-connect-button />`) for drop-in UI
@@ -40,6 +40,19 @@ Wallet discovery is **event-based**, not singleton-based:
 
 ## Provider integration notes
 
+- Discovery UUIDs identify provider instances on the current page, not products.
+  Explicit selections now persist a versioned `rdns` product hint; restoration
+  requires a unique match. Old raw-ID preferences still work when that ID is
+  present, and migrate on the next explicit selection. `preferredProviderId`
+  and `selectProvider(uuid)` remain current-page selectors. An unmatched saved
+  preference or `preferredProviderId` leaves selection empty until a match
+  arrives or the user explicitly selects another instance. Constructor-supplied
+  providers are explicit choices, not restored product hints.
+- Conflicting UUID claims appear as `conflicted: true` and cannot be selected;
+  the optional modal shows the conflict and disables the entry. Low-level
+  `requestDuskProviders()` users must check this flag and handle later changes.
+  UUIDs and `rdns` are self-attested, not authentication. See the
+  [discovery rules](./docs/wallet-discovery.md#selection-rules).
 - Chain IDs are CAIP-2 strings such as `dusk:2`, not bare decimal or
   hexadecimal numbers. Parse the numeric component with
   `/^dusk:(\d+)$/i.exec(chainId.trim())` only when a numeric protocol value is
@@ -65,7 +78,7 @@ A no-bundler demo lives at `examples/vanilla/` and imports the SDK directly from
 From a fresh checkout, build the SDK once before serving the repo locally:
 
 ```bash
-npm install
+npm ci
 npm run build
 python3 -m http.server 5173
 ```
@@ -155,7 +168,43 @@ Optional entrypoints:
 ```ts
 import { runWalletConformance } from "@dusk/connect/testing";
 import { defineDuskConnectButton } from "@dusk/connect/ui";
+import { hashTypedDataHex } from "@dusk/connect/typed-data";
+import { verifyTypedDataSignature } from "@dusk/connect/bls";
 ```
+
+The unreleased `./typed-data` and `./bls` entrypoints use
+[`@dusk/typed-data`](https://github.com/dusk-network/typed-data). The root entrypoint
+loads no cryptography. This integration pins the published JSR
+`@dusk/typed-data@0.1.0-rc.0` release through its npm compatibility registry;
+no native npm publication of the library is required.
+
+`npx jsr add` configures the JSR registry for npm projects. When installing a packed
+Connect build manually in another npm project, configure that scope first:
+
+```sh
+npm config set @jsr:registry=https://npm.jsr.io --location=project
+```
+
+This checkout already includes that `.npmrc` setting and a registry-backed lockfile;
+use `npm ci` to reproduce it. The protocol remains draft, not frozen.
+
+Verification requires trusted chain/origin expectations and an explicit `result.ok`
+check. Given the original typed input and the Wallet response:
+
+```ts
+const result = verifyTypedDataSignature(
+  { ...input, origin: response.origin },
+  response.signature,
+  response.publicKeyHex,
+  { chainId: "dusk:2", origin: "https://app.example" },
+);
+if (!result.ok) throw new Error(result.code);
+```
+
+The response supplies the origin Wallet signed; the policy supplies the origin the
+application expects. Applications must also check the signer, authorization and
+replay protection. `verifyBlsDigest` is not a typed-data verifier. See the
+[typed-data specification and usage](./docs/typed-data-v1.md).
 
 ## Which entrypoint should I use?
 
@@ -176,8 +225,9 @@ import { createDuskWallet } from "@dusk/connect";
 const wallet = createDuskWallet();
 await wallet.ready();
 
-if (wallet.state.availableProviders.length > 1 && !wallet.state.providerId) {
-  await wallet.selectProvider(wallet.state.availableProviders[0]!.uuid);
+if (!wallet.provider) {
+  // Use your picker or the optional Connect modal, not the first list entry.
+  throw new Error("Select an unconflicted wallet first");
 }
 
 await wallet.connect();
@@ -243,9 +293,9 @@ if (!wallet.state.installed) {
   // show "Install Dusk Wallet" UI
 }
 
-if (wallet.state.availableProviders.length > 1 && !wallet.state.providerId) {
-  // or show your own wallet picker UI
-  await wallet.selectProvider(wallet.state.availableProviders[0]!.uuid);
+if (!wallet.provider) {
+  // Show a picker, then pass the user's chosen UUID to wallet.selectProvider().
+  throw new Error("Select an unconflicted wallet first");
 }
 
 // Prompt connection (opens wallet approval)
@@ -568,6 +618,8 @@ npm run build
 
 Produces ESM + types in `dist/`.
 `npm pack` and `npm publish` run this automatically via `prepack`.
+`npm run test:package` also checks packed entrypoint files and imports the built
+package through its public exports; it is included in `npm run ci`.
 
 ## Publishing
 

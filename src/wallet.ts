@@ -42,6 +42,7 @@ import {
 import {
   DUSK_SELECTED_PROVIDER_STORAGE_KEY,
   isDuskProvider,
+  registerDiscoveredProvider,
   requestDuskProviders,
   subscribeDuskProviders,
   waitForDuskProviders,
@@ -64,7 +65,7 @@ export type DuskWalletOptions = {
   /** Metadata for an explicitly provided provider. */
   providerInfo?: DuskProviderInfo | null;
 
-  /** Preferred wallet id to auto-select when multiple providers are discovered. */
+  /** Preferred current-page provider UUID; an unmatched ID requires explicit selection. */
   preferredProviderId?: string | null;
 
   /** If no provider is selected synchronously, wait briefly for discovery. Default: true. */
@@ -76,7 +77,7 @@ export type DuskWalletOptions = {
   /** Immediately fetch `dusk_chainId` and `dusk_profiles` on init. Default: true. */
   autoRefresh?: boolean;
 
-  /** Persist and restore the last selected provider. Default: true. */
+  /** Remember the selected product's rdns; restore only a unique match. Default: true. */
   rememberLastUsedProvider?: boolean;
 
   /** localStorage key used for provider persistence. */
@@ -110,6 +111,7 @@ function cloneProviderInfo(info: DuskProviderInfo): DuskProviderInfo {
     name: info.name,
     icon: info.icon,
     rdns: info.rdns,
+    ...(info.conflicted ? { conflicted: true } : {}),
   };
 }
 
@@ -137,7 +139,8 @@ function shallowArrayEq(a: readonly unknown[], b: readonly unknown[]) {
 function providerInfoEq(a: DuskProviderInfo | null, b: DuskProviderInfo | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  return a.uuid === b.uuid && a.name === b.name && a.icon === b.icon && a.rdns === b.rdns;
+  return a.uuid === b.uuid && a.name === b.name && a.icon === b.icon && a.rdns === b.rdns &&
+    Boolean(a.conflicted) === Boolean(b.conflicted);
 }
 
 function providerInfoArrayEq(a: readonly DuskProviderInfo[], b: readonly DuskProviderInfo[]): boolean {
@@ -182,6 +185,7 @@ export class DuskWallet {
   private _rememberLastUsed = true;
   private _providerStorageKey = DUSK_SELECTED_PROVIDER_STORAGE_KEY;
   private _preferredProviderId: string | null = null;
+  private _preferredProviderRdns: string | null = null;
   private _readySettled = false;
   private _selectionEpoch = 0;
   private _sessionEpoch = 0;
@@ -315,11 +319,20 @@ export class DuskWallet {
     this._explicitProvider = Boolean(opts.provider);
     this._rememberLastUsed = opts.rememberLastUsedProvider !== false;
     this._providerStorageKey = opts.providerStorageKey || DUSK_SELECTED_PROVIDER_STORAGE_KEY;
-    this._preferredProviderId =
-      (opts.preferredProviderId && String(opts.preferredProviderId).trim()) ||
-      (this._rememberLastUsed ? this._readStoredProviderId() : null);
+    this._preferredProviderId = (opts.preferredProviderId && String(opts.preferredProviderId).trim()) || null;
+    if (!this._explicitProvider && !this._preferredProviderId && this._rememberLastUsed) {
+      const stored = this._readStoredProvider();
+      this._preferredProviderId = stored?.uuid ?? null;
+      this._preferredProviderRdns = stored?.rdns ?? null;
+    }
 
     this._state = initialState(false);
+    // Register before subscribing: its initial request elicits synchronous announcements.
+    if (opts.provider && isDuskProvider(opts.provider)) {
+      this._provider = opts.provider;
+      this._registerExplicitProvider(opts.provider, opts.providerInfo ?? null, { notify: false, persist: false });
+    }
+
     this._stopDiscovery = subscribeDuskProviders((detail) => {
       this._registerDiscoveredProvider(detail, { notify: false });
       if (this._readySettled && !this._provider && !this._explicitProvider) {
@@ -327,11 +340,6 @@ export class DuskWallet {
       }
       this._notify();
     });
-
-    if (opts.provider && isDuskProvider(opts.provider)) {
-      this._provider = opts.provider;
-      this._registerExplicitProvider(opts.provider, opts.providerInfo ?? null, { notify: false, persist: false });
-    }
 
     this._readyPromise = (async () => {
       if (!this._provider) {
@@ -384,8 +392,9 @@ export class DuskWallet {
     opts: { notify?: boolean; persist?: boolean } = {}
   ) {
     if (providerInfo?.uuid) {
-      this._providers.set(providerInfo.uuid, { info: cloneProviderInfo(providerInfo), provider });
-      this._applySelectedProvider({ info: providerInfo, provider }, opts);
+      registerDiscoveredProvider(this._providers, { info: cloneProviderInfo(providerInfo), provider });
+      const detail = this._providers.get(providerInfo.uuid)!;
+      this._applySelectedProvider(detail.info.conflicted ? null : detail, opts);
       this._syncAvailableProviders({ notify: false });
       return;
     }
@@ -414,37 +423,53 @@ export class DuskWallet {
   }
 
   private _registerDiscoveredProvider(detail: DuskProviderDetail, opts: { notify?: boolean } = {}): boolean {
-    const info = cloneProviderInfo(detail.info);
-    const current = this._providers.get(info.uuid);
-    const sameProvider = current?.provider === detail.provider;
-    if (current && !sameProvider) return false;
-    if (sameProvider && providerInfoEq(current.info, info)) return false;
-
-    this._providers.set(info.uuid, { info, provider: detail.provider });
-    this._syncAvailableProviders({ notify: false });
-    if (sameProvider && this._provider === detail.provider) {
-      this._patch({ providerInfo: info }, { notify: false });
+    const changed = registerDiscoveredProvider(this._providers, detail);
+    const retained = this._providers.get(detail.info.uuid)!;
+    const selectedConflict = retained.info.conflicted &&
+      (retained.provider === this._provider || detail.provider === this._provider);
+    // A selected later claimant can leave the retained diagnostic entry unchanged.
+    if (!changed && !selectedConflict) return false;
+    const ambiguousProduct = this._preferredProviderRdns &&
+      this._state.providerInfo?.rdns === this._preferredProviderRdns &&
+      [...this._providers.values()].filter(item => item.info.rdns === this._preferredProviderRdns).length > 1;
+    if (ambiguousProduct || selectedConflict) {
+      // Reuse the existing selection epoch/teardown path for pending reads/events.
+      this._applySelectedProvider(null, { notify: false, persist: false });
+    } else if (retained.provider === this._provider) {
+      this._patch({ providerInfo: cloneProviderInfo(retained.info) }, { notify: false });
     }
+    this._syncAvailableProviders({ notify: false });
 
     if (opts.notify !== false) this._notify();
     return true;
   }
 
-  private _readStoredProviderId(): string | null {
-    if (!this._rememberLastUsed || typeof localStorage === "undefined") return null;
+  private _readStoredProvider(): { uuid?: string; rdns?: string } | null {
     try {
-      const value = localStorage.getItem(this._providerStorageKey);
-      const trimmed = typeof value === "string" ? value.trim() : "";
-      return trimmed || null;
+      if (typeof localStorage === "undefined") return null;
+      const value = localStorage.getItem(this._providerStorageKey)?.trim();
+      if (!value) return null;
+      try {
+        const stored = JSON.parse(value);
+        if (stored?.version === 1 && typeof stored.rdns === "string" && stored.rdns.trim()) {
+          return { rdns: stored.rdns.trim().toLowerCase() };
+        }
+      } catch {
+        // Not a structured preference; preserve the legacy raw ID below.
+      }
+      return { uuid: value };
     } catch {
-      return null;
+      // Unavailable storage must not prevent discovery.
     }
+    return null;
   }
 
-  private _writeStoredProviderId(providerId: string | null) {
-    if (!this._rememberLastUsed || typeof localStorage === "undefined") return;
+  private _writeStoredProvider(info: DuskProviderInfo | null) {
+    if (!this._rememberLastUsed) return;
     try {
-      if (providerId) localStorage.setItem(this._providerStorageKey, providerId);
+      if (typeof localStorage === "undefined") return;
+      if (info?.rdns) localStorage.setItem(this._providerStorageKey,
+        JSON.stringify({ version: 1, rdns: info.rdns.trim().toLowerCase() }));
       else localStorage.removeItem(this._providerStorageKey);
     } catch {
       // ignore
@@ -499,7 +524,8 @@ export class DuskWallet {
 
     if (opts.persist !== false) {
       this._preferredProviderId = nextProviderId;
-      this._writeStoredProviderId(nextProviderId);
+      this._preferredProviderRdns = null;
+      this._writeStoredProvider(nextInfo);
     }
 
     if (opts.notify !== false && (!sameProvider || !sameInfo)) {
@@ -509,15 +535,21 @@ export class DuskWallet {
 
   private _autoSelectDiscoveredProvider(opts: { notify?: boolean } = {}) {
     if (this._explicitProvider || this._provider) return;
+    const providers = [...this._providers.values()];
+    // A collision requires a visible choice, never a different automatic winner.
+    if (providers.some(detail => detail.info.conflicted)) return;
 
-    if (this._preferredProviderId) {
-      const preferred = this._providers.get(this._preferredProviderId);
+    if (this._preferredProviderId || this._preferredProviderRdns) {
+      const matches = providers.filter(detail => detail.info.rdns === this._preferredProviderRdns);
+      const preferred = this._preferredProviderId
+        ? this._providers.get(this._preferredProviderId)
+        : matches.length === 1 ? matches[0] : undefined;
       if (preferred) {
         const applyOpts: { notify?: boolean; persist?: boolean } = { persist: false };
         if (opts.notify !== undefined) applyOpts.notify = opts.notify;
         this._applySelectedProvider(preferred, applyOpts);
-        return;
       }
+      return; // Never substitute another provider for an unmatched preference.
     }
 
     if (this._providers.size === 1) {
@@ -677,6 +709,7 @@ export class DuskWallet {
     }
 
     if (!detail) throw new DuskWalletProviderNotFoundError(`Unknown Dusk wallet provider: ${id}`);
+    if (detail.info.conflicted) throw new DuskWalletProviderSelectionError("Conflicting wallet identifier; reload after resolving the conflict");
 
     this._applySelectedProvider(detail, { notify: false });
     const { provider, epoch } = this._captureSelection();
