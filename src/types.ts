@@ -379,6 +379,10 @@ export type DuskProviderCapabilities = {
      */
     shieldedReceiveAddress?: boolean;
     signMessage: boolean;
+    /** Whether the provider supports typed-data signing. */
+    signTypedData?: boolean;
+    /** Typed-data protocol versions supported by the provider. */
+    signTypedDataVersions?: number[];
     signAuth: boolean;
     contractCallPrivacy: boolean;
     watchAsset?: boolean;

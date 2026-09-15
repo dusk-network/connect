@@ -21,6 +21,10 @@ for (const entry of Object.values(manifest.exports)) {
   }
 }
 
+// Check the consumer-facing declarations, not source aliases or transpile-only tests.
+execFileSync("npm", ["exec", "--offline", "--", "tsc", "--noEmit", "--strict", "--skipLibCheck",
+  "--target", "ES2022", "--module", "NodeNext", "scripts/check-types.ts"], { cwd: root, stdio: "inherit" });
+
 // Start cold: importing the root must not load the optional cryptography.
 const guard = registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -41,4 +45,4 @@ const sharedBls = await import("@dusk/typed-data/bls");
 for (const name of ["BLS_SIGN_DST", "TYPED_DATA_SIG_TAG", "verifyTypedDataSignature", "verifyBlsDigest"]) {
   assert.equal(bls[name], sharedBls[name], `Wrong built BLS export: ${name}`);
 }
-console.log("PASS: packed entrypoints, crypto-free root and built shared-library exports");
+console.log("PASS: packed entrypoints, public capability types, crypto-free root and built shared-library exports");

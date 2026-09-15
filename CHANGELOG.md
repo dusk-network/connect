@@ -23,6 +23,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Declared optional typed-data signing support and protocol versions in provider capabilities [wallet#22].
 - Cleared metadata-less explicit providers participating in UUID conflicts, including during discovery initialization [#42].
 - Kept caller-supplied metadata from creating discovery conflicts [#42].
 - Preserved explicit constructor selections when saved product hints become ambiguous [#42].
