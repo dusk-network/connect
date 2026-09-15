@@ -5,7 +5,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./testing": "./src/testing.ts",
-    "./ui": "./src/ui.ts"
+    "./ui": "./src/ui.ts",
+    "./typed-data": "./src/typed-data/index.ts",
+    "./bls": "./src/bls/index.ts"
+  },
+  "imports": {
+    "@dusk/typed-data": "jsr:@dusk/typed-data@0.1.0-rc.0"
   },
   "publish": {
     "include": [
