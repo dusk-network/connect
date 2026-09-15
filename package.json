@@ -56,7 +56,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@dusk/typed-data": "0.1.0-next.0"
+    "@dusk/typed-data": "npm:@jsr/dusk__typed-data@0.1.0-rc.0"
   },
   "scripts": {
     "clean": "rm -rf dist",

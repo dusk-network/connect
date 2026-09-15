@@ -15,6 +15,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Pinned the shared typed-data RC through JSR's npm compatibility registry for reproducible installs [wallet#22].
 - **Breaking:** Removed signer resource limits from `./typed-data`; use `@dusk/typed-data/policy` instead [typed-data#2].
 - Required explicit choice for unmatched saved preferences or `preferredProviderId` [#42].
 - Made `TxWaitReceipt.ok` nullable for unrecognized execution payloads [#26].

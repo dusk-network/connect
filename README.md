@@ -78,7 +78,7 @@ A no-bundler demo lives at `examples/vanilla/` and imports the SDK directly from
 From a fresh checkout, build the SDK once before serving the repo locally:
 
 ```bash
-npm install
+npm ci
 npm run build
 python3 -m http.server 5173
 ```
@@ -174,8 +174,19 @@ import { verifyTypedDataSignature } from "@dusk/connect/bls";
 
 The unreleased `./typed-data` and `./bls` entrypoints use
 [`@dusk/typed-data`](https://github.com/dusk-network/typed-data). The root entrypoint
-loads no cryptography. These integrations currently require the unpublished
-`0.1.0-next.0` package; registry publication and lockfiles must be completed before release.
+loads no cryptography. This integration pins the published JSR
+`@dusk/typed-data@0.1.0-rc.0` release through its npm compatibility registry;
+no native npm publication of the library is required.
+
+`npx jsr add` configures the JSR registry for npm projects. When installing a packed
+Connect build manually in another npm project, configure that scope first:
+
+```sh
+npm config set @jsr:registry=https://npm.jsr.io --location=project
+```
+
+This checkout already includes that `.npmrc` setting and a registry-backed lockfile;
+use `npm ci` to reproduce it. The protocol remains draft, not frozen.
 
 Verification requires trusted chain/origin expectations and an explicit `result.ok`
 check. Given the original typed input and the Wallet response:

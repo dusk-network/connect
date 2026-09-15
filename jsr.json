@@ -10,7 +10,7 @@
     "./bls": "./src/bls/index.ts"
   },
   "imports": {
-    "@dusk/typed-data": "jsr:@dusk/typed-data@0.1.0-next.0"
+    "@dusk/typed-data": "jsr:@dusk/typed-data@0.1.0-rc.0"
   },
   "publish": {
     "include": [

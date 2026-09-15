@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { findPackageJSON } from "node:module";
+import { dirname, join } from "node:path";
 import { expect, it } from "vitest";
 import { hashTypedDataHex } from "./typed-data/index.js";
 import { verifyTypedDataSignature } from "./bls/index.js";
@@ -24,7 +25,11 @@ it.each([
 });
 
 it("pins the same shared protocol version for npm and JSR", () => {
-  expect(jsr.imports["@dusk/typed-data"]).toBe(`jsr:@dusk/typed-data@${npm.dependencies["@dusk/typed-data"]}`);
+  const version = jsr.imports["@dusk/typed-data"].replace("jsr:@dusk/typed-data@", "");
+  expect(npm.dependencies["@dusk/typed-data"]).toBe(`npm:@jsr/dusk__typed-data@${version}`);
+  const installed = JSON.parse(readFileSync(findPackageJSON("@dusk/typed-data", import.meta.url)!, "utf8"));
+  expect(installed.name).toBe("@jsr/dusk__typed-data");
+  expect(installed.version).toBe(version);
 });
 
 it("exposes shared-package re-exports through the Connect subpaths", () => {
@@ -39,9 +44,10 @@ it("exposes shared-package re-exports through the Connect subpaths", () => {
 });
 
 it("verifies a packaged frozen signature with the required policy and structured result", () => {
-  const require = createRequire(import.meta.url);
-  const vector = JSON.parse(readFileSync(require.resolve(
-    "@dusk/typed-data/vectors/bls-signing/typed_data_digest_nested_struct.json"
+  // ponytail: JSR does not export fixtures; use public subpaths if it adds them.
+  const packageRoot = dirname(findPackageJSON("@dusk/typed-data", import.meta.url)!);
+  const vector = JSON.parse(readFileSync(join(packageRoot,
+    "vectors/bls-signing/typed_data_digest_nested_struct.json"
   ), "utf8"));
   const input = vector.input.typedData;
   const { signatureG1Hex, publicKeyG2Hex } = vector.expected;
