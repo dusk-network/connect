@@ -309,6 +309,12 @@ export class DuskWallet {
     }
 
     this._state = initialState(false);
+    // Register before subscribing: its initial request elicits synchronous announcements.
+    if (opts.provider && isDuskProvider(opts.provider)) {
+      this._provider = opts.provider;
+      this._registerExplicitProvider(opts.provider, opts.providerInfo ?? null, { notify: false, persist: false });
+    }
+
     this._stopDiscovery = subscribeDuskProviders((detail) => {
       this._registerDiscoveredProvider(detail, { notify: false });
       if (this._readySettled && !this._provider && !this._explicitProvider) {
@@ -316,11 +322,6 @@ export class DuskWallet {
       }
       this._notify();
     });
-
-    if (opts.provider && isDuskProvider(opts.provider)) {
-      this._provider = opts.provider;
-      this._registerExplicitProvider(opts.provider, opts.providerInfo ?? null, { notify: false, persist: false });
-    }
 
     this._readyPromise = (async () => {
       if (!this._provider) {
@@ -404,12 +405,16 @@ export class DuskWallet {
   }
 
   private _registerDiscoveredProvider(detail: DuskProviderDetail, opts: { notify?: boolean } = {}): boolean {
-    if (!registerDiscoveredProvider(this._providers, detail)) return false;
+    const changed = registerDiscoveredProvider(this._providers, detail);
     const retained = this._providers.get(detail.info.uuid)!;
+    const selectedConflict = retained.info.conflicted &&
+      (retained.provider === this._provider || detail.provider === this._provider);
+    // A selected later claimant can leave the retained diagnostic entry unchanged.
+    if (!changed && !selectedConflict) return false;
     const ambiguousProduct = this._preferredProviderRdns &&
       this._state.providerInfo?.rdns === this._preferredProviderRdns &&
       [...this._providers.values()].filter(item => item.info.rdns === this._preferredProviderRdns).length > 1;
-    if (ambiguousProduct || (retained.provider === this._provider && retained.info.conflicted)) {
+    if (ambiguousProduct || selectedConflict) {
       // Reuse the existing selection epoch/teardown path for pending reads/events.
       this._applySelectedProvider(null, { notify: false, persist: false });
     } else if (retained.provider === this._provider) {

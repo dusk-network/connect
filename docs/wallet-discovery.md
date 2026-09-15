@@ -136,8 +136,12 @@ The Connect collector and wrapper expose a single diagnostic entry with
 The collector remembers conflicts for its collection cycle; the wrapper retains
 them for its lifetime, clears a conflicting selection through its existing
 selection-change handling, and refuses selection of that UUID. Re-announcements
-cannot clear a conflict. Caller-supplied `conflicted` metadata cannot create a
-conflict, including with an explicit `providerInfo`. The optional modal displays
+cannot clear a conflict. This also applies to constructor-supplied providers without
+`providerInfo`: once observed claiming a conflicted UUID, their selection is cleared
+regardless of announcement order, including during initialization. Explicit providers
+not observed participating in the conflict remain usable.
+Caller-supplied `conflicted` metadata cannot create a conflict, including with an
+explicit `providerInfo`. The optional modal displays
 and disables conflicted entries. Raw-provider users must handle later
 announcements/selection changes; a one-shot collector is not a lifetime monitor or an authentication mechanism.
 

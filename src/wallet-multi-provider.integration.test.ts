@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DuskWalletProviderChangedError, DuskWalletProviderSelectionError } from "./errors.js";
 import { DUSK_SELECTED_PROVIDER_STORAGE_KEY, requestDuskProviders } from "./discovery.js";
@@ -104,6 +104,83 @@ describe("integration: multi-provider wallet selection", () => {
       await refused;
       expect(wallet.provider).toBeNull();
     } finally { wallet.destroy(); selected.cleanup(); collision?.cleanup(); }
+  });
+
+  it.each([
+    ["Q,P", true],
+    ["P,Q", true],
+    ["P,R,Q", true],
+    ["P,R", false], // A conflict Q has not joined must not disable explicit Q.
+  ] as const)("handles metadata-less explicit selection after announcements %s", async (order, quarantine) => {
+    const uuid = "11111111-1111-4111-8111-111111111111";
+    let finish!: (value: string) => void;
+    const response = new Promise<string>(resolve => { finish = resolve; });
+    const fixtures = {
+      Q: installReferenceWallet({ info: { uuid, name: "Q" }, announceOnStart: false,
+        requestOverrides: { dusk_chainId: () => response } }),
+      P: installReferenceWallet({ info: { uuid, name: "P" }, announceOnStart: false }),
+      R: installReferenceWallet({ info: { uuid, name: "R" }, announceOnStart: false }),
+    };
+    // Remove automatic request listeners; announce manually after initialization.
+    Object.values(fixtures).forEach(fixture => fixture.cleanup());
+    const requests = vi.spyOn(fixtures.Q.provider, "request");
+    const wallet = createDuskWallet({ provider: fixtures.Q.provider, autoRefresh: false, waitForProvider: false });
+    try {
+      await wallet.ready();
+      expect(wallet.providers).toEqual([]);
+      expect(wallet.provider).toBe(fixtures.Q.provider);
+      expect(requests).not.toHaveBeenCalled();
+      const epoch = wallet.selectionEpoch;
+      const read = wallet.getChainId().catch(error => error);
+      expect(requests).toHaveBeenCalledTimes(1);
+      for (const name of order.split(",") as Array<keyof typeof fixtures>) fixtures[name].announce();
+      expect(wallet.providers).toMatchObject([{ uuid, conflicted: true }]);
+      finish("dusk:2");
+      const outcome = await read;
+      const next = await wallet.getChainId().catch(error => error);
+      expect({
+        selected: wallet.provider === fixtures.Q.provider,
+        epochDelta: wallet.selectionEpoch - epoch,
+        pending: outcome instanceof DuskWalletProviderChangedError ? "changed" : outcome,
+        next: next instanceof DuskWalletProviderSelectionError ? "selection-required" : next,
+        rpcCalls: requests.mock.calls.length,
+      }).toEqual(quarantine
+        ? { selected: false, epochDelta: 1, pending: "changed", next: "selection-required", rpcCalls: 1 }
+        : { selected: true, epochDelta: 0, pending: "dusk:2", next: "dusk:2", rpcCalls: 2 });
+    } finally {
+      finish("dusk:2");
+      wallet.destroy();
+      Object.values(fixtures).forEach(fixture => fixture.cleanup());
+    }
+  });
+
+  it.each([
+    ["Q,P", false],
+    ["P,Q", false],
+    ["P,R,Q", false],
+    ["Q,P", true],
+    ["P,Q", true],
+  ] as const)("refuses an explicit startup conflict %s (providerInfo=%s)", async (order, withInfo) => {
+    const uuid = "11111111-1111-4111-8111-111111111111";
+    const fixtures = order.split(",").map(name => installReferenceWallet({
+      info: { uuid, name }, announceOnStart: false,
+    }));
+    const selected = fixtures.find(fixture => fixture.info.name === "Q")!;
+    const requests = vi.spyOn(selected.provider, "request");
+    const wallet = createDuskWallet({ provider: selected.provider,
+      ...(withInfo ? { providerInfo: selected.info } : {}), autoRefresh: false, waitForProvider: false });
+    try {
+      // Request listeners announce synchronously before construction returns.
+      expect(wallet.providers).toMatchObject([{ uuid, conflicted: true }]);
+      await wallet.ready();
+      const next = await wallet.getChainId().catch(error => error);
+      expect(wallet.provider).toBeNull();
+      expect(next).toBeInstanceOf(DuskWalletProviderSelectionError);
+      expect(requests).not.toHaveBeenCalled();
+    } finally {
+      wallet.destroy();
+      fixtures.forEach(fixture => fixture.cleanup());
+    }
   });
 
   it("persists a product hint and restores its new session UUID only when unambiguous", async () => {

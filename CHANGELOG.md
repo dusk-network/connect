@@ -19,6 +19,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Cleared metadata-less explicit providers participating in UUID conflicts, including during discovery initialization [#42].
 - Kept caller-supplied metadata from creating discovery conflicts [#42].
 - Preserved explicit constructor selections when saved product hints become ambiguous [#42].
 - Preserved brace-prefixed legacy provider preferences [#42].
