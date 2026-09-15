@@ -2,7 +2,14 @@
 import { describe, expect, it } from "vitest";
 import { createDuskWallet } from "./wallet.js";
 import { createMockProvider } from "./test/mocks.js";
-import type { DuskProfile } from "./types.js";
+import { ERROR_CODES } from "./errors.js";
+import type { ConnectOptions, DuskProfile } from "./types.js";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
 
 describe("same-provider session and network changes", () => {
   it.each(["connect", "getProfiles", "refresh"] as const)(
@@ -154,5 +161,178 @@ describe("same-provider session and network changes", () => {
       await pending;
       wallet.destroy();
     }
+  });
+
+  it.each(["connect", "requestProfiles"] as const)("allows overlapping %s calls in an unchanged session", async (method) => {
+    const provider = createMockProvider({ authorized: true });
+    const wallet = createDuskWallet({ provider, autoRefresh: false });
+    await wallet.ready();
+    const profiles = wallet.state.profiles;
+    try {
+      await expect(Promise.all([wallet[method](), wallet[method]()])).resolves.toEqual([profiles, profiles]);
+      expect(wallet.state).toMatchObject({ authorized: true, profiles });
+    } finally { wallet.destroy(); }
+  });
+
+  it("keeps an earlier connection valid when a later disclosure is denied", async () => {
+    const provider = createMockProvider({ authorized: true });
+    const wallet = createDuskWallet({ provider, autoRefresh: false });
+    await wallet.ready();
+    const profiles = wallet.state.profiles;
+    const delayed = deferred<DuskProfile[]>();
+    provider.setResponse("dusk_requestProfiles", (params: unknown) => {
+      if ((params as ConnectOptions | undefined)?.shieldedReceiveAddress) {
+        throw Object.assign(new Error("Disclosure denied"), { code: ERROR_CODES.USER_REJECTED });
+      }
+      return delayed.promise;
+    });
+    const pending = Promise.allSettled([wallet.connect()]);
+    try {
+      await expect(wallet.connect({ shieldedReceiveAddress: true })).rejects.toMatchObject({
+        name: "DuskWalletUserRejectedError", code: ERROR_CODES.USER_REJECTED,
+      });
+      expect(provider.isAuthorized).toBe(true);
+      expect(provider.profiles).toEqual(profiles);
+      delayed.resolve(profiles);
+      expect(await pending).toEqual([{ status: "fulfilled", value: profiles }]);
+      expect(wallet.state).toMatchObject({ authorized: true, profiles });
+    } finally { delayed.resolve(profiles); await pending; wallet.destroy(); }
+  });
+
+  it.each(["getProfiles", "refresh", "requestShieldedAddress"] as const)(
+    "keeps a pending %s valid across an unchanged connection",
+    async (method) => {
+      const provider = createMockProvider({ authorized: true });
+      const wallet = createDuskWallet({ provider, autoRefresh: false });
+      await wallet.ready();
+      const profiles = wallet.state.profiles;
+      const response = method === "requestShieldedAddress"
+        ? { address: "shielded-receive-address", account: profiles[0]!.account, profileId: profiles[0]!.profileId }
+        : profiles;
+      const delayed = deferred<typeof response>();
+      provider.setResponse(method === "requestShieldedAddress" ? "dusk_requestShieldedAddress" : "dusk_profiles", () => delayed.promise);
+      const pending = Promise.allSettled([wallet[method]()]);
+      try {
+        await wallet.connect();
+        delayed.resolve(response);
+        const value = method === "requestShieldedAddress" ? "shielded-receive-address"
+          : method === "refresh" ? expect.objectContaining({ authorized: true, profiles }) : profiles;
+        expect(await pending).toEqual([{ status: "fulfilled", value }]);
+      } finally { delayed.resolve(response); await pending; wallet.destroy(); }
+    }
+  );
+
+  it.each([false, true])("coalesces initial refreshes with autoRefresh=%s without caching settled results", async (autoRefresh) => {
+    const provider = createMockProvider({ authorized: true });
+    const wallet = createDuskWallet({ provider, autoRefresh });
+    if (!autoRefresh) await wallet.ready();
+    expect(wallet.state.node).toBeNull();
+    const epoch = wallet.networkEpoch;
+    try {
+      const states = await Promise.all([wallet.refresh(), wallet.refresh()]);
+      const expected = {
+        authorized: true, profiles: provider.profiles, chainId: "dusk:2",
+        node: { nodeUrl: "https://testnet.nodes.dusk.network" },
+      };
+      expect(states).toMatchObject([expected, expected]);
+      expect(states[0]).not.toBe(states[1]);
+      states[0]!.profiles[0]!.account = "modified-copy";
+      expect(states[1]!.profiles).toEqual(provider.profiles);
+      expect(wallet.state.profiles).toEqual(provider.profiles);
+      expect(wallet.networkEpoch).toBe(epoch + 1);
+      expect(provider.request).toHaveBeenCalledTimes(3);
+      await wallet.ready();
+      await wallet.refresh();
+      await wallet.refresh();
+      expect(provider.request).toHaveBeenCalledTimes(9);
+    } finally { await wallet.ready(); wallet.destroy(); }
+  });
+
+  it.each(["disconnect", "lock", "chain", "node"] as const)(
+    "starts a fresh refresh after %s and retains it when the old refresh settles",
+    async (change) => {
+      const provider = createMockProvider({ authorized: true });
+      const wallet = createDuskWallet({ provider, autoRefresh: false });
+      await wallet.ready();
+      const old = deferred<string>();
+      const fresh = deferred<string>();
+      let next = old.promise;
+      let chainReads = 0;
+      provider.setResponse("dusk_chainId", () => { chainReads++; return next; });
+      const stale = Promise.allSettled([wallet.refresh(), wallet.refresh()]);
+      let current: Promise<unknown> | undefined;
+      try {
+        if (change === "disconnect") await wallet.disconnect();
+        if (change === "lock") provider.setProfiles([]);
+        if (change === "chain") provider.setChainId("dusk:3");
+        const nodeUrl = change === "node" ? "https://new-node.example" : "https://testnet.nodes.dusk.network";
+        if (change === "node") provider.emit("duskNodeChanged", { chainId: "dusk:2", nodeUrl, networkName: "New node" });
+        provider.setResponse("dusk_getCapabilities", { chainId: provider.chainId, nodeUrl });
+        next = fresh.promise;
+        const first = wallet.refresh();
+        current = Promise.allSettled([first]);
+        old.resolve("dusk:2");
+        const reason = change === "disconnect" || change === "lock" ? "session_changed" : "network_changed";
+        expect(await stale).toMatchObject([
+          { status: "rejected", reason: { name: "DuskSdkError", data: { reason } } },
+          { status: "rejected", reason: { name: "DuskSdkError", data: { reason } } },
+        ]);
+        current = Promise.allSettled([first, wallet.refresh()]);
+        expect(chainReads).toBe(2);
+        fresh.resolve(provider.chainId!);
+        const expected = {
+          authorized: provider.isAuthorized, profiles: provider.profiles,
+          chainId: provider.chainId, node: { nodeUrl },
+        };
+        expect(await current).toMatchObject([
+          { status: "fulfilled", value: expected }, { status: "fulfilled", value: expected },
+        ]);
+        expect(wallet.state).toMatchObject(expected);
+      } finally {
+        old.resolve("dusk:2"); fresh.resolve(provider.chainId!);
+        await stale; await current; wallet.destroy();
+      }
+    }
+  );
+
+  it("coalesces a refresh reentered synchronously through a provider event", async () => {
+    const provider = createMockProvider({ authorized: true });
+    const wallet = createDuskWallet({ provider, autoRefresh: false });
+    await wallet.ready();
+    const caps = await wallet.getCapabilities();
+    provider.request.mockClear();
+    let joined!: ReturnType<typeof wallet.refresh>;
+    wallet.on("chainChanged", () => { joined = wallet.refresh(); });
+    provider.setResponse("dusk_getCapabilities", () => {
+      provider.setResponse("dusk_getCapabilities", caps);
+      provider.emit("chainChanged", provider.chainId!);
+      return caps;
+    });
+    try {
+      const first = wallet.refresh();
+      const states = await Promise.all([first, joined]);
+      expect(states).toEqual([wallet.state, wallet.state]);
+      expect(wallet.state.node?.nodeUrl).toBe(caps.nodeUrl);
+      expect(provider.request).toHaveBeenCalledTimes(3);
+    } finally { wallet.destroy(); }
+  });
+
+  it("rechecks both refresh callers after a subscriber disconnects", async () => {
+    const provider = createMockProvider({ authorized: true });
+    const wallet = createDuskWallet({ provider, autoRefresh: false });
+    await wallet.ready();
+    wallet.subscribe((state) => {
+      if (state.authorized && state.node) {
+        provider.setAuthorized(false);
+        provider.emit("disconnect", { code: ERROR_CODES.DISCONNECTED, message: "Disconnected" });
+      }
+    });
+    try {
+      expect(await Promise.allSettled([wallet.refresh(), wallet.refresh()])).toMatchObject([
+        { status: "rejected", reason: { name: "DuskSdkError", data: { reason: "session_changed" } } },
+        { status: "rejected", reason: { name: "DuskSdkError", data: { reason: "session_changed" } } },
+      ]);
+      expect(wallet.state).toMatchObject({ authorized: false, profiles: [], accounts: [] });
+    } finally { wallet.destroy(); }
   });
 });

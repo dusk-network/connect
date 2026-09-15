@@ -17,8 +17,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
-- Discarded delayed profile and shielded-address responses after disconnect without disabling provider events. ([#37](https://github.com/dusk-network/connect/issues/37))
-- Prevented stale refresh results from overwriting newer chain/node events. ([#38](https://github.com/dusk-network/connect/issues/38))
+- Discard delayed profile and shielded-address responses after disconnect without disabling provider events [#37].
+- Preserve valid overlapping connections and reads in an unchanged wallet session [#37].
+- Prevent stale refresh results from overwriting newer chain/node events [#38].
+- Coalesce overlapping refreshes within the same wallet context [#38].
 - Made live transaction waits race-safe, exact, and retryable [#27].
 - Bound asynchronous wallet operations and contract writes to the selected provider [#24].
 - Prevented contract proxy facets from being treated as promises [#28].
@@ -78,6 +80,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed provider event normalization for profile and chain changes.
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
+[#38]: https://github.com/dusk-network/connect/issues/38
+[#37]: https://github.com/dusk-network/connect/issues/37
 [#28]: https://github.com/dusk-network/connect/issues/28
 [#27]: https://github.com/dusk-network/connect/issues/27
 [#26]: https://github.com/dusk-network/connect/issues/26

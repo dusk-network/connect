@@ -185,7 +185,15 @@ export class DuskWallet {
   private _readySettled = false;
   private _selectionEpoch = 0;
   private _sessionEpoch = 0;
+  private _connectionIntent = 0;
   private _networkEpoch = 0;
+  private _refreshing: {
+    provider: DuskProvider;
+    epoch: number;
+    sessionEpoch: number;
+    networkEpoch: number;
+    promise: Promise<DuskWalletState>;
+  } | null = null;
   private _appEventHandlers = new Map<keyof DuskProviderEventMap, Set<(payload: any) => void>>();
 
   private _profilesFrom(value: unknown): DuskProfile[] {
@@ -700,7 +708,10 @@ export class DuskWallet {
       : await this._requestForSelection<T>(provider, epoch, method, params);
   }
 
-  /** Refresh capabilities, chain id, and approved profiles without prompting. */
+  /**
+   * Refresh capabilities, chain id, and approved profiles without prompting.
+   * Overlapping refreshes share requests within the same provider/session/network context.
+   */
   async refresh(): Promise<DuskWalletState> {
     if (this._destroyed) throw new DuskWalletProviderChangedError("Dusk wallet has been destroyed");
     const p = this._getProvider();
@@ -728,6 +739,37 @@ export class DuskWallet {
     const epoch = this._selectionEpoch;
     const sessionEpoch = this._sessionEpoch;
     const networkEpoch = this._networkEpoch;
+    let pending = this._refreshing;
+    if (
+      !pending ||
+      pending.provider !== p || pending.epoch !== epoch ||
+      pending.sessionEpoch !== sessionEpoch || pending.networkEpoch !== networkEpoch
+    ) {
+      let start!: () => void;
+      const promise = new Promise<DuskWalletState>((resolve, reject) => {
+        start = () => {
+          this._refreshState(p, epoch, sessionEpoch, networkEpoch).then(resolve, reject);
+        };
+      });
+      // Register the refresh before provider calls can synchronously emit events.
+      pending = this._refreshing = { provider: p, epoch, sessionEpoch, networkEpoch, promise };
+      start();
+    }
+    try {
+      const state = await pending.promise;
+      this._assertCurrentSelection(p, epoch, sessionEpoch);
+      return cloneState(state);
+    } finally {
+      if (this._refreshing === pending) this._refreshing = null;
+    }
+  }
+
+  private async _refreshState(
+    p: DuskProvider,
+    epoch: number,
+    sessionEpoch: number,
+    networkEpoch: number
+  ): Promise<DuskWalletState> {
     const [caps, chainId, profiles] = await Promise.all([
       this._requestProvider<DuskProviderCapabilities>(p, "dusk_getCapabilities").catch(() => null),
       this._requestProvider<ChainId>(p, "dusk_chainId").catch(() => null),
@@ -762,9 +804,8 @@ export class DuskWallet {
     );
     this._setProfiles(profiles, { notify: false });
     this._notify();
-    this._assertCurrentSelection(p, epoch, sessionEpoch);
 
-    return this.state;
+    return this._state;
   }
 
   /** Prompt the user to connect (permission grant). */
@@ -775,7 +816,8 @@ export class DuskWallet {
   /** Prompt the user to connect and return approved profile pairs. */
   async requestProfiles(options?: ConnectOptions): Promise<DuskProfile[]> {
     const { provider, epoch } = this._captureSelection();
-    const sessionEpoch = ++this._sessionEpoch;
+    this._connectionIntent++;
+    const sessionEpoch = this._sessionEpoch;
     const params = options && Object.keys(options).length > 0 ? options : undefined;
     const profilesRaw = await this._requestForSelection<DuskProfile[]>(
       provider,
@@ -800,9 +842,12 @@ export class DuskWallet {
     // Discard older reads as soon as revocation is requested, even if the RPC
     // later fails. Do not let its delayed completion clear a newer connection.
     const sessionEpoch = ++this._sessionEpoch;
+    const connectionIntent = this._connectionIntent;
     const res = await this._requestForSelection<boolean>(provider, epoch, "dusk_disconnect");
     this._assertCurrentSelection(provider, epoch);
-    if (sessionEpoch === this._sessionEpoch) this._setDisconnected();
+    if (sessionEpoch === this._sessionEpoch && connectionIntent === this._connectionIntent) {
+      this._setDisconnected();
+    }
     this._assertCurrentSelection(provider, epoch);
     return Boolean(res);
   }
