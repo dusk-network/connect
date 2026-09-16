@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import { createDuskContract } from "./contract.js";
 import { ensureChain } from "./ensureChain.js";
 import { DuskWalletProviderChangedError, DuskWalletProviderSelectionError } from "./errors.js";
-import { DUSK_SELECTED_PROVIDER_STORAGE_KEY, makeDuskAnnounceProviderEvent, requestDuskProviders } from "./discovery.js";
+import { DUSK_ANNOUNCE_PROVIDER_EVENT, DUSK_SELECTED_PROVIDER_STORAGE_KEY, makeDuskAnnounceProviderEvent, requestDuskProviders } from "./discovery.js";
 import { createMockProvider, createMockProviderInfo } from "./test/mocks.js";
 import { installReferenceWallet } from "./test/referenceWallet.js";
 import { createDuskWallet } from "./wallet.js";
@@ -55,9 +55,11 @@ describe("integration: multi-provider wallet selection", () => {
 
   it.each(["write", "ensureChain"])("reports current selection errors after failed startup during %s", async operation => {
     vi.useFakeTimers();
-    const provider = createMockProvider({ responses: { dusk_getCapabilities: { then() {} } } });
-    const info = createMockProviderInfo();
-    const wallet = createDuskWallet({ provider, providerInfo: info, providerReadTimeoutMs: 25 });
+    const fixture = installReferenceWallet({ announceOnStart: false,
+      requestOverrides: { dusk_getCapabilities: () => new Promise(() => {}) } });
+    const { provider, info } = fixture;
+    const requests = vi.spyOn(provider, "request");
+    const wallet = createDuskWallet({ providerReadTimeoutMs: 25 });
     try {
       const startup = wallet.ready().catch(error => error);
       await vi.advanceTimersByTimeAsync(25);
@@ -75,10 +77,10 @@ describe("integration: multi-provider wallet selection", () => {
         : ensureChain(wallet, { chainId: "dusk:2" });
       await expect(request).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
       expect(encodeInputFn).not.toHaveBeenCalled();
-      expect(provider.request.mock.calls.some(([arg]) => arg.method === "dusk_sendTransaction" || arg.method === "dusk_switchNetwork")).toBe(false);
+      expect(requests.mock.calls.some(([arg]) => arg.method === "dusk_sendTransaction" || arg.method === "dusk_switchNetwork")).toBe(false);
       await expect(wallet.ready()).rejects.toBe(error);
       expect(vi.getTimerCount()).toBe(0);
-    } finally { wallet.destroy(); vi.useRealTimers(); }
+    } finally { wallet.destroy(); fixture.cleanup(); vi.useRealTimers(); }
   });
 
   it("keeps the shared registry helper off the public package root", async () => {
@@ -171,12 +173,7 @@ describe("integration: multi-provider wallet selection", () => {
     } finally { wallet.destroy(); selected.cleanup(); collision?.cleanup(); }
   });
 
-  it.each([
-    ["Q,P", true],
-    ["P,Q", true],
-    ["P,R,Q", true],
-    ["P,R", false], // A conflict Q has not joined must not disable explicit Q.
-  ] as const)("handles metadata-less explicit selection after announcements %s", async (order, quarantine) => {
+  it.each(["Q,P", "P,Q", "P,R,Q", "P,R"])("preserves metadata-less explicit selection after late announcements %s", async order => {
     const uuid = "11111111-1111-4111-8111-111111111111";
     let finish!: (value: string) => void;
     const response = new Promise<string>(resolve => { finish = resolve; });
@@ -209,9 +206,9 @@ describe("integration: multi-provider wallet selection", () => {
         pending: outcome instanceof DuskWalletProviderChangedError ? "changed" : outcome,
         next: next instanceof DuskWalletProviderSelectionError ? "selection-required" : next,
         rpcCalls: requests.mock.calls.length,
-      }).toEqual(quarantine
-        ? { selected: false, epochDelta: 1, pending: "changed", next: "selection-required", rpcCalls: 1 }
-        : { selected: true, epochDelta: 0, pending: "dusk:2", next: "dusk:2", rpcCalls: 2 });
+      }).toEqual({ selected: true, epochDelta: 0, pending: "dusk:2", next: "dusk:2", rpcCalls: 2 });
+      expect(wallet.providerInfo?.name).not.toBe("P"); // Never adopt the other object's retained metadata.
+      await expect(wallet.selectProvider(uuid)).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
     } finally {
       finish("dusk:2");
       wallet.destroy();
@@ -246,6 +243,155 @@ describe("integration: multi-provider wallet selection", () => {
       wallet.destroy();
       fixtures.forEach(fixture => fixture.cleanup());
     }
+  });
+
+  it.each(["picker", "connect", "constructor"])("keeps the exact %s choice through collisions, requests and later switches", async choice => {
+    const info = createMockProviderInfo({ uuid: "chosen", name: "Chosen Wallet" });
+    if (choice === "connect") localStorage.setItem(DUSK_SELECTED_PROVIDER_STORAGE_KEY, JSON.stringify({ version: 1, rdns: info.rdns }));
+    const selected = createMockProvider({ accounts: ["chosen-account"] });
+    const impostor = createMockProvider({ chainId: "dusk:999", accounts: ["impostor-account"], authorized: true });
+    const healthy = createMockProvider({ accounts: ["healthy-account"], authorized: true });
+    const wallet = createDuskWallet(choice === "constructor"
+      ? { provider: selected, providerInfo: info, autoRefresh: false }
+      : { autoRefresh: false, waitForProvider: false });
+    onTestFinished(() => wallet.destroy());
+    await wallet.ready();
+    const announce = (provider = selected, metadata = info) => window.dispatchEvent(makeDuskAnnounceProviderEvent({ info: metadata, provider }));
+    announce();
+    if (choice === "picker") await wallet.selectProvider(info.uuid);
+    if (choice === "connect") await wallet.connect();
+    else selected.setAuthorized(true);
+    await wallet.refresh();
+    const state = wallet.state;
+    const epoch = wallet.selectionEpoch;
+    const networkEpoch = wallet.networkEpoch;
+    const chainEvents = vi.fn();
+    wallet.on("chainChanged", chainEvents);
+    let finish!: (value: string) => void;
+    selected.setResponse("dusk_chainId", () => new Promise<string>(resolve => { finish = resolve; }));
+    const pending = wallet.getChainId().catch(error => error);
+    announce(impostor, { ...info, name: "Scam Wallet", rdns: "example.scam" });
+    finish("dusk:2");
+    expect(await pending).toBe("dusk:2");
+    selected.setResponse("dusk_chainId", undefined);
+    for (let i = 0; i < 2; i++) { announce(impostor); announce(); }
+    await wallet.discoverProviders({ timeoutMs: 0 });
+    expect(wallet.provider).toBe(selected);
+    expect(wallet.selectionEpoch).toBe(epoch);
+    expect(wallet.networkEpoch).toBe(networkEpoch);
+    expect(wallet.state).toMatchObject({ ...state,
+      providerInfo: { ...info, conflicted: true },
+      availableProviders: [{ ...info, conflicted: true }], lastUpdated: expect.any(Number) });
+    await expect(wallet.selectProvider(info.uuid)).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
+    impostor.emit("chainChanged", "dusk:999");
+    impostor.emit("profilesChanged", [{ profileId: "evil", account: "impostor-account" }]);
+    impostor.emit("disconnect", { code: 4900, message: "forged" });
+    impostor.emit("duskNodeChanged", { chainId: "dusk:999", nodeUrl: "https://scam.example", networkName: "Scam" });
+    expect(wallet.state.node).toEqual(state.node);
+    expect(wallet.networkEpoch).toBe(networkEpoch);
+    expect(wallet.state.chainId).toBe("dusk:2");
+    expect(wallet.state.accounts).toEqual(["chosen-account"]);
+    expect(chainEvents).not.toHaveBeenCalled();
+    selected.setChainId("dusk:3");
+    expect(wallet.state.chainId).toBe("dusk:3");
+    expect(chainEvents).toHaveBeenCalledWith("dusk:3");
+    selected.setResponse("dusk_signMessage", { signature: "chosen-signature" });
+    await expect(wallet.signMessage("hello")).resolves.toEqual({ signature: "chosen-signature" });
+    const contract = createDuskContract({ contractId: "0x" + "11".repeat(32), wallet,
+      driver: { encodeInputFn: () => new Uint8Array([1]) } as any });
+    await expect(contract.write["ping"]!(null, { privacy: "public" })).resolves.toMatchObject({ hash: "0xtxhash" });
+    expect(impostor.request).not.toHaveBeenCalled();
+    expect(impostor.on).not.toHaveBeenCalled();
+    await wallet.disconnect(); // Permission revocation does not change the chosen provider object.
+    expect(wallet.state.authorized).toBe(false);
+    expect(wallet.state.accounts).toEqual([]);
+    expect(wallet.provider).toBe(selected);
+    await wallet.connect();
+    expect(wallet.state.accounts).toEqual(["chosen-account"]);
+    announce(healthy, { ...info, uuid: "healthy", name: "Healthy Wallet" });
+    expect(wallet.provider).toBe(selected); // Even a duplicate product hint cannot override the choice.
+    selected.setResponse("dusk_chainId", () => new Promise<string>(resolve => { finish = resolve; }));
+    const oldRead = wallet.getChainId().catch(error => error);
+    await wallet.selectProvider("healthy");
+    finish("dusk:3");
+    expect(await oldRead).toBeInstanceOf(DuskWalletProviderChangedError);
+    expect(wallet.provider).toBe(healthy);
+    expect(wallet.selectionEpoch).toBe(epoch + 1);
+    announce();
+    announce(impostor);
+    selected.setAccounts(["late-old-account"]);
+    expect(wallet.state.accounts).toEqual(["healthy-account"]);
+    await expect(wallet.selectProvider(info.uuid)).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
+    expect(wallet.provider).toBe(healthy);
+  });
+
+  it.each(["picker", "connect", "constructor"])("preserves a %s choice while its initial RPC is pending", async choice => {
+    const info = createMockProviderInfo();
+    const selected = createMockProvider();
+    let finish!: (value: any) => void;
+    selected.setResponse(choice === "connect" ? "dusk_requestProfiles" : "dusk_chainId",
+      () => new Promise(resolve => { finish = resolve; }));
+    const wallet = createDuskWallet(choice === "constructor"
+      ? { provider: selected, providerInfo: info }
+      : { autoRefresh: false, waitForProvider: false });
+    onTestFinished(() => wallet.destroy());
+    if (choice !== "constructor") {
+      await wallet.ready();
+      window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: selected }));
+    }
+    const choosing = (choice === "constructor" ? wallet.ready()
+      : choice === "picker" ? wallet.selectProvider(info.uuid) : wallet.connect()).catch(error => error);
+    const epoch = wallet.selectionEpoch;
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: createMockProvider() }));
+    finish(choice === "connect" ? [{ profileId: "approved", account: "chosen-account" }] : "dusk:2");
+    const result = await choosing;
+    if (choice === "constructor") expect(result).toBe(wallet);
+    else expect(result).toMatchObject(choice === "connect"
+      ? [{ profileId: "approved", account: "chosen-account" }]
+      : { chainId: "dusk:2" });
+    expect(wallet.state.chainId).toBe("dusk:2");
+    expect(wallet.provider).toBe(selected);
+    expect(wallet.selectionEpoch).toBe(epoch);
+    expect(wallet.providerInfo?.conflicted).toBe(true);
+  });
+
+  it.each(["single", "preferred", "stored", "connect-event"])("still quarantines an automatic %s selection", async mode => {
+    const info = createMockProviderInfo();
+    if (mode === "stored") localStorage.setItem(DUSK_SELECTED_PROVIDER_STORAGE_KEY, JSON.stringify({ version: 1, rdns: info.rdns }));
+    const selected = createMockProvider({ authorized: true });
+    const wallet = createDuskWallet({ autoRefresh: false, waitForProvider: false,
+      ...(mode === "preferred" ? { preferredProviderId: info.uuid } : {}) });
+    onTestFinished(() => wallet.destroy());
+    await wallet.ready();
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: selected }));
+    if (mode === "connect-event") selected.emit("connect", { chainId: "dusk:2" });
+    expect(wallet.provider).toBe(selected);
+    const epoch = wallet.selectionEpoch;
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: createMockProvider() }));
+    expect(wallet.provider).toBeNull();
+    expect(wallet.selectionEpoch).toBe(epoch + 1);
+    await expect(wallet.connect()).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
+    await expect(wallet.selectProvider(info.uuid)).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
+  });
+
+  it("does not treat a reentrant forged first announcement as an explicit selection", async () => {
+    const info = createMockProviderInfo();
+    const genuine = createMockProvider();
+    const forged = createMockProvider();
+    const intercept = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (detail.provider === genuine) window.dispatchEvent(makeDuskAnnounceProviderEvent({ info: detail.info, provider: forged }));
+    };
+    window.addEventListener(DUSK_ANNOUNCE_PROVIDER_EVENT, intercept);
+    onTestFinished(() => window.removeEventListener(DUSK_ANNOUNCE_PROVIDER_EVENT, intercept));
+    const wallet = createDuskWallet({ autoRefresh: false, waitForProvider: false });
+    onTestFinished(() => wallet.destroy());
+    await wallet.ready();
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: genuine }));
+    expect(wallet.provider).toBeNull();
+    expect(wallet.providers).toMatchObject([{ uuid: info.uuid, conflicted: true }]);
+    await expect(wallet.selectProvider(info.uuid)).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
+    expect(forged.request).not.toHaveBeenCalled();
   });
 
   it("persists a product hint and restores its new session UUID only when unambiguous", async () => {
@@ -326,7 +472,8 @@ describe("integration: multi-provider wallet selection", () => {
       expect(wallet.providers[0]?.conflicted).toBeUndefined();
       collision = installReferenceWallet({ info: { uuid: first.info.uuid }, announceOnStart: false });
       collision.announce();
-      expect(wallet.provider).toBeNull();
+      expect(wallet.provider).toBe(first.provider);
+      expect(wallet.providerInfo?.conflicted).toBe(true);
       expect(wallet.providers[0]?.conflicted).toBe(true);
       await expect(wallet.selectProvider(first.info.uuid)).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
       first.announce();

@@ -68,10 +68,6 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-function walletLabel(st: DuskWalletState): string {
-  return st.providerInfo?.name || "Choose wallet";
-}
-
 function connectTitle(appName: string | undefined): string {
   const app = (appName || "").trim();
   if (!app) return "Connect wallet";
@@ -618,7 +614,12 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     const notice = root?.querySelector<HTMLElement>("#dwcProviderNotice");
     if (notice) notice.hidden = walletStatus(st) === "missing" || st.availableProviders.length === 0;
     const warning = root?.querySelector<HTMLElement>("#dwcConflicts");
-    if (warning) warning.hidden = !st.availableProviders.some(provider => provider.conflicted);
+    if (warning) {
+      warning.hidden = !st.availableProviders.some(provider => provider.conflicted);
+      warning.textContent = wallet.provider
+        ? "Conflicting wallet identifiers detected. Your selected provider is unchanged. Conflicting entries cannot be selected."
+        : "Conflicting wallet identifiers detected. Conflicting entries are disabled; resolve the conflict and reload, or choose another wallet.";
+    }
 
     if (walletStatus(st) === "missing") {
       const targets = getDuskWalletInstallTargets();
@@ -684,7 +685,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
                 <span class="dconnect-provider-rdns">${escapeHtml(provider.rdns)}</span>
               </span>
             </span>
-            <span class="dconnect-provider-tag">${provider.conflicted ? "Conflict" : selected ? "Selected" : "Available"}</span>
+            <span class="dconnect-provider-tag">${provider.conflicted ? selected ? "Selected · Conflict" : "Conflict" : selected ? "Selected" : "Available"}</span>
           </button>
         `;
       })
@@ -799,7 +800,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           return;
         }
 
-        const needsSelection = st.availableProviders.length > 0 && !st.providerId;
+        const needsSelection = st.availableProviders.length > 0 && !st.providerId && !wallet.provider;
         if (needsSelection) return;
 
         if (status === "connected") {
@@ -831,7 +832,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     const status = walletStatus(st);
     const acct = st.selectedProfile?.account || st.profiles?.[0]?.account || "";
     const net = networkLabel(st);
-    const needsSelection = st.availableProviders.length > 0 && !st.providerId;
+    const needsSelection = st.availableProviders.length > 0 && !st.providerId && !wallet.provider;
 
     if ($title) {
       const app = (options.appName || "").trim();
@@ -848,7 +849,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
       $status.textContent = needsSelection ? "Choose wallet" : STATUS_TEXT[status];
     }
 
-    if ($wallet) $wallet.textContent = walletLabel(st);
+    if ($wallet) $wallet.textContent = st.providerInfo?.name || (wallet.provider ? "Selected wallet" : "Choose wallet");
     if ($account) $account.textContent = acct ? shortenMiddle(acct, 10, 8) : "—";
     if ($network) $network.textContent = net || "—";
     if ($copy) $copy.hidden = !acct;

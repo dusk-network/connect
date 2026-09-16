@@ -48,10 +48,16 @@ Wallet discovery is **event-based**, not singleton-based:
   preference or `preferredProviderId` leaves selection empty until a match
   arrives or the user explicitly selects another instance. Constructor-supplied
   providers are explicit choices, not restored product hints.
-- Conflicting UUID claims appear as `conflicted: true` and cannot be selected;
-  the optional modal shows the conflict and disables the entry. Low-level
-  `requestDuskProviders()` users must check this flag and handle later changes.
-  UUIDs and `rdns` are self-attested, not authentication. See the
+- Conflicting UUID claims appear as `conflicted: true` and cannot be newly
+  selected. An explicit `selectProvider()`, `connect()` or `requestProfiles()`
+  choice retains its exact provider object across later collisions; the other
+  claimant cannot replace or disconnect it. Constructor-supplied providers get
+  the same continuity after synchronous startup discovery checks. Automatic-only
+  selections still clear on conflict. The modal warns and disables conflicting
+  picker entries without disabling the existing choice's connect/disconnect
+  controls. Low-level `requestDuskProviders()` users must check the flag and
+  handle later changes themselves. This preserves a choice, not authentication:
+  UUIDs and `rdns` remain self-attested. See the
   [discovery rules](./docs/wallet-discovery.md#selection-rules).
 - Chain IDs are CAIP-2 strings such as `dusk:2`, not bare decimal or
   hexadecimal numbers. Parse the numeric component with

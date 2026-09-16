@@ -190,6 +190,7 @@ export class DuskWallet {
   private readonly _providerReadTimeoutMs: number;
   private _stopDiscovery: (() => void) | null = null;
   private _explicitProvider = false;
+  private _chosenProvider: DuskProvider | null = null;
   private _rememberLastUsed = true;
   private _providerStorageKey = DUSK_SELECTED_PROVIDER_STORAGE_KEY;
   private _preferredProviderId: string | null = null;
@@ -356,6 +357,9 @@ export class DuskWallet {
       this._notify();
     });
 
+    // Check synchronous startup announcements before pinning a constructor choice.
+    if (this._explicitProvider) this._chosenProvider = this._provider;
+
     this._readyPromise = (async () => {
       if (!this._provider) {
         const details =
@@ -452,8 +456,8 @@ export class DuskWallet {
     const ambiguousProduct = this._preferredProviderRdns &&
       this._state.providerInfo?.rdns === this._preferredProviderRdns &&
       [...this._providers.values()].filter(item => item.info.rdns === this._preferredProviderRdns).length > 1;
-    if (ambiguousProduct || selectedConflict) {
-      // Reuse the existing selection epoch/teardown path for pending reads/events.
+    if ((ambiguousProduct || selectedConflict) && this._chosenProvider !== this._provider) {
+      // Quarantine automatic choices; a later claimant cannot evict an explicit object choice.
       this._applySelectedProvider(null, { notify: false, persist: false });
     } else if (retained.provider === this._provider) {
       this._patch({ providerInfo: cloneProviderInfo(retained.info) }, { notify: false });
@@ -505,6 +509,7 @@ export class DuskWallet {
     const nextProviderId = nextInfo?.uuid ?? null;
     const sameProvider = this._provider === nextProvider;
     const sameInfo = providerInfoEq(this._state.providerInfo, nextInfo);
+    if (this._chosenProvider !== nextProvider) this._chosenProvider = null;
 
     if (!sameProvider) {
       this._unbindProviderEvents();
@@ -748,6 +753,7 @@ export class DuskWallet {
     if (!detail) throw new DuskWalletProviderNotFoundError(`Unknown Dusk wallet provider: ${id}`);
     if (detail.info.conflicted) throw new DuskWalletProviderSelectionError("Conflicting wallet identifier; reload after resolving the conflict");
 
+    this._chosenProvider = detail.provider;
     this._applySelectedProvider(detail, { notify: false });
     const { provider, epoch } = this._captureSelection();
     await this.refresh();
@@ -896,6 +902,8 @@ export class DuskWallet {
   /** Prompt the user to connect and return approved profile pairs. */
   async requestProfiles(options?: ConnectOptions): Promise<DuskProfile[]> {
     const { provider, epoch } = this._captureSelection();
+    // Calling connect/requestProfiles chooses this object, not permission or wallet authenticity.
+    this._chosenProvider = provider;
     this._connectionIntent++;
     const sessionEpoch = this._sessionEpoch;
     const params = options && Object.keys(options).length > 0 ? options : undefined;

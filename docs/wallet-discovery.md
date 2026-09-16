@@ -133,24 +133,52 @@ Recommended behavior:
 
 The same UUID and same provider object may update display metadata. Distinct
 provider objects claiming the same UUID are a conflict, not first-wins or
-last-wins ownership: dApps MUST make the conflict visible and MUST NOT select
-that UUID. Do not silently switch to another provider after a collision.
+last-wins ownership: dApps MUST make the conflict visible and MUST NOT make a
+new selection through that UUID. An existing explicit object choice may continue
+as described below. Do not silently switch to another provider after a collision.
 
 The Connect collector and wrapper expose a single diagnostic entry with
 `info.conflicted: true`, retaining the first object's metadata for display only.
 The collector remembers conflicts for its collection cycle; the wrapper retains
-them for its lifetime, clears a conflicting selection through its existing
-selection-change handling, and refuses selection of that UUID. Re-announcements
-cannot clear a conflict. This also applies to constructor-supplied providers without
-`providerInfo`: once observed claiming a conflicted UUID, their selection is cleared
-regardless of announcement order, including during initialization. Explicit providers
-not observed participating in the conflict remain usable.
-Caller-supplied `conflicted` metadata cannot create a conflict, including with an
-explicit `providerInfo`. The optional modal displays
-and disables conflicted entries. Raw-provider users must handle later
-announcements/selection changes; a one-shot collector is not a lifetime monitor or an authentication mechanism.
+them for its lifetime. Re-announcements cannot clear a conflict. Caller-supplied
+`conflicted` metadata cannot create one, including with an explicit `providerInfo`.
 
-Connect stores explicit product choices as `{ "version": 1, "rdns": "…" }` under
+The wrapper distinguishes automatic discovery from an explicit object choice:
+
+- Before an explicit choice, a conflict clears any participating automatic
+  selection through the existing selection-change handling. This includes lone
+  providers, saved hints and `preferredProviderId`. `selectProvider(uuid)` still
+  refuses a conflicted UUID, even if that UUID is currently in use.
+- `selectProvider(uuid)` chooses its unconflicted provider object before its
+  refresh. Calling `connect()` / `requestProfiles()` also chooses the current
+  object before requesting approval, covering the modal's lone-wallet flow.
+  These calls express application intent, not successful authorization or proof
+  of a user gesture. A rejected approval does not grant permission.
+- A constructor-supplied provider becomes an explicit choice after the initial
+  synchronous discovery announcements have been checked. Startup conflicts
+  still clear participating providers, with or without `providerInfo` and
+  regardless of announcement order. Later announcements do not evict the choice,
+  even if initial read RPCs are still pending or have timed out.
+- Once chosen, the exact object remains the request/event target on later UUID
+  collisions or duplicate product claims. Its selection epoch, pending requests
+  and own chain/profile events remain valid. A competing object supplies neither
+  routing nor selected metadata. The conflict is still visible and cannot be
+  used for a fresh selection, including after choosing a different wallet.
+- Switching explicitly to an unconflicted provider replaces the choice and
+  invalidates old work normally; destruction still stops the wrapper. Disconnect
+  and lock retain their existing permission/session semantics, not a new wallet
+  selection. Reconnection therefore uses the same chosen object, never a fresh
+  lookup of the conflicted UUID. Choices are not authenticated identities and
+  are not restored as trusted objects across page loads.
+
+The optional modal warns about conflicts and disables their picker entries;
+connect/disconnect controls for a retained choice remain usable. Raw-provider
+users must handle later announcements/selection changes themselves; a one-shot
+collector is not a lifetime monitor or an authentication mechanism. Low-level
+`wallet.request()` calls alone do not establish an explicit choice; select the
+provider first when using that API.
+
+Connect stores `selectProvider()` product choices as `{ "version": 1, "rdns": "…" }` under
 `dusk.connect.selectedProvider` (or `providerStorageKey`). A saved product hint
 restores only when exactly one discovered entry matches; a later duplicate
 match clears automatic restoration, but not an explicit instance choice (including

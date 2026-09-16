@@ -18,6 +18,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Preserved explicit provider choices across later discovery collisions, with visible warnings and no replacement; pre-selection and automatic-only conflicts remain quarantined [#45].
 - Pinned the shared typed-data RC through JSR's npm compatibility registry for reproducible installs [wallet#22].
 - **Breaking:** Removed signer resource limits from `./typed-data`; use `@dusk/typed-data/policy` instead [typed-data#2].
 - Required explicit choice for unmatched saved preferences or `preferredProviderId` [#42].
@@ -38,7 +39,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Prevent stale refresh results from overwriting newer chain/node events [#38].
 - Coalesce overlapping refreshes within the same wallet context [#38].
 - Declared optional typed-data signing support and protocol versions in provider capabilities [wallet#22].
-- Cleared metadata-less explicit providers participating in UUID conflicts, including during discovery initialization [#42].
+- Cleared metadata-less explicit providers participating in UUID conflicts during synchronous discovery initialization [#42].
 - Kept caller-supplied metadata from creating discovery conflicts [#42].
 - Preserved explicit constructor selections when saved product hints become ambiguous [#42].
 - Preserved brace-prefixed legacy provider preferences [#42].
@@ -101,6 +102,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed provider event normalization for profile and chain changes.
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
+[#45]: https://github.com/dusk-network/connect/issues/45
 [#44]: https://github.com/dusk-network/connect/issues/44
 [#46]: https://github.com/dusk-network/connect/issues/46
 [#38]: https://github.com/dusk-network/connect/issues/38
