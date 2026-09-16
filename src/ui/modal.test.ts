@@ -53,6 +53,7 @@ describe("connect modal", () => {
     ];
 
     expect(section.textContent).toBe("Install");
+    expect(document.querySelector<HTMLElement>("#dwcProviderNotice")?.hidden).toBe(true);
     expect(primary.textContent).toBe("Refresh wallets");
     expect(installButtons.map((button) => button.textContent)).toEqual([
       expect.stringContaining("Dusk Wallet"),
@@ -185,50 +186,48 @@ describe("connect modal", () => {
     );
   });
 
-  it("uses the Dusk logo mark for Dusk Wallet rows even when an icon is supplied", () => {
-    const wallet = createMockUiWallet({
-      installed: true,
-      authorized: false,
-      accounts: [],
-      availableProviders: [
-        {
-          uuid: "wallet.dusk.extension",
-          name: "Dusk Wallet",
-          icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Ctext%3ED%3C/text%3E%3C/svg%3E",
-          rdns: "network.dusk.wallet",
-        },
-      ],
-    });
-    const modal = createDuskConnectModal(wallet as any);
+  it.each([
+    { name: "Dusk Wallet" },
+    { rdns: "network.dusk.wallet" },
+    { rdns: "evil.dusk.wallet" },
+    { name: "Piewallet" },
+    { name: "Pie Wallet" },
+    { rdns: "evil.piewallet.example" },
+    { rdns: "evil.pieswap.example" },
+    { uuid: "evil-piewallet-instance" },
+    { uuid: "evil-pieswap-instance" },
+    { rdns: "evil.harbor.example" },
+  ].flatMap(claim => ["", "data:image/png;base64,AA=="].map(icon => ({ ...claim, icon }))))(
+    "does not award SDK branding to self-reported metadata: %j",
+    (claim) => {
+      const info = { uuid: "unverified", name: "Example Wallet", rdns: "com.example.wallet", ...claim };
+      const wallet = createMockUiWallet({
+        installed: true, authorized: false, accounts: [], availableProviders: [info],
+      });
+      const modal = createDuskConnectModal(wallet as any);
+      onTestFinished(() => modal.destroy());
+      modal.open();
 
-    modal.open();
-
-    expect(document.querySelector(".dconnect-provider-mark")).toBeTruthy();
-    expect(document.querySelector(".dconnect-provider-icon")).toBeNull();
-  });
-
-  it("uses the Piewallet logo for Piewallet rows even when a generic icon is supplied", () => {
-    const wallet = createMockUiWallet({
-      installed: true,
-      authorized: false,
-      accounts: [],
-      availableProviders: [
-        {
-          uuid: "wallet.piewallet.extension",
-          name: "Piewallet",
-          icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Ctext%3EP%3C/text%3E%3C/svg%3E",
-          rdns: "network.dusk.piewallet",
-        },
-      ],
-    });
-    const modal = createDuskConnectModal(wallet as any);
-
-    modal.open();
-
-    const icon = document.querySelector(".dconnect-provider-icon") as HTMLImageElement | null;
-    expect(icon?.getAttribute("src")).toBe(PIEWALLET_ICON_URL);
-    expect(document.querySelector(".dconnect-provider-initial")).toBeNull();
-  });
+      const row = document.querySelector<HTMLButtonElement>('[data-action="select-provider"]')!;
+      expect(row.querySelector(".dconnect-provider-dusk")).toBeNull();
+      expect(row.querySelector(".dconnect-provider-name")?.textContent).toBe(info.name);
+      expect(row.querySelector(".dconnect-provider-rdns")?.textContent).toBe(info.rdns);
+      if (info.icon) {
+        expect(row.querySelector("img")?.getAttribute("src")).toBe(info.icon);
+        expect(row.querySelector(".dconnect-provider-initial")).toBeNull();
+      } else {
+        expect(row.querySelector("img")).toBeNull();
+        const initial = row.querySelector<HTMLElement>(".dconnect-provider-initial")!;
+        expect(initial.textContent).toBe(info.name[0]);
+        expect(initial.style.getPropertyValue("--dconnect-provider-accent")).toBe("#71B1FF");
+      }
+      const notice = document.querySelector<HTMLElement>("#dwcProviderNotice")!;
+      expect(notice.hidden).toBe(false);
+      expect(notice.textContent).toContain("self-reported, not verified");
+      row.click();
+      expect(wallet.selectProvider).toHaveBeenCalledWith(info.uuid);
+    }
+  );
 
   it("uses provider initials for iconless non-Dusk wallet rows", () => {
     const wallet = createMockUiWallet({

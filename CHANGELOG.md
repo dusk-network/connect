@@ -23,6 +23,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Stopped assigning SDK-owned wallet branding from self-reported discovery metadata; kept curated installation choices separate [#46].
 - Discard delayed profile and shielded-address responses after disconnect without disabling provider events [#37].
 - Preserve valid overlapping connections and reads in an unchanged wallet session [#37].
 - Keep refresh results current across authorization and profile changes [#37].
@@ -92,6 +93,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed provider event normalization for profile and chain changes.
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
+[#46]: https://github.com/dusk-network/connect/issues/46
 [#38]: https://github.com/dusk-network/connect/issues/38
 [#37]: https://github.com/dusk-network/connect/issues/37
 [typed-data#2]: https://github.com/dusk-network/typed-data/issues/2

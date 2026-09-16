@@ -89,7 +89,12 @@ A wallet's internal bridge routing identifier is separate from its discovery UUI
 
 Neither UUID, `rdns`, name nor icon authenticates a wallet. All announcement
 metadata is self-attested; matching a familiar product string is not proof of
-ownership or a substitute for application authorization.
+ownership or a substitute for application authorization. The Connect modal renders
+all discovered providers uniformly: their supplied icon or a generic initial,
+without substituting SDK-owned artwork based on product-like metadata. Its
+self-reporting notice does not prevent lookalike names or icons. Curated install
+links/artwork belong to the separate missing-wallet installation flow and do not
+endorse a discovered provider.
 
 ## Provider Summary
 
