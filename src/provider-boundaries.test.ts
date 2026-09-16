@@ -158,6 +158,72 @@ describe("provider value boundaries", () => {
 });
 
 describe("bounded non-interactive provider reads", () => {
+  it.each(["unsupported", "omitted", "invalid"].flatMap(node =>
+    ["nodeUrl", "pinnedNodeUrl"].map(option => ({ node, option }))))(
+    "writes after startup recovery with $node capabilities and $option", async ({ node, option }) => {
+      vi.useFakeTimers();
+      const fetch = vi.fn(async () => new Response(new Uint8Array([2])));
+      vi.stubGlobal("fetch", fetch);
+      const provider = createMockProvider({ responses: { dusk_getCapabilities: { then() {} } } });
+      const wallet = walletFor(provider, { providerReadTimeoutMs: 25 });
+      const app = createDuskApp({ wallet, [option]: fallback });
+      const startup = app.ready().catch(error => error);
+      await vi.advanceTimersByTimeAsync(25);
+      const error = await startup;
+      expect(error).toMatchObject({ name: "DuskWalletRequestTimeoutError", data: { method: "dusk_getCapabilities", timeoutMs: 25 } });
+      provider.setResponse("dusk_getCapabilities", () => {
+        if (node === "unsupported") throw Object.assign(new Error("Unsupported"), { code: 4200 });
+        return { chainId: "dusk:2", ...(node === "invalid" ? { nodeUrl: "file:///node" } : {}) };
+      });
+      await wallet.refresh();
+      expect(wallet.state.node).toBeNull();
+      expect(wallet.state.chainId).toBe("dusk:2");
+      expect(app.nodeUrl()).toBe(fallback);
+      await expect(app.readContract({ contract, functionName: "read" })).resolves.toEqual([2]);
+      expect(fetch.mock.calls[0]?.[0]).toBe(`${fallback}/on/contracts:${"11".repeat(32)}/read`);
+      provider.request.mockClear();
+      const writing = app.writeContract({ contract, functionName: "write", privacy: "public", chain: { chainId: "dusk:2" } });
+      await expect(writing).resolves.toMatchObject({ hash: "0xtxhash" });
+      const handle = await writing;
+      const methods = provider.request.mock.calls.map(([arg]) => arg.method);
+      expect(methods.filter(method => method === "dusk_requestProfiles")).toHaveLength(1);
+      expect(methods.filter(method => method === "dusk_sendTransaction")).toHaveLength(1);
+      expect(handle.origin.nodeUrl).toBe("");
+      await expect(handle.wait()).rejects.toMatchObject({ name: "DuskTxTrackingUnavailableError" });
+      await expect(app.ready()).rejects.toBe(error); // Recovery does not rewrite initial readiness.
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it.each(["hydrate", "timeout"])("still waits for pending startup to %s before a contract write", async outcome => {
+    vi.useFakeTimers();
+    const caps = deferred<unknown>();
+    const provider = createMockProvider({ authorized: true, responses: { dusk_getCapabilities: () => caps.promise } });
+    const wallet = walletFor(provider, { providerReadTimeoutMs: 25 });
+    const app = createDuskApp({ wallet, nodeUrl: fallback });
+    const startup = app.ready().catch(error => error);
+    const settled = vi.fn();
+    const writing = app.writeContract({ contract, functionName: "write", privacy: "public" }).then(settled, settled);
+    await vi.advanceTimersByTimeAsync(24);
+    expect(settled).not.toHaveBeenCalled();
+    expect(provider.request.mock.calls.some(([arg]) => arg.method === "dusk_sendTransaction")).toBe(false);
+    if (outcome === "hydrate") {
+      caps.resolve({ chainId: "dusk:2", nodeUrl: fallback });
+      await writing;
+      await expect(startup).resolves.toBe(wallet);
+      expect(settled).toHaveBeenCalledWith(expect.objectContaining({ hash: "0xtxhash", origin: expect.objectContaining({ nodeUrl: fallback }) }));
+    } else {
+      await vi.advanceTimersByTimeAsync(1);
+      const error = await startup;
+      await writing;
+      expect(error).toMatchObject({ name: "DuskWalletRequestTimeoutError" });
+      expect(settled).toHaveBeenCalledWith(error);
+      expect(provider.request.mock.calls.some(([arg]) => arg.method === "dusk_sendTransaction")).toBe(false);
+    }
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it.each(reads)("rejects ready when %s returns a never-settling thenable", async (method) => {
     vi.useFakeTimers();
     const provider = createMockProvider({ responses: { [method]: { then() {} } } });

@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
+import { createDuskContract } from "./contract.js";
+import { ensureChain } from "./ensureChain.js";
 import { DuskWalletProviderChangedError, DuskWalletProviderSelectionError } from "./errors.js";
-import { DUSK_SELECTED_PROVIDER_STORAGE_KEY, requestDuskProviders } from "./discovery.js";
+import { DUSK_SELECTED_PROVIDER_STORAGE_KEY, makeDuskAnnounceProviderEvent, requestDuskProviders } from "./discovery.js";
+import { createMockProvider, createMockProviderInfo } from "./test/mocks.js";
 import { installReferenceWallet } from "./test/referenceWallet.js";
 import { createDuskWallet } from "./wallet.js";
 
@@ -14,6 +17,68 @@ describe("integration: multi-provider wallet selection", () => {
 
   afterEach(() => {
     window.localStorage.clear();
+  });
+
+  it.each([42, { arbitrary: true }, ["dusk:3"], null])("clears the previous provider's chain before hydrating a replacement: %j", async chainId => {
+    const unsupported = () => { throw Object.assign(new Error("Unsupported"), { code: 4200 }); };
+    const first = createMockProvider({ chainId: "dusk:2" });
+    const next = createMockProvider({ responses: {
+      dusk_getCapabilities: unsupported, dusk_chainId: unsupported, dusk_switchNetwork: null,
+    } });
+    Object.defineProperty(next, "chainId", { get: () => chainId });
+    const info = createMockProviderInfo({ uuid: "next", rdns: "example.next" });
+    const wallet = createDuskWallet({ provider: first });
+    onTestFinished(() => wallet.destroy());
+    await wallet.ready();
+    expect(wallet.state.chainId).toBe("dusk:2");
+    const epoch = wallet.selectionEpoch;
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: next }));
+    const selecting = wallet.selectProvider(info.uuid);
+    const immediate = wallet.state;
+    await selecting;
+    expect(wallet.provider).toBe(next);
+    expect(wallet.selectionEpoch).toBe(epoch + 1);
+    expect(immediate.chainId).toBeNull();
+    expect(wallet.state.chainId).toBeNull();
+    expect(wallet.state.node).toBeNull();
+    await expect(ensureChain(wallet, { chainId: "dusk:2" })).resolves.toBe(true);
+    expect(next.request).toHaveBeenLastCalledWith({ method: "dusk_switchNetwork", params: [{ chainId: "dusk:2" }] });
+
+    // Once B supplies a valid chain, malformed B updates may retain B's snapshot, never A's.
+    next.setResponse("dusk_chainId", "dusk:3");
+    await wallet.refresh();
+    expect(wallet.state.chainId).toBe("dusk:3");
+    next.setResponse("dusk_chainId", unsupported);
+    await wallet.refresh();
+    expect(wallet.state.chainId).toBe(chainId === null ? null : "dusk:3"); // Explicit null still clears.
+  });
+
+  it.each(["write", "ensureChain"])("reports current selection errors after failed startup during %s", async operation => {
+    vi.useFakeTimers();
+    const provider = createMockProvider({ responses: { dusk_getCapabilities: { then() {} } } });
+    const info = createMockProviderInfo();
+    const wallet = createDuskWallet({ provider, providerInfo: info, providerReadTimeoutMs: 25 });
+    try {
+      const startup = wallet.ready().catch(error => error);
+      await vi.advanceTimersByTimeAsync(25);
+      const error = await startup;
+      expect(error).toMatchObject({ name: "DuskWalletRequestTimeoutError" });
+      window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: createMockProvider() }));
+      expect(wallet.provider).toBeNull();
+      expect(wallet.providers[0]?.conflicted).toBe(true);
+      const encodeInputFn = vi.fn(() => new Uint8Array());
+      const contract = createDuskContract({
+        contractId: "0x" + "11".repeat(32), wallet, driver: { encodeInputFn } as any,
+      });
+      const request = operation === "write"
+        ? contract.write["ping"]!(undefined, { privacy: "public" })
+        : ensureChain(wallet, { chainId: "dusk:2" });
+      await expect(request).rejects.toBeInstanceOf(DuskWalletProviderSelectionError);
+      expect(encodeInputFn).not.toHaveBeenCalled();
+      expect(provider.request.mock.calls.some(([arg]) => arg.method === "dusk_sendTransaction" || arg.method === "dusk_switchNetwork")).toBe(false);
+      await expect(wallet.ready()).rejects.toBe(error);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { wallet.destroy(); vi.useRealTimers(); }
   });
 
   it("keeps the shared registry helper off the public package root", async () => {

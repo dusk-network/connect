@@ -195,7 +195,7 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
       const autoConnect = writeOpts?.autoConnect ?? opts.autoConnect ?? true;
       const chainTarget = writeOpts?.chain ?? opts.chain;
       let provider = wallet.provider;
-      if (!provider) {
+      if (!provider && wallet.initializing) {
         await wallet.ready?.();
         provider = wallet.provider;
       }
@@ -206,7 +206,7 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
         }
       };
 
-      if (!wallet.state.node) {
+      if (!wallet.state.node && wallet.initializing) {
         await wallet.ready?.();
         assertSelection();
       }

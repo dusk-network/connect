@@ -20,6 +20,7 @@ function createWalletStub(overrides: {
 
   return {
     state,
+    initializing: true,
     provider: { id: "provider" },
     selectionEpoch: 0,
     ready: vi.fn(async () => null),

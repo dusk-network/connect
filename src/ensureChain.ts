@@ -35,7 +35,7 @@ export async function ensureChain(
   opts: EnsureChainOptions = {}
 ): Promise<boolean> {
   let provider = wallet.provider;
-  if (!provider && !opts.selection) {
+  if (!provider && !opts.selection && wallet.initializing) {
     await wallet.ready();
     provider = wallet.provider;
   }

@@ -9,6 +9,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Added read-only `wallet.initializing` to distinguish pending initialization from a settled success or failure [#44].
 - Added opt-in `pinnedNodeUrl` for app reads without changing the existing `nodeUrl` fallback semantics or the wallet's transaction network [#44].
 - Added configurable `providerReadTimeoutMs` (default 10 seconds) and `DuskWalletRequestTimeoutError` for non-interactive provider reads, including initial readiness [#44].
 - Added validated conversion between Base58 Moonlight accounts and `0x` public-key hex [#92].
@@ -25,6 +26,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Cleared the previous provider's chain snapshot before hydrating a replacement provider [#44].
+- Stopped replaying settled startup errors into contract writes and chain checks after recovery [#44].
 - Validated node URLs at every wallet state ingress and before node I/O: HTTPS or HTTP on loopback, without credentials, queries or fragments. Invalid provider URLs clear the node snapshot; invalid app URLs throw [#44].
 - Guarded chain ID types across provider properties, RPCs and events; made `connect` reread provider state instead of trusting its payload as permission [#44].
 - Documented that typed-data capability flags are unvalidated declarations, not enforced signing gates [#44].

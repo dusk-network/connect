@@ -245,8 +245,13 @@ with an integer from 1 through 2,147,483,647 milliseconds. A timeout rejects wit
 `DuskWalletRequestTimeoutError` (a `DuskSdkError`) and `data: { method, timeoutMs }`;
 it does not invent a provider RPC error code. Initial read timeouts reject
 `ready()` too; catch that error and offer `wallet.refresh()` to retry. `ready()`
-records the initial attempt, not the retry. Other unsupported/failed initialization
-reads retain their best-effort fallback behavior.
+records the initial attempt, not the retry. Read-only `wallet.initializing` is
+`true` only while that initial discovery/refresh is pending, and becomes `false`
+after either success or failure; it does not indicate authorization or recovery.
+Contract writes and chain checks do not replay a settled startup error. After a
+successful `refresh()`, a write can proceed even without an advertised node;
+its handle still refuses automatic tracking when the submission node is unknown.
+Other unsupported/failed initialization reads retain their best-effort fallback behavior.
 
 The deadline does **not** cancel the provider operation, and late read responses
 do not update the wrapper state. Connect does not apply this deadline to approvals,

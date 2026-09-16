@@ -9,6 +9,9 @@ createDuskApp({ pinnedNodeUrl: 42 });
 createDuskWallet({ providerReadTimeoutMs: "20s" });
 
 declare const wallet: ReturnType<typeof createDuskWallet>;
+const initializing: boolean = wallet.initializing;
+// @ts-expect-error Initialization status is read-only.
+wallet.initializing = false;
 const { features } = await wallet.getCapabilities();
 const supportsTypedDataV1: boolean | undefined =
   features.signTypedData && features.signTypedDataVersions?.includes(1);

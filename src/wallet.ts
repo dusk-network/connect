@@ -530,7 +530,7 @@ export class DuskWallet {
             profiles: [],
             selectedAddress: null,
             selectedProfile: null,
-            chainId: nextProvider?.chainId ?? null,
+            chainId: null, // Hydrate only after clearing the previous provider's chain.
             node: null,
             capabilities: null,
             availableProviders: this._availableProviderInfos(),
@@ -681,6 +681,11 @@ export class DuskWallet {
   async ready(): Promise<this> {
     await this._readyPromise;
     return this;
+  }
+
+  /** Whether initial discovery/refresh is pending; false after either success or failure. */
+  get initializing(): boolean {
+    return !this._readySettled;
   }
 
   /** The currently selected provider, if any. */
