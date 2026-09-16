@@ -565,10 +565,13 @@ describe("wallet", () => {
       account: "dusk1publicprofile",
       shieldedAddress: "dusk1profiledshielded",
     });
-    expect(provider.request).toHaveBeenLastCalledWith({
+    expect(provider.request).toHaveBeenNthCalledWith(1, {
       method: "dusk_requestProfiles",
       params: { shieldedReceiveAddress: true, reason: "payment_request" },
     });
+    expect(provider.request.mock.calls.map(([arg]) => arg.method)).toEqual([
+      "dusk_requestProfiles", "dusk_getCapabilities", "dusk_chainId", "dusk_profiles",
+    ]);
   });
 
   it("forwards shielded transfer privacy before sending to the provider", async () => {

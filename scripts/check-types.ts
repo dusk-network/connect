@@ -1,5 +1,12 @@
 // Compile against public exports after building; this file is never executed.
-import { createDuskWallet, type DuskProviderCapabilities } from "@dusk/connect";
+import { createDuskWallet, createDuskApp, DuskWalletRequestTimeoutError, type DuskProviderCapabilities } from "@dusk/connect";
+
+createDuskApp({ pinnedNodeUrl: "https://node.example", wallet: { providerReadTimeoutMs: 20_000 } });
+const timeout: Error = new DuskWalletRequestTimeoutError("dusk_profiles", 20_000);
+// @ts-expect-error A pinned node URL must be a string.
+createDuskApp({ pinnedNodeUrl: 42 });
+// @ts-expect-error The read deadline is a number, not a duration string.
+createDuskWallet({ providerReadTimeoutMs: "20s" });
 
 declare const wallet: ReturnType<typeof createDuskWallet>;
 const { features } = await wallet.getCapabilities();

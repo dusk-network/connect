@@ -10,6 +10,22 @@ export function normalizeBaseUrl(url: string): string {
   return String(url || "").trim().replace(/\/+$/, "");
 }
 
+/** Accept HTTPS, or HTTP on loopback, without credentials, query or fragment. */
+export function normalizeNodeUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value.trim());
+    const loopback = url.hostname === "localhost" || url.hostname === "[::1]" || /^127(?:\.\d+){3}$/.test(url.hostname);
+    if (
+      (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
+      url.username || url.password || url.href.includes("?") || url.href.includes("#")
+    ) return null;
+    return normalizeBaseUrl(url.href);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Normalize a CAIP-2 chain id, returning canonical `dusk:<id>` or "".
  *
