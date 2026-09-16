@@ -18,7 +18,7 @@ import { bytesToHex } from "./bytes.js";
 import { DuskTxTrackingUnavailableError, DuskWalletProviderChangedError } from "./errors.js";
 import { ensureChain } from "./ensureChain.js";
 import { normalizeContractId0x } from "./internal/contractId.js";
-import { compact, normalizeBaseUrl, normalizeCaip2ChainId } from "./internal/normalize.js";
+import { compact, normalizeNodeUrl, normalizeCaip2ChainId } from "./internal/normalize.js";
 import { waitForTxReceipt } from "./internal/tx.js";
 
 /** Optional wallet transaction fields for a contract call. */
@@ -195,7 +195,7 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
       const autoConnect = writeOpts?.autoConnect ?? opts.autoConnect ?? true;
       const chainTarget = writeOpts?.chain ?? opts.chain;
       let provider = wallet.provider;
-      if (!provider) {
+      if (!provider && wallet.initializing) {
         await wallet.ready?.();
         provider = wallet.provider;
       }
@@ -206,7 +206,7 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
         }
       };
 
-      if (!wallet.state.node) {
+      if (!wallet.state.node && wallet.initializing) {
         await wallet.ready?.();
         assertSelection();
       }
@@ -227,11 +227,11 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
 
       const walletNode = wallet.state.node;
       const walletNodeUrl = walletNode?.chainId === wallet.state.chainId ? walletNode.nodeUrl : "";
-      const nodeUrl = walletNodeUrl ? normalizeBaseUrl(walletNodeUrl) : "";
+      const nodeUrl = normalizeNodeUrl(walletNodeUrl) ?? "";
       const targetConfirmed =
         (!chainTarget?.chainId ||
           normalizeCaip2ChainId(chainTarget.chainId) === normalizeCaip2ChainId(wallet.state.chainId ?? "")) &&
-        (!chainTarget?.nodeUrl || normalizeBaseUrl(chainTarget.nodeUrl) === nodeUrl);
+        (!chainTarget?.nodeUrl || normalizeNodeUrl(chainTarget.nodeUrl) === nodeUrl);
       const origin: TxOrigin = Object.freeze({
         providerId: wallet.state.providerId ?? null,
         selectionEpoch: selection.epoch,

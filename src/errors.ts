@@ -54,6 +54,14 @@ export class DuskWalletNotInstalledError extends DuskSdkError {
   }
 }
 
+/** A non-interactive provider read timed out; the underlying operation is not cancelled. */
+export class DuskWalletRequestTimeoutError extends DuskSdkError {
+  constructor(method: string, timeoutMs: number) {
+    super(`Dusk Wallet ${method} timed out after ${timeoutMs}ms`, { data: { method, timeoutMs } });
+    this.name = "DuskWalletRequestTimeoutError";
+  }
+}
+
 /** Raised when a provider does not support the requested method. */
 export class DuskWalletUnsupportedMethodError extends DuskSdkError {
   constructor(message = "Dusk Wallet does not support this method") {

@@ -1,7 +1,6 @@
 import type { ConnectOptions, DuskProviderInfo, DuskWalletState } from "../types.js";
 import type { DuskWallet } from "../wallet.js";
 import {
-  PIEWALLET_ICON_URL,
   getDuskWalletInstallTargets,
   type DuskWalletInstallTarget,
 } from "./installOptions.js";
@@ -79,47 +78,15 @@ function connectTitle(appName: string | undefined): string {
   return /^connect\b/i.test(app) ? app : `Connect ${app}`;
 }
 
-function isDuskProvider(provider: DuskProviderInfo): boolean {
-  const name = String(provider.name || "").trim().toLowerCase();
-  const rdns = String(provider.rdns || "").trim().toLowerCase();
-  return name === "dusk wallet" || rdns === "network.dusk.wallet" || rdns.endsWith(".dusk.wallet");
-}
-
-function isPiewalletProvider(provider: DuskProviderInfo): boolean {
-  const name = String(provider.name || "").trim().toLowerCase();
-  const rdns = String(provider.rdns || "").trim().toLowerCase();
-  const uuid = String(provider.uuid || "").trim().toLowerCase();
-  return (
-    name === "piewallet" ||
-    name === "pie wallet" ||
-    rdns.includes("piewallet") ||
-    rdns.includes("pieswap") ||
-    uuid.includes("piewallet") ||
-    uuid.includes("pieswap")
-  );
-}
-
 function providerInitial(provider: DuskProviderInfo): string {
   const initial = String(provider.name || "Wallet").trim().charAt(0).toUpperCase();
   return /^[A-Z0-9]$/.test(initial) ? initial : "W";
 }
 
-function providerAccent(provider: DuskProviderInfo): string {
-  const rdns = String(provider.rdns || "").toLowerCase();
-  if (rdns.includes("harbor")) return "#6FBF8E";
-  return "#71B1FF";
-}
-
 function renderProviderIcon(provider: DuskProviderInfo): string {
   const icon = String(provider.icon || "").trim();
-  if (isDuskProvider(provider)) {
-    return `<span class="dconnect-provider-mark dconnect-provider-dusk" aria-hidden="true"></span>`;
-  }
-  if (isPiewalletProvider(provider)) {
-    return `<img class="dconnect-provider-icon" src="${PIEWALLET_ICON_URL}" alt="" />`;
-  }
   if (!icon) {
-    return `<span class="dconnect-provider-mark dconnect-provider-initial" style="--dconnect-provider-accent: ${providerAccent(provider)}" aria-hidden="true">${providerInitial(provider)}</span>`;
+    return `<span class="dconnect-provider-mark dconnect-provider-initial" style="--dconnect-provider-accent: #71B1FF" aria-hidden="true">${providerInitial(provider)}</span>`;
   }
   return `<img class="dconnect-provider-icon" src="${escapeHtml(icon)}" alt="" />`;
 }
@@ -648,6 +615,8 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
 
   const renderProviders = (st: DuskWalletState) => {
     if (!$providers) return;
+    const notice = root?.querySelector<HTMLElement>("#dwcProviderNotice");
+    if (notice) notice.hidden = walletStatus(st) === "missing" || st.availableProviders.length === 0;
     const warning = root?.querySelector<HTMLElement>("#dwcConflicts");
     if (warning) warning.hidden = !st.availableProviders.some(provider => provider.conflicted);
 
@@ -759,6 +728,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           <div class="dconnect-section">
             <div class="dconnect-section-label" id="dwcSectionLabel">Wallets</div>
             <div class="dconnect-provider-list" id="dwcProviders" hidden></div>
+            <div class="dconnect-hint" id="dwcProviderNotice" hidden>Wallet names, identifiers and icons are self-reported, not verified.</div>
             <div class="dconnect-hint" id="dwcConflicts" role="alert" hidden>Conflicting wallet identifiers detected. Conflicting entries are disabled; resolve the conflict and reload, or choose another wallet.</div>
           </div>
           <div class="dconnect-actions">

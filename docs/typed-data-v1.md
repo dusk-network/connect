@@ -7,6 +7,24 @@ Connect exposes hashing through `@dusk/connect/typed-data` and signature verific
 
 Verification requires a trusted `{ chainId, origin }` policy and returns a structured result. Check `result.ok`, not the truthiness of the object. Applications must also check signer identity, authorization and replay/expiry rules. Bare-digest verification is not typed-data verification.
 
+## Capability declarations
+
+`getCapabilities().features.signTypedData` and `signTypedDataVersions` are optional,
+untrusted provider declarations. Connect forwards them; it does not validate the
+versions array or gate `wallet.request("dusk_signTypedData", ...)`. Consumers own
+feature detection and must still handle RPC refusals and verify the signature:
+
+```ts
+const features = (await wallet.getCapabilities())?.features;
+const versions = features?.signTypedDataVersions;
+const advertisesV1 = features?.signTypedData === true &&
+  Array.isArray(versions) &&
+  versions.every(version => Number.isSafeInteger(version) && version > 0) &&
+  versions.includes(1);
+```
+
+A true result is not proof of implementation, signer identity, or signature validity.
+
 Signer resource checks are deliberately separate: import `checkPolicyLimits` from `@dusk/typed-data/policy`, not `@dusk/connect/typed-data`. They do not define digest validity; verifiers must support otherwise-valid inputs within the spec's floor and may decline larger requests at their transport boundary.
 
 The shared library owns the encoder, BLS verifier, generators and vectors. Its [provenance](https://github.com/dusk-network/typed-data/blob/main/PROVENANCE.md) preserves ichbindas's original work from [Connect #35](https://github.com/dusk-network/connect/pull/35); this integration does not need that PR merged first.

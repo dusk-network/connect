@@ -31,6 +31,7 @@ import {
   DuskWalletProviderChangedError,
   DuskWalletProviderNotFoundError,
   DuskWalletProviderSelectionError,
+  DuskWalletRequestTimeoutError,
   DuskWalletUnauthorizedError,
   DuskWalletUnsupportedMethodError,
   DuskWalletUserRejectedError,
@@ -51,7 +52,7 @@ import {
 } from "./discovery.js";
 
 import { normalizeContractId0x } from "./internal/contractId.js";
-import { normalizeBaseUrl } from "./internal/normalize.js";
+import { normalizeBaseUrl, normalizeNodeUrl } from "./internal/normalize.js";
 import { bytesToHex, toBytes } from "./bytes.js";
 
 /** Provider discovery wait options used by {@link DuskWallet}. */
@@ -77,6 +78,9 @@ export type DuskWalletOptions = {
   /** Immediately fetch `dusk_chainId` and `dusk_profiles` on init. Default: true. */
   autoRefresh?: boolean;
 
+  /** Deadline for capabilities, chain, profiles, balance and gas reads. Positive integer ms; default: 10_000. */
+  providerReadTimeoutMs?: number;
+
   /** Remember the selected product's rdns; restore only a unique match. Default: true. */
   rememberLastUsedProvider?: boolean;
 
@@ -88,6 +92,9 @@ export type DuskWalletOptions = {
 export type DuskWalletSubscriber = (state: DuskWalletState) => void;
 
 const EMPTY_PROVIDERS: DuskProviderInfo[] = [];
+const PROVIDER_READ_METHODS = new Set([
+  "dusk_getCapabilities", "dusk_chainId", "dusk_profiles", "dusk_getPublicBalance", "dusk_estimateGas",
+]);
 
 const initialState = (installed: boolean): DuskWalletState => ({
   installed,
@@ -180,6 +187,7 @@ export class DuskWallet {
   private _boundEvents: Array<[keyof DuskProviderEventMap, (payload: any) => void]> = [];
   private _destroyed = false;
   private _readyPromise: Promise<void>;
+  private readonly _providerReadTimeoutMs: number;
   private _stopDiscovery: (() => void) | null = null;
   private _explicitProvider = false;
   private _rememberLastUsed = true;
@@ -265,7 +273,7 @@ export class DuskWallet {
       {
         installed: this._providers.size > 0 || Boolean(this._provider),
         chainId: p.chainId ?? this._state.chainId,
-        authorized: Boolean(p.isAuthorized),
+        authorized: p.isAuthorized === true,
       },
       opts
     );
@@ -274,11 +282,12 @@ export class DuskWallet {
     }
   }
 
-  private _onConnect = (payload: DuskProviderEventMap["connect"]) => {
-    const nextChainId = payload?.chainId ?? this._provider?.chainId ?? null;
-    if (!this._state.authorized || this._state.chainId !== nextChainId) {
-      this._patch({ authorized: true, chainId: nextChainId });
-    }
+  private _onConnect = () => {
+    if (!this._provider) return;
+    // The event is a hint, not a permission grant or authoritative chain snapshot.
+    this._hydrateFromProvider(this._provider, { notify: false });
+    this._notify();
+    void this.refresh().catch(() => {});
   };
 
   private _onDisconnect = (_payload: DuskProviderEventMap["disconnect"]) => {
@@ -290,7 +299,7 @@ export class DuskWallet {
     // A locked provider may clear profiles without revoking site permission.
     if (
       Array.isArray(profiles) && profiles.length === 0 &&
-      (this._state.authorized || this._provider?.isAuthorized)
+      (this._state.authorized || this._provider?.isAuthorized === true)
     ) {
       this._sessionEpoch++;
     }
@@ -318,6 +327,10 @@ export class DuskWallet {
   ];
 
   constructor(opts: DuskWalletOptions = {}) {
+    this._providerReadTimeoutMs = opts.providerReadTimeoutMs === undefined ? 10_000 : opts.providerReadTimeoutMs;
+    if (!Number.isInteger(this._providerReadTimeoutMs) || this._providerReadTimeoutMs <= 0 || this._providerReadTimeoutMs > 2_147_483_647) {
+      throw new TypeError("providerReadTimeoutMs must be an integer between 1 and 2147483647");
+    }
     this._explicitProvider = Boolean(opts.provider);
     this._rememberLastUsed = opts.rememberLastUsedProvider !== false;
     this._providerStorageKey = opts.providerStorageKey || DUSK_SELECTED_PROVIDER_STORAGE_KEY;
@@ -362,15 +375,20 @@ export class DuskWallet {
         this._bindProviderEvents();
         this._hydrateFromProvider(this._provider, { notify: false });
         if (opts.autoRefresh !== false) {
-          await this.refresh().catch(() => {});
+          await this.refresh().catch(error => {
+            if (error instanceof DuskWalletRequestTimeoutError) throw error;
+          });
         }
       } else {
         this._syncAvailableProviders({ notify: false });
       }
-
+    })().finally(() => {
       this._readySettled = true;
       this._notify();
-    })();
+    });
+    // Initialization starts eagerly; keep its rejection observable through ready()
+    // without an unhandled rejection when the application has not awaited it yet.
+    void this._readyPromise.catch(() => {});
   }
 
   private _availableProviderInfos(): DuskProviderInfo[] {
@@ -512,7 +530,7 @@ export class DuskWallet {
             profiles: [],
             selectedAddress: null,
             selectedProfile: null,
-            chainId: nextProvider?.chainId ?? null,
+            chainId: null, // Hydrate only after clearing the previous provider's chain.
             node: null,
             capabilities: null,
             availableProviders: this._availableProviderInfos(),
@@ -600,10 +618,17 @@ export class DuskWallet {
   }
 
   private async _requestProvider<T>(provider: DuskProvider, method: string, params?: unknown): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return await provider.request<T>({ method, params });
+      if (!PROVIDER_READ_METHODS.has(method)) return await provider.request<T>({ method, params });
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new DuskWalletRequestTimeoutError(method, this._providerReadTimeoutMs)), this._providerReadTimeoutMs);
+      });
+      return await Promise.race([provider.request<T>({ method, params }), deadline]);
     } catch (err) {
       throw translateProviderError(err);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -652,10 +677,15 @@ export class DuskWallet {
     }
   }
 
-  /** Resolves once initial provider discovery/refresh finished. */
+  /** Resolves after initial discovery/refresh; rejects if a provider read times out. Retry with refresh(). */
   async ready(): Promise<this> {
     await this._readyPromise;
     return this;
+  }
+
+  /** Whether initial discovery/refresh is pending; false after either success or failure. */
+  get initializing(): boolean {
+    return !this._readySettled;
   }
 
   /** The currently selected provider, if any. */
@@ -814,10 +844,17 @@ export class DuskWallet {
     profilesEpoch: number,
     networkEpoch: number
   ): Promise<{ state: DuskWalletState; profilesEpoch: number }> {
+    const optionalRead = (error: unknown) => {
+      if (error instanceof DuskWalletRequestTimeoutError) {
+        this._assertCurrentSelection(p, epoch, sessionEpoch, profilesEpoch);
+        throw error;
+      }
+      return null;
+    };
     const [caps, chainId, profiles] = await Promise.all([
-      this._requestProvider<DuskProviderCapabilities>(p, "dusk_getCapabilities").catch(() => null),
-      this._requestProvider<ChainId>(p, "dusk_chainId").catch(() => null),
-      this._requestProvider<DuskProfile[]>(p, "dusk_profiles").catch(() => []),
+      this._requestProvider<DuskProviderCapabilities>(p, "dusk_getCapabilities").catch(optionalRead),
+      this._requestProvider<ChainId>(p, "dusk_chainId").catch(optionalRead),
+      this._requestProvider<DuskProfile[]>(p, "dusk_profiles").catch(optionalRead),
     ]);
     this._assertCurrentSelection(p, epoch, sessionEpoch, profilesEpoch);
     if (networkEpoch !== this._networkEpoch) {
@@ -829,11 +866,10 @@ export class DuskWallet {
       : typeof caps?.chainId === "string"
         ? caps.chainId
         : p.chainId ?? null;
-    const nodeUrl = typeof caps?.nodeUrl === "string" ? caps.nodeUrl.trim() : "";
-    const nextNode = caps && nodeUrl
+    const nextNode = caps
       ? {
           chainId: nextChainId ?? caps.chainId,
-          nodeUrl,
+          nodeUrl: caps.nodeUrl,
           networkName: caps.networkName,
         }
       : this._state.node;
@@ -842,7 +878,7 @@ export class DuskWallet {
         chainId: nextChainId,
         node: nextNode,
         capabilities: caps,
-        authorized: Boolean(p.isAuthorized),
+        authorized: p.isAuthorized === true,
       },
       { notify: false }
     );
@@ -1157,6 +1193,14 @@ export class DuskWallet {
   }
 
   private _patch(partial: Partial<DuskWalletState>, opts: { notify?: boolean } = {}) {
+    // Validate at the shared state boundary: RPCs, properties and events are all untrusted.
+    if (partial.chainId !== null && typeof partial.chainId !== "string") delete partial.chainId;
+    if (partial.node != null) {
+      const nodeUrl = normalizeNodeUrl(partial.node.nodeUrl);
+      partial.node = nodeUrl && typeof partial.node.chainId === "string"
+        ? { chainId: partial.node.chainId, nodeUrl, networkName: typeof partial.node.networkName === "string" ? partial.node.networkName : "" }
+        : null;
+    }
     // _setProfiles preserves the array for equivalent profile lists.
     if (
       (partial.authorized !== undefined && partial.authorized !== this._state.authorized) ||

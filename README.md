@@ -217,7 +217,7 @@ Use this when you only need wallet discovery + provider access:
 - get balances
 - send transactions
 
-It’s the smallest surface area and has no opinion about contracts, nodes, or data-drivers.
+It’s the smallest surface area and does not create contract facades, node clients, or data-drivers.
 
 ```ts
 import { createDuskWallet } from "@dusk/connect";
@@ -237,6 +237,26 @@ console.log(wallet.state.profiles);
 await wallet.connect({ shieldedReceiveAddress: true, reason: "payment_request" });
 console.log(wallet.state.selectedProfile);
 ```
+
+Non-interactive provider reads (`dusk_getCapabilities`, `dusk_chainId`,
+`dusk_profiles`, `dusk_getPublicBalance`, `dusk_estimateGas`) have a 10-second
+per-request deadline. Configure `createDuskWallet({ providerReadTimeoutMs: 20_000 })`
+with an integer from 1 through 2,147,483,647 milliseconds. A timeout rejects with
+`DuskWalletRequestTimeoutError` (a `DuskSdkError`) and `data: { method, timeoutMs }`;
+it does not invent a provider RPC error code. Initial read timeouts reject
+`ready()` too; catch that error and offer `wallet.refresh()` to retry. `ready()`
+records the initial attempt, not the retry. Read-only `wallet.initializing` is
+`true` only while that initial discovery/refresh is pending, and becomes `false`
+after either success or failure; it does not indicate authorization or recovery.
+Contract writes and chain checks do not replay a settled startup error. After a
+successful `refresh()`, a write can proceed even without an advertised node;
+its handle still refuses automatic tracking when the submission node is unknown.
+Other unsupported/failed initialization reads retain their best-effort fallback behavior.
+
+The deadline does **not** cancel the provider operation, and late read responses
+do not update the wrapper state. Connect does not apply this deadline to approvals,
+signing, transactions, disconnection, or unknown methods. A provider is executable
+page code: timers do not sandbox it or interrupt synchronous JavaScript.
 
 ### `createDuskApp()`
 
@@ -263,6 +283,28 @@ await dusk.ready();
 // dApps/UI components still use the same wallet instance
 await dusk.wallet.connect();
 ```
+
+`nodeUrl` remains a **fallback**, not a pin: a valid wallet-advertised URL takes
+precedence. To keep app reads on a trusted node, use
+`createDuskApp({ pinnedNodeUrl: "https://my-node.example" })`. `pinnedNodeUrl` wins
+over both `nodeUrl` and provider updates, but does not switch or pin the wallet's
+transaction network. Set/check the write `chain` separately. A transaction handle
+refuses automatic tracking when its wallet-reported submission node differs from
+the read node rather than silently following it.
+
+Node URLs must be absolute HTTPS, or HTTP on `localhost`, IPv4 loopback (127/8)
+or `[::1]`, without credentials, query or fragment. They are serialized with the
+native URL parser and stripped of trailing slashes before use, so scheme-like
+inputs cannot become page-relative fetches. For node URL targets, `ensureChain`
+uses the same URL policy and normalization; its `strictNodeUrl` option instead requires the input string to
+match the normalized wallet snapshot exactly. Invalid provider URLs clear
+the node snapshot and app reads use their fallback; invalid app-configured URLs
+throw at construction. The node transport checks the policy again before I/O.
+This is URL validation, **not** node authentication, an IP/DNS/redirect allowlist
+or general SSRF protection. HTTPS alone does not make a provider-selected node
+trustworthy. `connect` events trigger a reread of the provider rather than granting
+permission from their payload; provider authorization and capability claims remain
+self-reported.
 
 Tip: you can share a wallet instance between both APIs:
 

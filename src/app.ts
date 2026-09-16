@@ -15,7 +15,7 @@ import { createDuskWallet, DuskWallet } from "./wallet.js";
 import { createDuskNodeClient } from "./node.js";
 import { fetchWasmDataDriver } from "./driver.js";
 import { ensureChain, type EnsureChainOptions } from "./ensureChain.js";
-import { normalizeBaseUrl, compact } from "./internal/normalize.js";
+import { normalizeBaseUrl, normalizeNodeUrl, compact } from "./internal/normalize.js";
 import { waitForTxReceipt } from "./internal/tx.js";
 import {
   createDuskContract,
@@ -47,8 +47,11 @@ export type DuskAppOptions = {
   /** Provide an existing wallet instance or wallet constructor options */
   wallet?: DuskWallet | DuskWalletOptions;
 
-  /** Fallback node URL for reads (used when the wallet hasn't emitted `duskNodeChanged`). */
+  /** Fallback node URL for reads when the wallet has no valid node URL. HTTPS or HTTP on loopback. */
   nodeUrl?: string;
+
+  /** Fixed read URL, never overridden by the wallet. Does not change the wallet's transaction network. */
+  pinnedNodeUrl?: string;
 
   /** Default chain target enforced before write calls (via ensureChain). */
   chain?: SwitchChainParams;
@@ -255,12 +258,13 @@ function pickTxOverrides(src: any): DuskContractTxOverrides {
  * ```
  */
 export function createDuskApp(opts: DuskAppOptions = {}): DuskApp {
-  const wallet = opts.wallet instanceof DuskWallet ? opts.wallet : createDuskWallet(opts.wallet as DuskWalletOptions);
+  const pinned = opts.pinnedNodeUrl !== undefined;
+  const configuredUrl = pinned ? opts.pinnedNodeUrl : opts.nodeUrl === undefined ? DEFAULT_FALLBACK_NODE_URL : opts.nodeUrl;
+  const appNodeUrl = normalizeNodeUrl(configuredUrl);
+  if (!appNodeUrl) throw new TypeError("Invalid nodeUrl (expected HTTPS or HTTP on loopback without credentials, query or fragment)");
 
-  const nodeUrl = () => {
-    const fromWallet = wallet.state.node?.nodeUrl;
-    return normalizeBaseUrl(String(fromWallet || opts.nodeUrl || DEFAULT_FALLBACK_NODE_URL));
-  };
+  const wallet = opts.wallet instanceof DuskWallet ? opts.wallet : createDuskWallet(opts.wallet as DuskWalletOptions);
+  const nodeUrl = () => pinned ? appNodeUrl : wallet.state.node?.nodeUrl ?? appNodeUrl;
 
   const node = createDuskNodeClient({ baseUrl: nodeUrl });
 

@@ -39,6 +39,7 @@ function createWalletStub() {
 
   return {
     state,
+    initializing: true,
     networkEpoch: 0,
     connect: vi.fn(async () => {
       state.authorized = true;
@@ -375,13 +376,14 @@ describe("contract facade", () => {
     expect(wallet.ready).not.toHaveBeenCalled();
   });
 
-  it("waits for node hydration before capturing transaction origin", async () => {
+  it.each([false, true])("waits for node hydration and checks the selection (replace=%s)", async replace => {
     const wallet = createWalletStub();
     wallet.provider = { id: "primary" };
     wallet.selectionEpoch = 1;
     wallet.state.authorized = true;
     wallet.ready = vi.fn(async () => {
       wallet.state.node = { chainId: "dusk:1", nodeUrl: "https://node.example" };
+      if (replace) { wallet.provider = { id: "secondary" }; wallet.selectionEpoch++; }
     });
     const contract = createDuskContract({
       contractId: "0x" + "33".repeat(32),
@@ -391,8 +393,14 @@ describe("contract facade", () => {
       defaultTx: { privacy: "public" },
     });
 
-    const handle = await contract.write["ping"]!();
-    expect(handle.origin.nodeUrl).toBe("https://node.example");
+    const writing = contract.write["ping"]!();
+    if (replace) {
+      await expect(writing).rejects.toBeInstanceOf(DuskWalletProviderChangedError);
+      expect(wallet.sendContractCall).not.toHaveBeenCalled();
+    } else {
+      expect((await writing).origin.nodeUrl).toBe("https://node.example");
+    }
+    expect(wallet.ready).toHaveBeenCalledTimes(1);
   });
 
   it("detects a provider changing away and back during encoding", async () => {
