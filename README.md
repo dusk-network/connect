@@ -48,11 +48,14 @@ Wallet discovery is **event-based**, not singleton-based:
   preference or `preferredProviderId` leaves selection empty until a match
   arrives or the user explicitly selects another instance. Constructor-supplied
   providers are explicit choices, not restored product hints.
-- Conflicting UUID claims appear as `conflicted: true` and cannot be selected;
-  the optional modal shows the conflict and disables the entry. Low-level
-  `requestDuskProviders()` users must check this flag and handle later changes.
-  UUIDs and `rdns` are self-attested, not authentication. See the
-  [discovery rules](./docs/wallet-discovery.md#selection-rules).
+- Discovery keeps the first valid provider object and metadata received for each
+  UUID, ignoring later duplicates even from the same object. Duplicate claims
+  neither replace nor disable that entry, before or after selection. Later
+  announcements also do not clear an active selection. This follows MIPD-style
+  first-wins handling, not wallet authentication: the first claimant can be
+  forged, and UUIDs and `rdns` remain self-attested. The modal keeps its
+  self-reporting notice; the legacy `conflicted` field is deprecated and never
+  set. See the [discovery rules](./docs/wallet-discovery.md#selection-rules).
 - Chain IDs are CAIP-2 strings such as `dusk:2`, not bare decimal or
   hexadecimal numbers. Parse the numeric component with
   `/^dusk:(\d+)$/i.exec(chainId.trim())` only when a numeric protocol value is
@@ -227,7 +230,7 @@ await wallet.ready();
 
 if (!wallet.provider) {
   // Use your picker or the optional Connect modal, not the first list entry.
-  throw new Error("Select an unconflicted wallet first");
+  throw new Error("Select a wallet first");
 }
 
 await wallet.connect();
@@ -337,7 +340,7 @@ if (!wallet.state.installed) {
 
 if (!wallet.provider) {
   // Show a picker, then pass the user's chosen UUID to wallet.selectProvider().
-  throw new Error("Select an unconflicted wallet first");
+  throw new Error("Select a wallet first");
 }
 
 // Prompt connection (opens wallet approval)

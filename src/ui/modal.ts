@@ -68,10 +68,6 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-function walletLabel(st: DuskWalletState): string {
-  return st.providerInfo?.name || "Choose wallet";
-}
-
 function connectTitle(appName: string | undefined): string {
   const app = (appName || "").trim();
   if (!app) return "Connect wallet";
@@ -617,8 +613,6 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     if (!$providers) return;
     const notice = root?.querySelector<HTMLElement>("#dwcProviderNotice");
     if (notice) notice.hidden = walletStatus(st) === "missing" || st.availableProviders.length === 0;
-    const warning = root?.querySelector<HTMLElement>("#dwcConflicts");
-    if (warning) warning.hidden = !st.availableProviders.some(provider => provider.conflicted);
 
     if (walletStatus(st) === "missing") {
       const targets = getDuskWalletInstallTargets();
@@ -675,7 +669,6 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
             data-action="select-provider"
             data-provider-id="${escapeHtml(provider.uuid)}"
             data-selected="${selected ? "true" : "false"}"
-            ${provider.conflicted ? "disabled" : ""}
           >
             <span class="dconnect-provider-main">
               ${renderProviderIcon(provider)}
@@ -684,7 +677,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
                 <span class="dconnect-provider-rdns">${escapeHtml(provider.rdns)}</span>
               </span>
             </span>
-            <span class="dconnect-provider-tag">${provider.conflicted ? "Conflict" : selected ? "Selected" : "Available"}</span>
+            <span class="dconnect-provider-tag">${selected ? "Selected" : "Available"}</span>
           </button>
         `;
       })
@@ -729,7 +722,6 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
             <div class="dconnect-section-label" id="dwcSectionLabel">Wallets</div>
             <div class="dconnect-provider-list" id="dwcProviders" hidden></div>
             <div class="dconnect-hint" id="dwcProviderNotice" hidden>Wallet names, identifiers and icons are self-reported, not verified.</div>
-            <div class="dconnect-hint" id="dwcConflicts" role="alert" hidden>Conflicting wallet identifiers detected. Conflicting entries are disabled; resolve the conflict and reload, or choose another wallet.</div>
           </div>
           <div class="dconnect-actions">
             <button class="dconnect-btn dconnect-btn-primary" id="dwcPrimary" type="button" data-action="primary">—</button>
@@ -799,7 +791,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           return;
         }
 
-        const needsSelection = st.availableProviders.length > 0 && !st.providerId;
+        const needsSelection = st.availableProviders.length > 0 && !st.providerId && !wallet.provider;
         if (needsSelection) return;
 
         if (status === "connected") {
@@ -831,7 +823,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     const status = walletStatus(st);
     const acct = st.selectedProfile?.account || st.profiles?.[0]?.account || "";
     const net = networkLabel(st);
-    const needsSelection = st.availableProviders.length > 0 && !st.providerId;
+    const needsSelection = st.availableProviders.length > 0 && !st.providerId && !wallet.provider;
 
     if ($title) {
       const app = (options.appName || "").trim();
@@ -848,7 +840,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
       $status.textContent = needsSelection ? "Choose wallet" : STATUS_TEXT[status];
     }
 
-    if ($wallet) $wallet.textContent = walletLabel(st);
+    if ($wallet) $wallet.textContent = st.providerInfo?.name || (wallet.provider ? "Selected wallet" : "Choose wallet");
     if ($account) $account.textContent = acct ? shortenMiddle(acct, 10, 8) : "—";
     if ($network) $network.textContent = net || "—";
     if ($copy) $copy.hidden = !acct;

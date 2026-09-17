@@ -304,7 +304,7 @@ export type DuskProviderInfo = {
   icon: string;
   /** Stable, self-attested product identifier, e.g. "network.dusk.wallet". */
   rdns: string;
-  /** Discovery result only: distinct provider objects claimed this UUID. Do not select it. */
+  /** @deprecated Ignored; first-seen discovery never sets a conflict flag. */
   conflicted?: boolean;
 };
 
