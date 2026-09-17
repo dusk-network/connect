@@ -81,7 +81,8 @@ function providerInitial(provider: DuskProviderInfo): string {
 
 function renderProviderIcon(provider: DuskProviderInfo): string {
   const icon = String(provider.icon || "").trim();
-  if (!icon) {
+  // Listing providers must not fetch icons from announcement-controlled origins.
+  if (!/^data:image\/[a-z0-9.+-]+(?:;[^,]*)?,/i.test(icon)) {
     return `<span class="dconnect-provider-mark dconnect-provider-initial" style="--dconnect-provider-accent: #71B1FF" aria-hidden="true">${providerInitial(provider)}</span>`;
   }
   return `<img class="dconnect-provider-icon" src="${escapeHtml(icon)}" alt="" />`;
