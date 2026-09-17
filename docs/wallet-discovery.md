@@ -122,74 +122,59 @@ for the canonical method, event, error, permission, and limit definitions.
 
 ## Selection Rules
 
-dApps must not rely on wallet injection order.
+dApps must not treat wallet injection or announcement order as proof of identity.
 
 Recommended behavior:
 
 - if zero wallets are discovered, show install/help UI
-- if exactly one non-conflicting wallet is discovered, it may be auto-selected
+- if exactly one wallet UUID is discovered, its retained provider may be auto-selected
 - if multiple wallets are discovered, require explicit selection or an unambiguous saved product hint
 - persist `rdns` as a product preference if desired, never a session UUID as product identity
 
-The same UUID and same provider object may update display metadata. Distinct
-provider objects claiming the same UUID are a conflict, not first-wins or
-last-wins ownership: dApps MUST make the conflict visible and MUST NOT make a
-new selection through that UUID. An existing explicit object choice may continue
-as described below. Do not silently switch to another provider after a collision.
+Collectors and wrappers MUST retain the first valid provider object and metadata
+received for each UUID and ignore later announcements with that UUID, including
+metadata changes from the same object. Duplicate claims MUST NOT replace,
+disable or disconnect the retained entry. It remains selectable before and after
+any collision. This matches [MIPD's first-seen UUID handling](https://github.com/wevm/mipd/blob/0fda4481a31a28a4571c10a1d99568c9b4fed226/src/store.ts#L51-L70),
+not a requirement imposed by EIP-6963 itself.
 
-The Connect collector and wrapper expose a single diagnostic entry with
-`info.conflicted: true`, retaining the first object's metadata for display only.
-The collector remembers conflicts for its collection cycle; the wrapper retains
-them for its lifetime. Re-announcements cannot clear a conflict. Caller-supplied
-`conflicted` metadata cannot create one, including with an explicit `providerInfo`.
+`requestDuskProviders()` retains entries for one collection cycle; a `DuskWallet`
+retains them for its lifetime, including across explicit rediscovery requests.
+Raw `subscribeDuskProviders()` listeners receive all valid announcements and must
+apply their own retention policy. A one-shot collection is not a lifetime monitor.
+The deprecated `DuskProviderInfo.conflicted` field is ignored and never emitted.
+The modal does not show collision warnings or disable duplicate-UUID entries;
+its notice that all discovered branding is self-reported remains.
 
-The wrapper distinguishes automatic discovery from an explicit object choice:
+Once selected, the provider object remains the request/event target regardless
+of later discovery, whether selected automatically, explicitly or supplied to the
+constructor. Constructor metadata is registered before initial discovery; a
+metadata-less supplied object never adopts another object's retained metadata.
+Duplicate announcements do not change selection/network epochs or invalidate
+pending RPCs. Explicit switches still replace the object and invalidate stale
+work normally; disconnect/lock keep their existing permission/session semantics,
+and destruction stops the wrapper. Reconnection uses the existing object.
 
-- Before an explicit choice, a conflict clears any participating automatic
-  selection through the existing selection-change handling. This includes lone
-  providers, saved hints and `preferredProviderId`. `selectProvider(uuid)` still
-  refuses a conflicted UUID, even if that UUID is currently in use.
-- `selectProvider(uuid)` chooses its unconflicted provider object before its
-  refresh. Calling `connect()` / `requestProfiles()` also chooses the current
-  object before requesting approval, covering the modal's lone-wallet flow.
-  These calls express application intent, not successful authorization or proof
-  of a user gesture. A rejected approval does not grant permission.
-- A constructor-supplied provider becomes an explicit choice after the initial
-  synchronous discovery announcements have been checked. Startup conflicts
-  still clear participating providers, with or without `providerInfo` and
-  regardless of announcement order. Later announcements do not evict the choice,
-  even if initial read RPCs are still pending or have timed out.
-- Once chosen, the exact object remains the request/event target on later UUID
-  collisions or duplicate product claims. Its selection epoch, pending requests
-  and own chain/profile events remain valid. A competing object supplies neither
-  routing nor selected metadata. The conflict is still visible and cannot be
-  used for a fresh selection, including after choosing a different wallet.
-- Switching explicitly to an unconflicted provider replaces the choice and
-  invalidates old work normally; destruction still stops the wrapper. Disconnect
-  and lock retain their existing permission/session semantics, not a new wallet
-  selection. Reconnection therefore uses the same chosen object, never a fresh
-  lookup of the conflicted UUID. Choices are not authenticated identities and
-  are not restored as trusted objects across page loads.
-
-The optional modal warns about conflicts and disables their picker entries;
-connect/disconnect controls for a retained choice remain usable. Raw-provider
-users must handle later announcements/selection changes themselves; a one-shot
-collector is not a lifetime monitor or an authentication mechanism. Low-level
-`wallet.request()` calls alone do not establish an explicit choice; select the
-provider first when using that API.
+First received does not mean genuine: an earlier page listener can synchronously
+emit a forgery that reaches discovery before the genuine announcement it copied.
+First-wins deliberately accepts that discovery limitation rather than allowing
+a later claimant to disable an entry. Neither selecting a provider nor keeping
+its object establishes wallet-brand authenticity or grants permission. Wallet
+approval and application-level verification remain separate.
 
 Connect stores `selectProvider()` product choices as `{ "version": 1, "rdns": "…" }` under
 `dusk.connect.selectedProvider` (or `providerStorageKey`). A saved product hint
-restores only when exactly one discovered entry matches; a later duplicate
-match clears automatic restoration, but not an explicit instance choice (including
-constructor-supplied `provider`/`providerInfo`, which ignore stored preferences).
-Legacy raw-ID preferences still match an existing unconflicted UUID; values that
+restores only when exactly one discovered entry matches at selection time.
+Additional product matches arriving later do not clear that selection.
+Constructor-supplied `provider`/`providerInfo` ignore stored preferences.
+Distinct UUIDs sharing an `rdns` remain separate entries, not verified identities.
+Legacy raw-ID preferences still match an existing UUID; values that
 are not valid version-1 product records remain raw IDs, including brace-prefixed
 IDs. The next explicit selection writes the new format. Unmatched legacy IDs
 cannot identify a new session. An unmatched saved preference or current-page
 `preferredProviderId` leaves selection empty until a match arrives or the user
 chooses another instance with `selectProvider(uuid)`; it does not select an
-unrelated lone provider. Without a preference, a lone unconflicted provider can
+unrelated lone provider. Without a preference, a lone retained provider can
 still auto-select. `rememberLastUsedProvider: false` disables storage reads and
 writes. Legacy non-UUID identifiers remain accepted for interoperability, but
 new wallet implementations must follow the UUIDv4 rule above.
@@ -238,8 +223,8 @@ import { createDuskWallet } from "@dusk/connect";
 
 const wallet = createDuskWallet();
 await wallet.ready();
-// With multiple or conflicted entries, use a wallet picker / Connect modal.
-// Pass the user's chosen unconflicted current-page UUID to selectProvider().
-if (!wallet.provider) throw new Error("Select an unconflicted wallet first");
+// With multiple entries, use a wallet picker / Connect modal.
+// Pass the user's chosen current-page UUID to selectProvider().
+if (!wallet.provider) throw new Error("Select a wallet first");
 await wallet.connect();
 ```

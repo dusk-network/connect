@@ -118,7 +118,6 @@ function cloneProviderInfo(info: DuskProviderInfo): DuskProviderInfo {
     name: info.name,
     icon: info.icon,
     rdns: info.rdns,
-    ...(info.conflicted ? { conflicted: true } : {}),
   };
 }
 
@@ -146,8 +145,7 @@ function shallowArrayEq(a: readonly unknown[], b: readonly unknown[]) {
 function providerInfoEq(a: DuskProviderInfo | null, b: DuskProviderInfo | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  return a.uuid === b.uuid && a.name === b.name && a.icon === b.icon && a.rdns === b.rdns &&
-    Boolean(a.conflicted) === Boolean(b.conflicted);
+  return a.uuid === b.uuid && a.name === b.name && a.icon === b.icon && a.rdns === b.rdns;
 }
 
 function providerInfoArrayEq(a: readonly DuskProviderInfo[], b: readonly DuskProviderInfo[]): boolean {
@@ -190,7 +188,6 @@ export class DuskWallet {
   private readonly _providerReadTimeoutMs: number;
   private _stopDiscovery: (() => void) | null = null;
   private _explicitProvider = false;
-  private _chosenProvider: DuskProvider | null = null;
   private _rememberLastUsed = true;
   private _providerStorageKey = DUSK_SELECTED_PROVIDER_STORAGE_KEY;
   private _preferredProviderId: string | null = null;
@@ -350,15 +347,12 @@ export class DuskWallet {
     }
 
     this._stopDiscovery = subscribeDuskProviders((detail) => {
-      this._registerDiscoveredProvider(detail, { notify: false });
+      if (!this._registerDiscoveredProvider(detail, { notify: false })) return;
       if (this._readySettled && !this._provider && !this._explicitProvider) {
         this._autoSelectDiscoveredProvider({ notify: false });
       }
       this._notify();
     });
-
-    // Check synchronous startup announcements before pinning a constructor choice.
-    if (this._explicitProvider) this._chosenProvider = this._provider;
 
     this._readyPromise = (async () => {
       if (!this._provider) {
@@ -418,7 +412,7 @@ export class DuskWallet {
     if (providerInfo?.uuid) {
       registerDiscoveredProvider(this._providers, { info: cloneProviderInfo(providerInfo), provider });
       const detail = this._providers.get(providerInfo.uuid)!;
-      this._applySelectedProvider(detail.info.conflicted ? null : detail, opts);
+      this._applySelectedProvider(detail, opts);
       this._syncAvailableProviders({ notify: false });
       return;
     }
@@ -447,19 +441,9 @@ export class DuskWallet {
   }
 
   private _registerDiscoveredProvider(detail: DuskProviderDetail, opts: { notify?: boolean } = {}): boolean {
-    const changed = registerDiscoveredProvider(this._providers, detail);
+    if (!registerDiscoveredProvider(this._providers, detail)) return false;
     const retained = this._providers.get(detail.info.uuid)!;
-    const selectedConflict = retained.info.conflicted &&
-      (retained.provider === this._provider || detail.provider === this._provider);
-    // A selected later claimant can leave the retained diagnostic entry unchanged.
-    if (!changed && !selectedConflict) return false;
-    const ambiguousProduct = this._preferredProviderRdns &&
-      this._state.providerInfo?.rdns === this._preferredProviderRdns &&
-      [...this._providers.values()].filter(item => item.info.rdns === this._preferredProviderRdns).length > 1;
-    if ((ambiguousProduct || selectedConflict) && this._chosenProvider !== this._provider) {
-      // Quarantine automatic choices; a later claimant cannot evict an explicit object choice.
-      this._applySelectedProvider(null, { notify: false, persist: false });
-    } else if (retained.provider === this._provider) {
+    if (retained.provider === this._provider && !this._state.providerInfo) {
       this._patch({ providerInfo: cloneProviderInfo(retained.info) }, { notify: false });
     }
     this._syncAvailableProviders({ notify: false });
@@ -509,7 +493,6 @@ export class DuskWallet {
     const nextProviderId = nextInfo?.uuid ?? null;
     const sameProvider = this._provider === nextProvider;
     const sameInfo = providerInfoEq(this._state.providerInfo, nextInfo);
-    if (this._chosenProvider !== nextProvider) this._chosenProvider = null;
 
     if (!sameProvider) {
       this._unbindProviderEvents();
@@ -561,8 +544,6 @@ export class DuskWallet {
   private _autoSelectDiscoveredProvider(opts: { notify?: boolean } = {}) {
     if (this._explicitProvider || this._provider) return;
     const providers = [...this._providers.values()];
-    // A collision requires a visible choice, never a different automatic winner.
-    if (providers.some(detail => detail.info.conflicted)) return;
 
     if (this._preferredProviderId || this._preferredProviderRdns) {
       const matches = providers.filter(detail => detail.info.rdns === this._preferredProviderRdns);
@@ -751,9 +732,6 @@ export class DuskWallet {
     }
 
     if (!detail) throw new DuskWalletProviderNotFoundError(`Unknown Dusk wallet provider: ${id}`);
-    if (detail.info.conflicted) throw new DuskWalletProviderSelectionError("Conflicting wallet identifier; reload after resolving the conflict");
-
-    this._chosenProvider = detail.provider;
     this._applySelectedProvider(detail, { notify: false });
     const { provider, epoch } = this._captureSelection();
     await this.refresh();
@@ -902,8 +880,6 @@ export class DuskWallet {
   /** Prompt the user to connect and return approved profile pairs. */
   async requestProfiles(options?: ConnectOptions): Promise<DuskProfile[]> {
     const { provider, epoch } = this._captureSelection();
-    // Calling connect/requestProfiles chooses this object, not permission or wallet authenticity.
-    this._chosenProvider = provider;
     this._connectionIntent++;
     const sessionEpoch = this._sessionEpoch;
     const params = options && Object.keys(options).length > 0 ? options : undefined;

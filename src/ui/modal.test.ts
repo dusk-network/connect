@@ -88,22 +88,35 @@ describe("connect modal", () => {
     expect(wallet.discoverProviders).toHaveBeenCalledWith({ timeoutMs: 250 });
   });
 
-  it("visibly disables conflicting provider IDs", () => {
-    const wallet = createMockUiWallet({ installed: true, providerId: null, authorized: false,
-      availableProviders: [{ uuid: "duplicate", name: "Wallet", icon: "", rdns: "com.example.wallet", conflicted: true }] });
-    const modal = createDuskConnectModal(wallet as any);
-    try {
-      modal.open();
-      const row = document.querySelector<HTMLButtonElement>('[data-provider-id="duplicate"]')!;
-      expect(row.disabled).toBe(true);
-      expect(row.textContent).toContain("Conflict");
-      expect(document.querySelector('[role="alert"]')?.textContent).toContain("Conflicting wallet identifiers");
-      row.click();
-      expect(wallet.selectProvider).not.toHaveBeenCalled();
-    } finally { modal.destroy(); }
+  it("keeps the first UUID entry selectable when a duplicate arrives before selection", async () => {
+    const info = createMockProviderInfo({ uuid: "first", name: "First Wallet" });
+    const first = createMockProvider();
+    const later = createMockProvider();
+    const wallet = createDuskWallet({ autoRefresh: false, waitForProvider: false, rememberLastUsedProvider: false });
+    const modal = createDuskConnectModal(wallet, { closeOnConnect: false });
+    onTestFinished(() => { modal.destroy(); wallet.destroy(); });
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: first }));
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info: { ...info, uuid: "other" }, provider: createMockProvider() }));
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info: { ...info, name: "Later Wallet" }, provider: later }));
+    await wallet.ready();
+    expect(wallet.provider).toBeNull(); // Two distinct UUIDs still require a choice.
+    modal.open();
+    const select = vi.spyOn(wallet, "selectProvider");
+    const row = document.querySelector<HTMLButtonElement>('[data-provider-id="first"]')!;
+    expect(row.disabled).toBe(false);
+    expect(row.textContent).toContain("First Wallet");
+    expect(row.textContent).not.toContain("Later Wallet");
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+    expect(document.querySelector("#dwcProviderNotice")?.textContent).toContain("self-reported, not verified");
+    row.click();
+    await select.mock.results[0]!.value;
+    expect(wallet.provider).toBe(first);
+    expect(document.querySelector<HTMLButtonElement>("#dwcPrimary")?.disabled).toBe(false);
+    expect(later.request).not.toHaveBeenCalled();
+    expect(later.on).not.toHaveBeenCalled();
   });
 
-  it("keeps the modal's chosen connection usable and warns without selecting the impostor", async () => {
+  it("keeps the first provider connected and selectable without adopting duplicate branding", async () => {
     const info = createMockProviderInfo({ uuid: "chosen", name: "Chosen Wallet" });
     const selected = createMockProvider({ accounts: ["chosen-account"] });
     const impostor = createMockProvider({ accounts: ["scam-account"], authorized: true });
@@ -116,6 +129,7 @@ describe("connect modal", () => {
     const primary = document.querySelector<HTMLButtonElement>("#dwcPrimary")!;
     const connect = vi.spyOn(wallet, "connect");
     const disconnect = vi.spyOn(wallet, "disconnect");
+    const select = vi.spyOn(wallet, "selectProvider");
     primary.click();
     await connect.mock.results[0]!.value;
     expect(wallet.state.authorized).toBe(true);
@@ -124,13 +138,14 @@ describe("connect modal", () => {
     expect(primary.disabled).toBe(false);
     expect(primary.textContent).toBe("Disconnect");
     expect(document.querySelector("#dwcWallet")?.textContent).toBe("Chosen Wallet");
-    const warning = document.querySelector<HTMLElement>("#dwcConflicts")!;
-    expect(warning.hidden).toBe(false);
-    expect(warning.textContent).toContain("selected provider is unchanged");
+    expect(document.querySelector("#dwcConflicts")).toBeNull();
     const row = document.querySelector<HTMLButtonElement>('[data-provider-id="chosen"]')!;
-    expect(row.disabled).toBe(true);
-    expect(row.textContent).toContain("Selected · Conflict");
+    expect(row.disabled).toBe(false);
+    expect(row.textContent).toContain("Selected");
+    expect(row.textContent).not.toContain("Conflict");
     row.click();
+    await select.mock.results[0]!.value;
+    expect(wallet.provider).toBe(selected);
     expect(impostor.request).not.toHaveBeenCalled();
     primary.click();
     await disconnect.mock.results[0]!.value;
@@ -158,7 +173,8 @@ describe("connect modal", () => {
     expect(document.querySelector("#dwcStatus")?.textContent).toBe("Connected");
     expect(document.querySelector<HTMLButtonElement>("#dwcPrimary")?.disabled).toBe(false);
     expect(document.querySelector('[data-provider-id="collision"]')?.getAttribute("data-selected")).toBe("false");
-    expect(document.querySelector("#dwcConflicts")?.textContent).toContain("selected provider is unchanged");
+    expect(document.querySelector("#dwcConflicts")).toBeNull();
+    expect(document.querySelector<HTMLElement>("#dwcProviderNotice")?.hidden).toBe(false);
   });
 
   it("shows the Firefox add-ons install option in Firefox", () => {
