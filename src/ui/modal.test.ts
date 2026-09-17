@@ -329,6 +329,46 @@ describe("connect modal", () => {
     }
   );
 
+  it.each([
+    ["https://icons.example/wallet.png", false],
+    ["http://icons.example/wallet.png", false],
+    ["//icons.example/wallet.png", false],
+    ["/wallet.png", false],
+    ["wallet.png", false],
+    ["blob:https://icons.example/wallet", false],
+    ["https://icons.example/data:image/png;base64,AA==", false],
+    ["javascript:alert(1)", false],
+    ["data:text/html,<img src='https://icons.example/wallet.png'>", false],
+    ["data:;base64,AA==", false],
+    ["data:image/png", false],
+    ["data:image/;base64,AA==", false],
+    ["data:image/png;base64,AA==", true],
+    ["data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E", true],
+    ["data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E", true],
+    [" \tDATA:IMAGE/PNG;BASE64,AA==\n", true],
+  ] as const)("renders only image data URI icons without rejecting the provider: %s", async (icon, rendered) => {
+    const provider = createMockProvider();
+    const info = createMockProviderInfo({ uuid: "unverified", name: "Example Wallet", icon });
+    const wallet = createDuskWallet({ autoRefresh: false, waitForProvider: false, rememberLastUsedProvider: false });
+    const modal = createDuskConnectModal(wallet);
+    onTestFinished(() => { modal.destroy(); wallet.destroy(); });
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider }));
+    await wallet.ready();
+    modal.open();
+
+    const row = document.querySelector<HTMLButtonElement>('[data-provider-id="unverified"]')!;
+    expect(row.querySelector("img")?.getAttribute("src") ?? null).toBe(rendered ? icon.trim() : null);
+    expect(row.querySelector(".dconnect-provider-initial")?.textContent ?? null).toBe(rendered ? null : "E");
+    expect(row.querySelector(".dconnect-provider-dusk")).toBeNull();
+    expect(row.disabled).toBe(false);
+    const select = vi.spyOn(wallet, "selectProvider");
+    row.click();
+    await select.mock.results[0]!.value;
+    expect(wallet.provider).toBe(provider);
+    expect(wallet.providerInfo).toEqual(info); // Rendering policy does not rewrite discovery metadata.
+    expect(wallet.providers).toEqual([info]);
+  });
+
   it("uses provider initials for iconless non-Dusk wallet rows", () => {
     const wallet = createMockUiWallet({
       installed: true,

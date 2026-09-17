@@ -300,7 +300,7 @@ export type DuskProviderInfo = {
   uuid: string;
   /** Human-friendly wallet name shown in pickers. */
   name: string;
-  /** Icon URL/data URI shown in pickers. */
+  /** Self-reported icon; the Connect modal renders only image data URIs. */
   icon: string;
   /** Stable, self-attested product identifier, e.g. "network.dusk.wallet". */
   rdns: string;

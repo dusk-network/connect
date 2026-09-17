@@ -76,7 +76,7 @@ Expected semantics:
 
 - `uuid`: random UUIDv4 identifying one provider instance for the current page
 - `name`: human-readable wallet name shown in pickers
-- `icon`: URL or data URI usable in wallet selection UIs
+- `icon`: image data URI recommended for wallet selection UIs
 - `rdns`: stable, self-attested product identifier such as `network.dusk.wallet`
 
 Wallets MUST generate a fresh UUIDv4 for each provider instance/page, and MUST
@@ -86,6 +86,12 @@ product constant, or regenerate the UUID on each request event. This follows
 `crypto.randomUUID()` is suitable in secure contexts; extension injection on HTTP
 pages can use `crypto.getRandomValues()` with UUIDv4 version/variant bits instead.
 A wallet's internal bridge routing identifier is separate from its discovery UUID.
+
+The Connect modal renders only image data URIs (`data:image/...`) in `<img>`
+elements, including SVG. Other icon values use a generic initial so listing a
+provider does not fetch its remote icon. Discovery still retains the original
+icon string and keeps the provider selectable; custom pickers should apply the
+same rendering policy.
 
 Neither UUID, `rdns`, name nor icon authenticates a wallet. All announcement
 metadata is self-attested; matching a familiar product string is not proof of
