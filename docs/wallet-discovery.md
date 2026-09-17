@@ -162,6 +162,10 @@ a later claimant to disable an entry. Neither selecting a provider nor keeping
 its object establishes wallet-brand authenticity or grants permission. Wallet
 approval and application-level verification remain separate.
 
+Initialize provider discovery early (for example, by calling `createDuskWallet()`),
+before third-party page scripts where practical; this is best-effort load-order
+guidance, not wallet authentication.
+
 Connect stores `selectProvider()` product choices as `{ "version": 1, "rdns": "…" }` under
 `dusk.connect.selectedProvider` (or `providerStorageKey`). A saved product hint
 restores only when exactly one discovered entry matches at selection time.
