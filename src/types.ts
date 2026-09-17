@@ -300,11 +300,11 @@ export type DuskProviderInfo = {
   uuid: string;
   /** Human-friendly wallet name shown in pickers. */
   name: string;
-  /** Icon URL/data URI shown in pickers. */
+  /** Self-reported icon; the Connect modal renders only image data URIs. */
   icon: string;
   /** Stable, self-attested product identifier, e.g. "network.dusk.wallet". */
   rdns: string;
-  /** Discovery result only: distinct provider objects claimed this UUID. Do not select it. */
+  /** @deprecated Ignored; first-seen discovery never sets a conflict flag. */
   conflicted?: boolean;
 };
 
@@ -379,9 +379,9 @@ export type DuskProviderCapabilities = {
      */
     shieldedReceiveAddress?: boolean;
     signMessage: boolean;
-    /** Whether the provider supports typed-data signing. */
+    /** Self-reported typed-data signing support; consumers must check it and handle RPC refusals. */
     signTypedData?: boolean;
-    /** Typed-data protocol versions supported by the provider. */
+    /** Self-reported protocol versions; Connect does not validate this array or gate signing requests. */
     signTypedDataVersions?: number[];
     signAuth: boolean;
     contractCallPrivacy: boolean;

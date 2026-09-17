@@ -310,8 +310,7 @@ function renderProviders(state) {
     button.className = "providerUse";
     button.type = "button";
     button.dataset.providerId = provider.uuid;
-    button.disabled = Boolean(provider.conflicted);
-    button.textContent = provider.conflicted ? "Conflict" : provider.uuid === state.providerId ? "Selected" : "Use Wallet";
+    button.textContent = provider.uuid === state.providerId ? "Selected" : "Use Wallet";
 
     copy.append(name, uuid, rdns);
     main.append(providerIcon(provider), copy);

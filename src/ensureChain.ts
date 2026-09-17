@@ -1,7 +1,7 @@
 import type { ChainId, DuskProvider, SwitchChainParams } from "./types.js";
 import type { DuskWallet } from "./wallet.js";
 import { DuskWalletProviderChangedError } from "./errors.js";
-import { normalizeBaseUrl, normalizeCaip2ChainId } from "./internal/normalize.js";
+import { normalizeNodeUrl, normalizeCaip2ChainId } from "./internal/normalize.js";
 
 /** Options for {@link ensureChain}. */
 export type EnsureChainOptions = {
@@ -35,7 +35,7 @@ export async function ensureChain(
   opts: EnsureChainOptions = {}
 ): Promise<boolean> {
   let provider = wallet.provider;
-  if (!provider && !opts.selection) {
+  if (!provider && !opts.selection && wallet.initializing) {
     await wallet.ready();
     provider = wallet.provider;
   }
@@ -88,9 +88,10 @@ export async function ensureChain(
   }
 
   // --- nodeUrl target
-  const desiredNodeUrl = normalizeBaseUrl(desiredNodeUrlRaw);
-  const currentNodeUrlRaw = wallet.state.node?.nodeUrl ? String(wallet.state.node.nodeUrl) : "";
-  const currentNodeUrl = normalizeBaseUrl(currentNodeUrlRaw);
+  const desiredNodeUrl = normalizeNodeUrl(desiredNodeUrlRaw);
+  if (!desiredNodeUrl) throw new TypeError("ensureChain: invalid nodeUrl");
+  const currentNodeUrlRaw = wallet.state.node?.nodeUrl ?? "";
+  const currentNodeUrl = normalizeNodeUrl(currentNodeUrlRaw);
 
   if (currentNodeUrl) {
     if (opts.strictNodeUrl) {
@@ -107,7 +108,7 @@ export async function ensureChain(
   }
 
   assertSelection();
-  await wallet.switchChain({ nodeUrl: desiredNodeUrlRaw });
+  await wallet.switchChain({ nodeUrl: desiredNodeUrl });
   assertSelection();
   return true;
 }

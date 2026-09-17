@@ -48,11 +48,14 @@ Wallet discovery is **event-based**, not singleton-based:
   preference or `preferredProviderId` leaves selection empty until a match
   arrives or the user explicitly selects another instance. Constructor-supplied
   providers are explicit choices, not restored product hints.
-- Conflicting UUID claims appear as `conflicted: true` and cannot be selected;
-  the optional modal shows the conflict and disables the entry. Low-level
-  `requestDuskProviders()` users must check this flag and handle later changes.
-  UUIDs and `rdns` are self-attested, not authentication. See the
-  [discovery rules](./docs/wallet-discovery.md#selection-rules).
+- Discovery keeps the first valid provider object and metadata received for each
+  UUID, ignoring later duplicates even from the same object. Duplicate claims
+  neither replace nor disable that entry, before or after selection. Later
+  announcements also do not clear an active selection. This follows MIPD-style
+  first-wins handling, not wallet authentication: the first claimant can be
+  forged, and UUIDs and `rdns` remain self-attested. The modal keeps its
+  self-reporting notice; the legacy `conflicted` field is deprecated and never
+  set. See the [discovery rules](./docs/wallet-discovery.md#selection-rules).
 - Chain IDs are CAIP-2 strings such as `dusk:2`, not bare decimal or
   hexadecimal numbers. Parse the numeric component with
   `/^dusk:(\d+)$/i.exec(chainId.trim())` only when a numeric protocol value is
@@ -217,7 +220,7 @@ Use this when you only need wallet discovery + provider access:
 - get balances
 - send transactions
 
-It’s the smallest surface area and has no opinion about contracts, nodes, or data-drivers.
+It’s the smallest surface area and does not create contract facades, node clients, or data-drivers.
 
 ```ts
 import { createDuskWallet } from "@dusk/connect";
@@ -227,7 +230,7 @@ await wallet.ready();
 
 if (!wallet.provider) {
   // Use your picker or the optional Connect modal, not the first list entry.
-  throw new Error("Select an unconflicted wallet first");
+  throw new Error("Select a wallet first");
 }
 
 await wallet.connect();
@@ -237,6 +240,26 @@ console.log(wallet.state.profiles);
 await wallet.connect({ shieldedReceiveAddress: true, reason: "payment_request" });
 console.log(wallet.state.selectedProfile);
 ```
+
+Non-interactive provider reads (`dusk_getCapabilities`, `dusk_chainId`,
+`dusk_profiles`, `dusk_getPublicBalance`, `dusk_estimateGas`) have a 10-second
+per-request deadline. Configure `createDuskWallet({ providerReadTimeoutMs: 20_000 })`
+with an integer from 1 through 2,147,483,647 milliseconds. A timeout rejects with
+`DuskWalletRequestTimeoutError` (a `DuskSdkError`) and `data: { method, timeoutMs }`;
+it does not invent a provider RPC error code. Initial read timeouts reject
+`ready()` too; catch that error and offer `wallet.refresh()` to retry. `ready()`
+records the initial attempt, not the retry. Read-only `wallet.initializing` is
+`true` only while that initial discovery/refresh is pending, and becomes `false`
+after either success or failure; it does not indicate authorization or recovery.
+Contract writes and chain checks do not replay a settled startup error. After a
+successful `refresh()`, a write can proceed even without an advertised node;
+its handle still refuses automatic tracking when the submission node is unknown.
+Other unsupported/failed initialization reads retain their best-effort fallback behavior.
+
+The deadline does **not** cancel the provider operation, and late read responses
+do not update the wrapper state. Connect does not apply this deadline to approvals,
+signing, transactions, disconnection, or unknown methods. A provider is executable
+page code: timers do not sandbox it or interrupt synchronous JavaScript.
 
 ### `createDuskApp()`
 
@@ -263,6 +286,28 @@ await dusk.ready();
 // dApps/UI components still use the same wallet instance
 await dusk.wallet.connect();
 ```
+
+`nodeUrl` remains a **fallback**, not a pin: a valid wallet-advertised URL takes
+precedence. To keep app reads on a trusted node, use
+`createDuskApp({ pinnedNodeUrl: "https://my-node.example" })`. `pinnedNodeUrl` wins
+over both `nodeUrl` and provider updates, but does not switch or pin the wallet's
+transaction network. Set/check the write `chain` separately. A transaction handle
+refuses automatic tracking when its wallet-reported submission node differs from
+the read node rather than silently following it.
+
+Node URLs must be absolute HTTPS, or HTTP on `localhost`, IPv4 loopback (127/8)
+or `[::1]`, without credentials, query or fragment. They are serialized with the
+native URL parser and stripped of trailing slashes before use, so scheme-like
+inputs cannot become page-relative fetches. For node URL targets, `ensureChain`
+uses the same URL policy and normalization; its `strictNodeUrl` option instead requires the input string to
+match the normalized wallet snapshot exactly. Invalid provider URLs clear
+the node snapshot and app reads use their fallback; invalid app-configured URLs
+throw at construction. The node transport checks the policy again before I/O.
+This is URL validation, **not** node authentication, an IP/DNS/redirect allowlist
+or general SSRF protection. HTTPS alone does not make a provider-selected node
+trustworthy. `connect` events trigger a reread of the provider rather than granting
+permission from their payload; provider authorization and capability claims remain
+self-reported.
 
 Tip: you can share a wallet instance between both APIs:
 
@@ -295,7 +340,7 @@ if (!wallet.state.installed) {
 
 if (!wallet.provider) {
   // Show a picker, then pass the user's chosen UUID to wallet.selectProvider().
-  throw new Error("Select an unconflicted wallet first");
+  throw new Error("Select a wallet first");
 }
 
 // Prompt connection (opens wallet approval)

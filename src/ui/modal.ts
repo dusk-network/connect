@@ -1,7 +1,6 @@
 import type { ConnectOptions, DuskProviderInfo, DuskWalletState } from "../types.js";
 import type { DuskWallet } from "../wallet.js";
 import {
-  PIEWALLET_ICON_URL,
   getDuskWalletInstallTargets,
   type DuskWalletInstallTarget,
 } from "./installOptions.js";
@@ -69,34 +68,10 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-function walletLabel(st: DuskWalletState): string {
-  return st.providerInfo?.name || "Choose wallet";
-}
-
 function connectTitle(appName: string | undefined): string {
   const app = (appName || "").trim();
   if (!app) return "Connect wallet";
   return /^connect\b/i.test(app) ? app : `Connect ${app}`;
-}
-
-function isDuskProvider(provider: DuskProviderInfo): boolean {
-  const name = String(provider.name || "").trim().toLowerCase();
-  const rdns = String(provider.rdns || "").trim().toLowerCase();
-  return name === "dusk wallet" || rdns === "network.dusk.wallet" || rdns.endsWith(".dusk.wallet");
-}
-
-function isPiewalletProvider(provider: DuskProviderInfo): boolean {
-  const name = String(provider.name || "").trim().toLowerCase();
-  const rdns = String(provider.rdns || "").trim().toLowerCase();
-  const uuid = String(provider.uuid || "").trim().toLowerCase();
-  return (
-    name === "piewallet" ||
-    name === "pie wallet" ||
-    rdns.includes("piewallet") ||
-    rdns.includes("pieswap") ||
-    uuid.includes("piewallet") ||
-    uuid.includes("pieswap")
-  );
 }
 
 function providerInitial(provider: DuskProviderInfo): string {
@@ -104,22 +79,11 @@ function providerInitial(provider: DuskProviderInfo): string {
   return /^[A-Z0-9]$/.test(initial) ? initial : "W";
 }
 
-function providerAccent(provider: DuskProviderInfo): string {
-  const rdns = String(provider.rdns || "").toLowerCase();
-  if (rdns.includes("harbor")) return "#6FBF8E";
-  return "#71B1FF";
-}
-
 function renderProviderIcon(provider: DuskProviderInfo): string {
   const icon = String(provider.icon || "").trim();
-  if (isDuskProvider(provider)) {
-    return `<span class="dconnect-provider-mark dconnect-provider-dusk" aria-hidden="true"></span>`;
-  }
-  if (isPiewalletProvider(provider)) {
-    return `<img class="dconnect-provider-icon" src="${PIEWALLET_ICON_URL}" alt="" />`;
-  }
-  if (!icon) {
-    return `<span class="dconnect-provider-mark dconnect-provider-initial" style="--dconnect-provider-accent: ${providerAccent(provider)}" aria-hidden="true">${providerInitial(provider)}</span>`;
+  // Listing providers must not fetch icons from announcement-controlled origins.
+  if (!/^data:image\/[a-z0-9.+-]+(?:;[^,]*)?,/i.test(icon)) {
+    return `<span class="dconnect-provider-mark dconnect-provider-initial" style="--dconnect-provider-accent: #71B1FF" aria-hidden="true">${providerInitial(provider)}</span>`;
   }
   return `<img class="dconnect-provider-icon" src="${escapeHtml(icon)}" alt="" />`;
 }
@@ -648,8 +612,8 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
 
   const renderProviders = (st: DuskWalletState) => {
     if (!$providers) return;
-    const warning = root?.querySelector<HTMLElement>("#dwcConflicts");
-    if (warning) warning.hidden = !st.availableProviders.some(provider => provider.conflicted);
+    const notice = root?.querySelector<HTMLElement>("#dwcProviderNotice");
+    if (notice) notice.hidden = walletStatus(st) === "missing" || st.availableProviders.length === 0;
 
     if (walletStatus(st) === "missing") {
       const targets = getDuskWalletInstallTargets();
@@ -706,7 +670,6 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
             data-action="select-provider"
             data-provider-id="${escapeHtml(provider.uuid)}"
             data-selected="${selected ? "true" : "false"}"
-            ${provider.conflicted ? "disabled" : ""}
           >
             <span class="dconnect-provider-main">
               ${renderProviderIcon(provider)}
@@ -715,7 +678,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
                 <span class="dconnect-provider-rdns">${escapeHtml(provider.rdns)}</span>
               </span>
             </span>
-            <span class="dconnect-provider-tag">${provider.conflicted ? "Conflict" : selected ? "Selected" : "Available"}</span>
+            <span class="dconnect-provider-tag">${selected ? "Selected" : "Available"}</span>
           </button>
         `;
       })
@@ -759,7 +722,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           <div class="dconnect-section">
             <div class="dconnect-section-label" id="dwcSectionLabel">Wallets</div>
             <div class="dconnect-provider-list" id="dwcProviders" hidden></div>
-            <div class="dconnect-hint" id="dwcConflicts" role="alert" hidden>Conflicting wallet identifiers detected. Conflicting entries are disabled; resolve the conflict and reload, or choose another wallet.</div>
+            <div class="dconnect-hint" id="dwcProviderNotice" hidden>Wallet names, identifiers and icons are self-reported, not verified.</div>
           </div>
           <div class="dconnect-actions">
             <button class="dconnect-btn dconnect-btn-primary" id="dwcPrimary" type="button" data-action="primary">—</button>
@@ -829,7 +792,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           return;
         }
 
-        const needsSelection = st.availableProviders.length > 0 && !st.providerId;
+        const needsSelection = st.availableProviders.length > 0 && !st.providerId && !wallet.provider;
         if (needsSelection) return;
 
         if (status === "connected") {
@@ -861,7 +824,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     const status = walletStatus(st);
     const acct = st.selectedProfile?.account || st.profiles?.[0]?.account || "";
     const net = networkLabel(st);
-    const needsSelection = st.availableProviders.length > 0 && !st.providerId;
+    const needsSelection = st.availableProviders.length > 0 && !st.providerId && !wallet.provider;
 
     if ($title) {
       const app = (options.appName || "").trim();
@@ -878,7 +841,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
       $status.textContent = needsSelection ? "Choose wallet" : STATUS_TEXT[status];
     }
 
-    if ($wallet) $wallet.textContent = walletLabel(st);
+    if ($wallet) $wallet.textContent = st.providerInfo?.name || (wallet.provider ? "Selected wallet" : "Choose wallet");
     if ($account) $account.textContent = acct ? shortenMiddle(acct, 10, 8) : "—";
     if ($network) $network.textContent = net || "—";
     if ($copy) $copy.hidden = !acct;

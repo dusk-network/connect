@@ -25,11 +25,13 @@ import type {
 } from "./types.js";
 
 import {
+  DuskSdkError,
   DuskWalletDisconnectedError,
   DuskWalletNotInstalledError,
   DuskWalletProviderChangedError,
   DuskWalletProviderNotFoundError,
   DuskWalletProviderSelectionError,
+  DuskWalletRequestTimeoutError,
   DuskWalletUnauthorizedError,
   DuskWalletUnsupportedMethodError,
   DuskWalletUserRejectedError,
@@ -50,7 +52,7 @@ import {
 } from "./discovery.js";
 
 import { normalizeContractId0x } from "./internal/contractId.js";
-import { normalizeBaseUrl } from "./internal/normalize.js";
+import { normalizeBaseUrl, normalizeNodeUrl } from "./internal/normalize.js";
 import { bytesToHex, toBytes } from "./bytes.js";
 
 /** Provider discovery wait options used by {@link DuskWallet}. */
@@ -76,6 +78,9 @@ export type DuskWalletOptions = {
   /** Immediately fetch `dusk_chainId` and `dusk_profiles` on init. Default: true. */
   autoRefresh?: boolean;
 
+  /** Deadline for capabilities, chain, profiles, balance and gas reads. Positive integer ms; default: 10_000. */
+  providerReadTimeoutMs?: number;
+
   /** Remember the selected product's rdns; restore only a unique match. Default: true. */
   rememberLastUsedProvider?: boolean;
 
@@ -87,6 +92,9 @@ export type DuskWalletOptions = {
 export type DuskWalletSubscriber = (state: DuskWalletState) => void;
 
 const EMPTY_PROVIDERS: DuskProviderInfo[] = [];
+const PROVIDER_READ_METHODS = new Set([
+  "dusk_getCapabilities", "dusk_chainId", "dusk_profiles", "dusk_getPublicBalance", "dusk_estimateGas",
+]);
 
 const initialState = (installed: boolean): DuskWalletState => ({
   installed,
@@ -110,7 +118,6 @@ function cloneProviderInfo(info: DuskProviderInfo): DuskProviderInfo {
     name: info.name,
     icon: info.icon,
     rdns: info.rdns,
-    ...(info.conflicted ? { conflicted: true } : {}),
   };
 }
 
@@ -138,8 +145,7 @@ function shallowArrayEq(a: readonly unknown[], b: readonly unknown[]) {
 function providerInfoEq(a: DuskProviderInfo | null, b: DuskProviderInfo | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  return a.uuid === b.uuid && a.name === b.name && a.icon === b.icon && a.rdns === b.rdns &&
-    Boolean(a.conflicted) === Boolean(b.conflicted);
+  return a.uuid === b.uuid && a.name === b.name && a.icon === b.icon && a.rdns === b.rdns;
 }
 
 function providerInfoArrayEq(a: readonly DuskProviderInfo[], b: readonly DuskProviderInfo[]): boolean {
@@ -179,6 +185,7 @@ export class DuskWallet {
   private _boundEvents: Array<[keyof DuskProviderEventMap, (payload: any) => void]> = [];
   private _destroyed = false;
   private _readyPromise: Promise<void>;
+  private readonly _providerReadTimeoutMs: number;
   private _stopDiscovery: (() => void) | null = null;
   private _explicitProvider = false;
   private _rememberLastUsed = true;
@@ -187,7 +194,18 @@ export class DuskWallet {
   private _preferredProviderRdns: string | null = null;
   private _readySettled = false;
   private _selectionEpoch = 0;
+  private _sessionEpoch = 0;
+  private _profilesEpoch = 0;
+  private _connectionIntent = 0;
   private _networkEpoch = 0;
+  private _refreshing: {
+    provider: DuskProvider;
+    epoch: number;
+    sessionEpoch: number;
+    profilesEpoch: number;
+    networkEpoch: number;
+    promise: Promise<{ state: DuskWalletState; profilesEpoch: number }>;
+  } | null = null;
   private _appEventHandlers = new Map<keyof DuskProviderEventMap, Set<(payload: any) => void>>();
 
   private _profilesFrom(value: unknown): DuskProfile[] {
@@ -253,7 +271,7 @@ export class DuskWallet {
       {
         installed: this._providers.size > 0 || Boolean(this._provider),
         chainId: p.chainId ?? this._state.chainId,
-        authorized: Boolean(p.isAuthorized),
+        authorized: p.isAuthorized === true,
       },
       opts
     );
@@ -262,18 +280,27 @@ export class DuskWallet {
     }
   }
 
-  private _onConnect = (payload: DuskProviderEventMap["connect"]) => {
-    const nextChainId = payload?.chainId ?? this._provider?.chainId ?? null;
-    if (!this._state.authorized || this._state.chainId !== nextChainId) {
-      this._patch({ authorized: true, chainId: nextChainId });
-    }
+  private _onConnect = () => {
+    if (!this._provider) return;
+    // The event is a hint, not a permission grant or authoritative chain snapshot.
+    this._hydrateFromProvider(this._provider, { notify: false });
+    this._notify();
+    void this.refresh().catch(() => {});
   };
 
   private _onDisconnect = (_payload: DuskProviderEventMap["disconnect"]) => {
+    this._sessionEpoch++;
     this._setDisconnected();
   };
 
   private _onProfilesChanged = (profiles: DuskProviderEventMap["profilesChanged"]) => {
+    // A locked provider may clear profiles without revoking site permission.
+    if (
+      Array.isArray(profiles) && profiles.length === 0 &&
+      (this._state.authorized || this._provider?.isAuthorized === true)
+    ) {
+      this._sessionEpoch++;
+    }
     this._setProfiles(profiles);
   };
 
@@ -298,6 +325,10 @@ export class DuskWallet {
   ];
 
   constructor(opts: DuskWalletOptions = {}) {
+    this._providerReadTimeoutMs = opts.providerReadTimeoutMs === undefined ? 10_000 : opts.providerReadTimeoutMs;
+    if (!Number.isInteger(this._providerReadTimeoutMs) || this._providerReadTimeoutMs <= 0 || this._providerReadTimeoutMs > 2_147_483_647) {
+      throw new TypeError("providerReadTimeoutMs must be an integer between 1 and 2147483647");
+    }
     this._explicitProvider = Boolean(opts.provider);
     this._rememberLastUsed = opts.rememberLastUsedProvider !== false;
     this._providerStorageKey = opts.providerStorageKey || DUSK_SELECTED_PROVIDER_STORAGE_KEY;
@@ -316,7 +347,7 @@ export class DuskWallet {
     }
 
     this._stopDiscovery = subscribeDuskProviders((detail) => {
-      this._registerDiscoveredProvider(detail, { notify: false });
+      if (!this._registerDiscoveredProvider(detail, { notify: false })) return;
       if (this._readySettled && !this._provider && !this._explicitProvider) {
         this._autoSelectDiscoveredProvider({ notify: false });
       }
@@ -342,15 +373,20 @@ export class DuskWallet {
         this._bindProviderEvents();
         this._hydrateFromProvider(this._provider, { notify: false });
         if (opts.autoRefresh !== false) {
-          await this.refresh().catch(() => {});
+          await this.refresh().catch(error => {
+            if (error instanceof DuskWalletRequestTimeoutError) throw error;
+          });
         }
       } else {
         this._syncAvailableProviders({ notify: false });
       }
-
+    })().finally(() => {
       this._readySettled = true;
       this._notify();
-    })();
+    });
+    // Initialization starts eagerly; keep its rejection observable through ready()
+    // without an unhandled rejection when the application has not awaited it yet.
+    void this._readyPromise.catch(() => {});
   }
 
   private _availableProviderInfos(): DuskProviderInfo[] {
@@ -376,7 +412,7 @@ export class DuskWallet {
     if (providerInfo?.uuid) {
       registerDiscoveredProvider(this._providers, { info: cloneProviderInfo(providerInfo), provider });
       const detail = this._providers.get(providerInfo.uuid)!;
-      this._applySelectedProvider(detail.info.conflicted ? null : detail, opts);
+      this._applySelectedProvider(detail, opts);
       this._syncAvailableProviders({ notify: false });
       return;
     }
@@ -405,20 +441,13 @@ export class DuskWallet {
   }
 
   private _registerDiscoveredProvider(detail: DuskProviderDetail, opts: { notify?: boolean } = {}): boolean {
-    const changed = registerDiscoveredProvider(this._providers, detail);
+    if (!registerDiscoveredProvider(this._providers, detail)) return false;
     const retained = this._providers.get(detail.info.uuid)!;
-    const selectedConflict = retained.info.conflicted &&
-      (retained.provider === this._provider || detail.provider === this._provider);
-    // A selected later claimant can leave the retained diagnostic entry unchanged.
-    if (!changed && !selectedConflict) return false;
-    const ambiguousProduct = this._preferredProviderRdns &&
-      this._state.providerInfo?.rdns === this._preferredProviderRdns &&
-      [...this._providers.values()].filter(item => item.info.rdns === this._preferredProviderRdns).length > 1;
-    if (ambiguousProduct || selectedConflict) {
-      // Reuse the existing selection epoch/teardown path for pending reads/events.
-      this._applySelectedProvider(null, { notify: false, persist: false });
-    } else if (retained.provider === this._provider) {
-      this._patch({ providerInfo: cloneProviderInfo(retained.info) }, { notify: false });
+    if (retained.provider === this._provider && !this._state.providerInfo) {
+      this._patch(
+        { providerId: retained.info.uuid, providerInfo: cloneProviderInfo(retained.info) },
+        { notify: false }
+      );
     }
     this._syncAvailableProviders({ notify: false });
 
@@ -492,7 +521,7 @@ export class DuskWallet {
             profiles: [],
             selectedAddress: null,
             selectedProfile: null,
-            chainId: nextProvider?.chainId ?? null,
+            chainId: null, // Hydrate only after clearing the previous provider's chain.
             node: null,
             capabilities: null,
             availableProviders: this._availableProviderInfos(),
@@ -518,8 +547,6 @@ export class DuskWallet {
   private _autoSelectDiscoveredProvider(opts: { notify?: boolean } = {}) {
     if (this._explicitProvider || this._provider) return;
     const providers = [...this._providers.values()];
-    // A collision requires a visible choice, never a different automatic winner.
-    if (providers.some(detail => detail.info.conflicted)) return;
 
     if (this._preferredProviderId || this._preferredProviderRdns) {
       const matches = providers.filter(detail => detail.info.rdns === this._preferredProviderRdns);
@@ -565,17 +592,32 @@ export class DuskWallet {
     return { provider: this._requireProvider(), epoch: this._selectionEpoch };
   }
 
-  private _assertCurrentSelection(provider: DuskProvider, epoch: number): void {
+  private _assertCurrentSelection(
+    provider: DuskProvider, epoch: number, sessionEpoch?: number, profilesEpoch?: number
+  ): void {
     if (this._destroyed || provider !== this._provider || epoch !== this._selectionEpoch) {
       throw new DuskWalletProviderChangedError();
+    }
+    if (
+      (sessionEpoch !== undefined && sessionEpoch !== this._sessionEpoch) ||
+      (profilesEpoch !== undefined && profilesEpoch !== this._profilesEpoch)
+    ) {
+      throw new DuskSdkError("Wallet session changed during request", { data: { reason: "session_changed" } });
     }
   }
 
   private async _requestProvider<T>(provider: DuskProvider, method: string, params?: unknown): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return await provider.request<T>({ method, params });
+      if (!PROVIDER_READ_METHODS.has(method)) return await provider.request<T>({ method, params });
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new DuskWalletRequestTimeoutError(method, this._providerReadTimeoutMs)), this._providerReadTimeoutMs);
+      });
+      return await Promise.race([provider.request<T>({ method, params }), deadline]);
     } catch (err) {
       throw translateProviderError(err);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -624,10 +666,15 @@ export class DuskWallet {
     }
   }
 
-  /** Resolves once initial provider discovery/refresh finished. */
+  /** Resolves after initial discovery/refresh; rejects if a provider read times out. Retry with refresh(). */
   async ready(): Promise<this> {
     await this._readyPromise;
     return this;
+  }
+
+  /** Whether initial discovery/refresh is pending; false after either success or failure. */
+  get initializing(): boolean {
+    return !this._readySettled;
   }
 
   /** The currently selected provider, if any. */
@@ -688,8 +735,6 @@ export class DuskWallet {
     }
 
     if (!detail) throw new DuskWalletProviderNotFoundError(`Unknown Dusk wallet provider: ${id}`);
-    if (detail.info.conflicted) throw new DuskWalletProviderSelectionError("Conflicting wallet identifier; reload after resolving the conflict");
-
     this._applySelectedProvider(detail, { notify: false });
     const { provider, epoch } = this._captureSelection();
     await this.refresh();
@@ -720,7 +765,10 @@ export class DuskWallet {
       : await this._requestForSelection<T>(provider, epoch, method, params);
   }
 
-  /** Refresh capabilities, chain id, and approved profiles without prompting. */
+  /**
+   * Refresh capabilities, chain id, and approved profiles without prompting.
+   * Overlapping refreshes share requests within the same provider/session/profile/network context.
+   */
   async refresh(): Promise<DuskWalletState> {
     if (this._destroyed) throw new DuskWalletProviderChangedError("Dusk wallet has been destroyed");
     const p = this._getProvider();
@@ -746,23 +794,69 @@ export class DuskWallet {
     }
 
     const epoch = this._selectionEpoch;
+    const sessionEpoch = this._sessionEpoch;
+    const profilesEpoch = this._profilesEpoch;
+    const networkEpoch = this._networkEpoch;
+    let pending = this._refreshing;
+    if (
+      !pending ||
+      pending.provider !== p || pending.epoch !== epoch ||
+      pending.sessionEpoch !== sessionEpoch || pending.profilesEpoch !== profilesEpoch ||
+      pending.networkEpoch !== networkEpoch
+    ) {
+      let start!: () => void;
+      const promise = new Promise<{ state: DuskWalletState; profilesEpoch: number }>((resolve, reject) => {
+        start = () => {
+          this._refreshState(p, epoch, sessionEpoch, profilesEpoch, networkEpoch).then(resolve, reject);
+        };
+      });
+      // Register the refresh before provider calls can synchronously emit events.
+      pending = this._refreshing = { provider: p, epoch, sessionEpoch, profilesEpoch, networkEpoch, promise };
+      start();
+    }
+    try {
+      const result = await pending.promise;
+      // Publishing fresh profiles can advance the revision; validate the returned snapshot's revision.
+      this._assertCurrentSelection(p, epoch, sessionEpoch, result.profilesEpoch);
+      return cloneState(result.state);
+    } finally {
+      if (this._refreshing === pending) this._refreshing = null;
+    }
+  }
+
+  private async _refreshState(
+    p: DuskProvider,
+    epoch: number,
+    sessionEpoch: number,
+    profilesEpoch: number,
+    networkEpoch: number
+  ): Promise<{ state: DuskWalletState; profilesEpoch: number }> {
+    const optionalRead = (error: unknown) => {
+      if (error instanceof DuskWalletRequestTimeoutError) {
+        this._assertCurrentSelection(p, epoch, sessionEpoch, profilesEpoch);
+        throw error;
+      }
+      return null;
+    };
     const [caps, chainId, profiles] = await Promise.all([
-      this._requestProvider<DuskProviderCapabilities>(p, "dusk_getCapabilities").catch(() => null),
-      this._requestProvider<ChainId>(p, "dusk_chainId").catch(() => null),
-      this._requestProvider<DuskProfile[]>(p, "dusk_profiles").catch(() => []),
+      this._requestProvider<DuskProviderCapabilities>(p, "dusk_getCapabilities").catch(optionalRead),
+      this._requestProvider<ChainId>(p, "dusk_chainId").catch(optionalRead),
+      this._requestProvider<DuskProfile[]>(p, "dusk_profiles").catch(optionalRead),
     ]);
-    this._assertCurrentSelection(p, epoch);
+    this._assertCurrentSelection(p, epoch, sessionEpoch, profilesEpoch);
+    if (networkEpoch !== this._networkEpoch) {
+      throw new DuskSdkError("Wallet network changed during refresh", { data: { reason: "network_changed" } });
+    }
 
     const nextChainId = typeof chainId === "string"
       ? chainId
       : typeof caps?.chainId === "string"
         ? caps.chainId
         : p.chainId ?? null;
-    const nodeUrl = typeof caps?.nodeUrl === "string" ? caps.nodeUrl.trim() : "";
-    const nextNode = caps && nodeUrl
+    const nextNode = caps
       ? {
           chainId: nextChainId ?? caps.chainId,
-          nodeUrl,
+          nodeUrl: caps.nodeUrl,
           networkName: caps.networkName,
         }
       : this._state.node;
@@ -771,15 +865,14 @@ export class DuskWallet {
         chainId: nextChainId,
         node: nextNode,
         capabilities: caps,
-        authorized: Boolean(p.isAuthorized),
+        authorized: p.isAuthorized === true,
       },
       { notify: false }
     );
     this._setProfiles(profiles, { notify: false });
     this._notify();
-    this._assertCurrentSelection(p, epoch);
 
-    return this.state;
+    return { state: this._state, profilesEpoch: this._profilesEpoch };
   }
 
   /** Prompt the user to connect (permission grant). */
@@ -790,6 +883,8 @@ export class DuskWallet {
   /** Prompt the user to connect and return approved profile pairs. */
   async requestProfiles(options?: ConnectOptions): Promise<DuskProfile[]> {
     const { provider, epoch } = this._captureSelection();
+    this._connectionIntent++;
+    const sessionEpoch = this._sessionEpoch;
     const params = options && Object.keys(options).length > 0 ? options : undefined;
     const profilesRaw = await this._requestForSelection<DuskProfile[]>(
       provider,
@@ -797,13 +892,13 @@ export class DuskWallet {
       "dusk_requestProfiles",
       params
     );
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
     const profiles = this._profilesFrom(profilesRaw);
 
     this._patch({ authorized: true, chainId: this._provider?.chainId ?? this._state.chainId }, { notify: false });
     this._setProfiles(profiles, { notify: false });
     this._notify();
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
 
     return profiles;
   }
@@ -811,21 +906,28 @@ export class DuskWallet {
   /** Revoke the site's connection permission. */
   async disconnect(): Promise<boolean> {
     const { provider, epoch } = this._captureSelection();
+    // Discard older reads as soon as revocation is requested, even if the RPC
+    // later fails. Do not let its delayed completion clear a newer connection.
+    const sessionEpoch = ++this._sessionEpoch;
+    const connectionIntent = this._connectionIntent;
     const res = await this._requestForSelection<boolean>(provider, epoch, "dusk_disconnect");
     this._assertCurrentSelection(provider, epoch);
-    this._setDisconnected();
+    if (sessionEpoch === this._sessionEpoch && connectionIntent === this._connectionIntent) {
+      this._setDisconnected();
+    }
     this._assertCurrentSelection(provider, epoch);
     return Boolean(res);
   }
 
   async getProfiles(): Promise<DuskProfile[]> {
     const { provider, epoch } = this._captureSelection();
+    const sessionEpoch = this._sessionEpoch;
     const profiles = await this._requestForSelection<DuskProfile[]>(provider, epoch, "dusk_profiles");
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
     const next = this._profilesFrom(profiles);
     this._setProfiles(next, { notify: false });
     this._notify();
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
     return next;
   }
 
@@ -855,13 +957,14 @@ export class DuskWallet {
    */
   async requestShieldedAddress(params: RequestShieldedAddressParams = {}): Promise<Address> {
     const { provider, epoch } = this._captureSelection();
+    const sessionEpoch = this._sessionEpoch;
     const result = await this._requestForSelection<RequestShieldedAddressResponse>(
       provider,
       epoch,
       "dusk_requestShieldedAddress",
       params
     );
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
     const address = typeof result === "string" ? result : result?.address;
     const trimmed = typeof address === "string" ? address.trim() : "";
     if (!trimmed) {
@@ -912,7 +1015,7 @@ export class DuskWallet {
       this._notify();
     }
 
-    this._assertCurrentSelection(provider, epoch);
+    this._assertCurrentSelection(provider, epoch, sessionEpoch);
     return trimmed;
   }
 
@@ -1077,6 +1180,21 @@ export class DuskWallet {
   }
 
   private _patch(partial: Partial<DuskWalletState>, opts: { notify?: boolean } = {}) {
+    // Validate at the shared state boundary: RPCs, properties and events are all untrusted.
+    if (partial.chainId !== null && typeof partial.chainId !== "string") delete partial.chainId;
+    if (partial.node != null) {
+      const nodeUrl = normalizeNodeUrl(partial.node.nodeUrl);
+      partial.node = nodeUrl && typeof partial.node.chainId === "string"
+        ? { chainId: partial.node.chainId, nodeUrl, networkName: typeof partial.node.networkName === "string" ? partial.node.networkName : "" }
+        : null;
+    }
+    // _setProfiles preserves the array for equivalent profile lists.
+    if (
+      (partial.authorized !== undefined && partial.authorized !== this._state.authorized) ||
+      (partial.profiles !== undefined && partial.profiles !== this._state.profiles)
+    ) {
+      this._profilesEpoch++;
+    }
     const chainId = partial.chainId !== undefined ? partial.chainId : this._state.chainId;
     const nodeUrl = normalizeBaseUrl(
       partial.node !== undefined ? partial.node?.nodeUrl ?? "" : this._state.node?.nodeUrl ?? ""

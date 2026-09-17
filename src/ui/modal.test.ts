@@ -9,7 +9,9 @@ import {
   PIEWALLET_CHROMIUM_URL,
   PIEWALLET_ICON_URL,
 } from "./installOptions.js";
-import { createMockUiWallet } from "../test/mocks.js";
+import { createMockProvider, createMockProviderInfo, createMockUiWallet } from "../test/mocks.js";
+import { makeDuskAnnounceProviderEvent } from "../discovery.js";
+import { createDuskWallet } from "../wallet.js";
 
 const originalUserAgent = navigator.userAgent;
 
@@ -53,6 +55,7 @@ describe("connect modal", () => {
     ];
 
     expect(section.textContent).toBe("Install");
+    expect(document.querySelector<HTMLElement>("#dwcProviderNotice")?.hidden).toBe(true);
     expect(primary.textContent).toBe("Refresh wallets");
     expect(installButtons.map((button) => button.textContent)).toEqual([
       expect.stringContaining("Dusk Wallet"),
@@ -85,19 +88,117 @@ describe("connect modal", () => {
     expect(wallet.discoverProviders).toHaveBeenCalledWith({ timeoutMs: 250 });
   });
 
-  it("visibly disables conflicting provider IDs", () => {
-    const wallet = createMockUiWallet({ installed: true, providerId: null, authorized: false,
-      availableProviders: [{ uuid: "duplicate", name: "Wallet", icon: "", rdns: "com.example.wallet", conflicted: true }] });
-    const modal = createDuskConnectModal(wallet as any);
-    try {
-      modal.open();
-      const row = document.querySelector<HTMLButtonElement>('[data-provider-id="duplicate"]')!;
-      expect(row.disabled).toBe(true);
-      expect(row.textContent).toContain("Conflict");
-      expect(document.querySelector('[role="alert"]')?.textContent).toContain("Conflicting wallet identifiers");
-      row.click();
-      expect(wallet.selectProvider).not.toHaveBeenCalled();
-    } finally { modal.destroy(); }
+  it("keeps the first UUID entry selectable when a duplicate arrives before selection", async () => {
+    const info = createMockProviderInfo({ uuid: "first", name: "First Wallet" });
+    const first = createMockProvider();
+    const later = createMockProvider();
+    const wallet = createDuskWallet({ autoRefresh: false, waitForProvider: false, rememberLastUsedProvider: false });
+    const modal = createDuskConnectModal(wallet, { closeOnConnect: false });
+    onTestFinished(() => { modal.destroy(); wallet.destroy(); });
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: first }));
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info: { ...info, uuid: "other" }, provider: createMockProvider() }));
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info: { ...info, name: "Later Wallet" }, provider: later }));
+    await wallet.ready();
+    expect(wallet.provider).toBeNull(); // Two distinct UUIDs still require a choice.
+    modal.open();
+    const select = vi.spyOn(wallet, "selectProvider");
+    const row = document.querySelector<HTMLButtonElement>('[data-provider-id="first"]')!;
+    expect(row.disabled).toBe(false);
+    expect(row.textContent).toContain("First Wallet");
+    expect(row.textContent).not.toContain("Later Wallet");
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+    expect(document.querySelector("#dwcProviderNotice")?.textContent).toContain("self-reported, not verified");
+    row.click();
+    await select.mock.results[0]!.value;
+    expect(wallet.provider).toBe(first);
+    expect(document.querySelector<HTMLButtonElement>("#dwcPrimary")?.disabled).toBe(false);
+    expect(later.request).not.toHaveBeenCalled();
+    expect(later.on).not.toHaveBeenCalled();
+  });
+
+  it("keeps the first provider connected and selectable without adopting duplicate branding", async () => {
+    const info = createMockProviderInfo({ uuid: "chosen", name: "Chosen Wallet" });
+    const selected = createMockProvider({ accounts: ["chosen-account"] });
+    const impostor = createMockProvider({ accounts: ["scam-account"], authorized: true });
+    const wallet = createDuskWallet({ autoRefresh: false, waitForProvider: false, rememberLastUsedProvider: false });
+    const modal = createDuskConnectModal(wallet, { closeOnConnect: false });
+    onTestFinished(() => { modal.destroy(); wallet.destroy(); });
+    await wallet.ready();
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: selected }));
+    modal.open();
+    const primary = document.querySelector<HTMLButtonElement>("#dwcPrimary")!;
+    const connect = vi.spyOn(wallet, "connect");
+    const disconnect = vi.spyOn(wallet, "disconnect");
+    const select = vi.spyOn(wallet, "selectProvider");
+    primary.click();
+    await connect.mock.results[0]!.value;
+    expect(wallet.state.authorized).toBe(true);
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info: { ...info, name: "Scam Wallet" }, provider: impostor }));
+    expect(wallet.provider).toBe(selected);
+    expect(primary.disabled).toBe(false);
+    expect(primary.textContent).toBe("Disconnect");
+    expect(document.querySelector("#dwcWallet")?.textContent).toBe("Chosen Wallet");
+    expect(document.querySelector("#dwcConflicts")).toBeNull();
+    const row = document.querySelector<HTMLButtonElement>('[data-provider-id="chosen"]')!;
+    expect(row.disabled).toBe(false);
+    expect(row.textContent).toContain("Selected");
+    expect(row.textContent).not.toContain("Conflict");
+    row.click();
+    await select.mock.results[0]!.value;
+    expect(wallet.provider).toBe(selected);
+    expect(impostor.request).not.toHaveBeenCalled();
+    primary.click();
+    await disconnect.mock.results[0]!.value;
+    expect(wallet.state.authorized).toBe(false);
+    expect(primary.disabled).toBe(false);
+    primary.click();
+    await connect.mock.results[1]!.value;
+    expect(wallet.state.authorized).toBe(true);
+    expect(wallet.provider).toBe(selected);
+    expect(impostor.request).not.toHaveBeenCalled();
+  });
+
+  it("marks a metadata-less supplied provider selected when its own metadata arrives", async () => {
+    const provider = createMockProvider();
+    const info = createMockProviderInfo({ uuid: "supplied", name: "Supplied Wallet" });
+    const wallet = createDuskWallet({ provider, autoRefresh: false, rememberLastUsedProvider: false });
+    const modal = createDuskConnectModal(wallet);
+    onTestFinished(() => { modal.destroy(); wallet.destroy(); });
+    await wallet.ready();
+    modal.open();
+    expect(wallet.state.providerId).toBeNull();
+    expect(wallet.providerInfo).toBeNull();
+    const epoch = wallet.selectionEpoch;
+
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider }));
+
+    expect(wallet.provider).toBe(provider);
+    expect(wallet.selectionEpoch).toBe(epoch);
+    expect(wallet.providerInfo).toEqual(info);
+    expect(wallet.state.providerId).toBe(info.uuid);
+    expect(document.querySelector("#dwcWallet")?.textContent).toBe(info.name);
+    const row = document.querySelector('[data-provider-id="supplied"]')!;
+    expect(row.getAttribute("data-selected")).toBe("true");
+    expect(row.querySelector(".dconnect-provider-tag")?.textContent).toBe("Selected");
+  });
+
+  it("does not label a metadata-less chosen provider with a colliding object's metadata", async () => {
+    const selected = createMockProvider({ accounts: ["chosen-account"], authorized: true });
+    const info = createMockProviderInfo({ uuid: "collision", name: "Scam Wallet" });
+    const wallet = createDuskWallet({ provider: selected, autoRefresh: false });
+    const modal = createDuskConnectModal(wallet, { closeOnConnect: false });
+    onTestFinished(() => { modal.destroy(); wallet.destroy(); });
+    await wallet.ready();
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: createMockProvider() }));
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info: { ...info, name: "Chosen Wallet" }, provider: selected }));
+    modal.open();
+    expect(wallet.provider).toBe(selected);
+    expect(document.querySelector("#dwcWallet")?.textContent).toBe("Selected wallet");
+    expect(document.querySelector("#dwcStatus")?.textContent).toBe("Connected");
+    expect(document.querySelector<HTMLButtonElement>("#dwcPrimary")?.disabled).toBe(false);
+    expect(document.querySelector('[data-provider-id="collision"]')?.getAttribute("data-selected")).toBe("false");
+    expect(document.querySelector("#dwcConflicts")).toBeNull();
+    expect(document.querySelector<HTMLElement>("#dwcProviderNotice")?.hidden).toBe(false);
   });
 
   it("shows the Firefox add-ons install option in Firefox", () => {
@@ -185,49 +286,87 @@ describe("connect modal", () => {
     );
   });
 
-  it("uses the Dusk logo mark for Dusk Wallet rows even when an icon is supplied", () => {
-    const wallet = createMockUiWallet({
-      installed: true,
-      authorized: false,
-      accounts: [],
-      availableProviders: [
-        {
-          uuid: "wallet.dusk.extension",
-          name: "Dusk Wallet",
-          icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Ctext%3ED%3C/text%3E%3C/svg%3E",
-          rdns: "network.dusk.wallet",
-        },
-      ],
-    });
-    const modal = createDuskConnectModal(wallet as any);
+  it.each([
+    { name: "Dusk Wallet" },
+    { rdns: "network.dusk.wallet" },
+    { rdns: "evil.dusk.wallet" },
+    { name: "Piewallet" },
+    { name: "Pie Wallet" },
+    { rdns: "evil.piewallet.example" },
+    { rdns: "evil.pieswap.example" },
+    { uuid: "evil-piewallet-instance" },
+    { uuid: "evil-pieswap-instance" },
+    { rdns: "evil.harbor.example" },
+  ].flatMap(claim => ["", "data:image/png;base64,AA=="].map(icon => ({ ...claim, icon }))))(
+    "does not award SDK branding to self-reported metadata: %j",
+    (claim) => {
+      const info = { uuid: "unverified", name: "Example Wallet", rdns: "com.example.wallet", ...claim };
+      const wallet = createMockUiWallet({
+        installed: true, authorized: false, accounts: [], availableProviders: [info],
+      });
+      const modal = createDuskConnectModal(wallet as any);
+      onTestFinished(() => modal.destroy());
+      modal.open();
 
+      const row = document.querySelector<HTMLButtonElement>('[data-action="select-provider"]')!;
+      expect(row.querySelector(".dconnect-provider-dusk")).toBeNull();
+      expect(row.querySelector(".dconnect-provider-name")?.textContent).toBe(info.name);
+      expect(row.querySelector(".dconnect-provider-rdns")?.textContent).toBe(info.rdns);
+      if (info.icon) {
+        expect(row.querySelector("img")?.getAttribute("src")).toBe(info.icon);
+        expect(row.querySelector(".dconnect-provider-initial")).toBeNull();
+      } else {
+        expect(row.querySelector("img")).toBeNull();
+        const initial = row.querySelector<HTMLElement>(".dconnect-provider-initial")!;
+        expect(initial.textContent).toBe(info.name[0]);
+        expect(initial.style.getPropertyValue("--dconnect-provider-accent")).toBe("#71B1FF");
+      }
+      const notice = document.querySelector<HTMLElement>("#dwcProviderNotice")!;
+      expect(notice.hidden).toBe(false);
+      expect(notice.textContent).toContain("self-reported, not verified");
+      row.click();
+      expect(wallet.selectProvider).toHaveBeenCalledWith(info.uuid);
+    }
+  );
+
+  it.each([
+    ["https://icons.example/wallet.png", false],
+    ["http://icons.example/wallet.png", false],
+    ["//icons.example/wallet.png", false],
+    ["/wallet.png", false],
+    ["wallet.png", false],
+    ["blob:https://icons.example/wallet", false],
+    ["https://icons.example/data:image/png;base64,AA==", false],
+    ["javascript:alert(1)", false],
+    ["data:text/html,<img src='https://icons.example/wallet.png'>", false],
+    ["data:;base64,AA==", false],
+    ["data:image/png", false],
+    ["data:image/;base64,AA==", false],
+    ["data:image/png;base64,AA==", true],
+    ["data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E", true],
+    ["data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E", true],
+    [" \tDATA:IMAGE/PNG;BASE64,AA==\n", true],
+  ] as const)("renders only image data URI icons without rejecting the provider: %s", async (icon, rendered) => {
+    const provider = createMockProvider();
+    const info = createMockProviderInfo({ uuid: "unverified", name: "Example Wallet", icon });
+    const wallet = createDuskWallet({ autoRefresh: false, waitForProvider: false, rememberLastUsedProvider: false });
+    const modal = createDuskConnectModal(wallet);
+    onTestFinished(() => { modal.destroy(); wallet.destroy(); });
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider }));
+    await wallet.ready();
     modal.open();
 
-    expect(document.querySelector(".dconnect-provider-mark")).toBeTruthy();
-    expect(document.querySelector(".dconnect-provider-icon")).toBeNull();
-  });
-
-  it("uses the Piewallet logo for Piewallet rows even when a generic icon is supplied", () => {
-    const wallet = createMockUiWallet({
-      installed: true,
-      authorized: false,
-      accounts: [],
-      availableProviders: [
-        {
-          uuid: "wallet.piewallet.extension",
-          name: "Piewallet",
-          icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Ctext%3EP%3C/text%3E%3C/svg%3E",
-          rdns: "network.dusk.piewallet",
-        },
-      ],
-    });
-    const modal = createDuskConnectModal(wallet as any);
-
-    modal.open();
-
-    const icon = document.querySelector(".dconnect-provider-icon") as HTMLImageElement | null;
-    expect(icon?.getAttribute("src")).toBe(PIEWALLET_ICON_URL);
-    expect(document.querySelector(".dconnect-provider-initial")).toBeNull();
+    const row = document.querySelector<HTMLButtonElement>('[data-provider-id="unverified"]')!;
+    expect(row.querySelector("img")?.getAttribute("src") ?? null).toBe(rendered ? icon.trim() : null);
+    expect(row.querySelector(".dconnect-provider-initial")?.textContent ?? null).toBe(rendered ? null : "E");
+    expect(row.querySelector(".dconnect-provider-dusk")).toBeNull();
+    expect(row.disabled).toBe(false);
+    const select = vi.spyOn(wallet, "selectProvider");
+    row.click();
+    await select.mock.results[0]!.value;
+    expect(wallet.provider).toBe(provider);
+    expect(wallet.providerInfo).toEqual(info); // Rendering policy does not rewrite discovery metadata.
+    expect(wallet.providers).toEqual([info]);
   });
 
   it("uses provider initials for iconless non-Dusk wallet rows", () => {

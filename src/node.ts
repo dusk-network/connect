@@ -1,5 +1,5 @@
 import { toBytes } from "./bytes.js";
-import { normalizeBaseUrl, normalizeTxHash, strip0x } from "./internal/normalize.js";
+import { normalizeNodeUrl, normalizeTxHash, strip0x } from "./internal/normalize.js";
 
 /** Options for low-level read-only contract calls through Rusk HTTP. */
 export type ContractCallOptions = {
@@ -161,15 +161,13 @@ export function createDuskNodeClient(opts: {
 
   const getBaseUrl = () => {
     const u = typeof opts.baseUrl === "function" ? opts.baseUrl() : opts.baseUrl;
-    return normalizeBaseUrl(u);
+    const base = normalizeNodeUrl(u);
+    if (!base) throw new TypeError("DuskNodeClient: invalid baseUrl (expected HTTPS or HTTP on loopback without credentials, query or fragment)");
+    return base;
   };
 
   const contractCall: DuskNodeClient["contractCall"] = async (contractId, fnName, body, callOpts = {}) => {
     const base = getBaseUrl();
-    if (!base) {
-      throw new Error("DuskNodeClient: baseUrl is empty");
-    }
-
     const cid = normalizeContractIdForUrl(contractId);
     const url = `${base}/on/contracts:${cid}/${String(fnName)}`;
 
@@ -242,8 +240,6 @@ return await f(url, init);
 
   const waitForTxExecuted: DuskNodeClient["waitForTxExecuted"] = async (hash, waitOpts = {}) => {
     const base = getBaseUrl();
-    if (!base) throw new Error("DuskNodeClient: baseUrl is empty");
-
     const tx = normalizeTxHash(hash);
 
     if (typeof WebSocket === "undefined") {

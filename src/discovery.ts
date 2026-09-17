@@ -41,22 +41,16 @@ function cloneInfo(info: DuskProviderInfo): DuskProviderInfo {
     name: info.name,
     icon: info.icon,
     rdns: info.rdns,
-    ...(info.conflicted ? { conflicted: true } : {}),
   };
 }
 
 /** @internal Shared registration for collectors and the wallet wrapper. */
 export function registerDiscoveredProvider(providers: Map<string, DuskProviderDetail>, detail: DuskProviderDetail): boolean {
-  const current = providers.get(detail.info.uuid);
-  const different = Boolean(current && current.provider !== detail.provider);
-  const retained = different ? current! : detail;
-  const conflicted = Boolean(current?.info.conflicted || different);
-  if (current && current.provider === retained.provider &&
-      Boolean(current.info.conflicted) === conflicted &&
-      DUSK_PROVIDER_INFO_FIELDS.every(key => current.info[key] === retained.info[key])) return false;
+  // First received wins, including metadata. This is continuity, not authentication.
+  if (providers.has(detail.info.uuid)) return false;
   providers.set(detail.info.uuid, {
-    info: cloneInfo({ ...retained.info, conflicted }),
-    provider: retained.provider,
+    info: cloneInfo(detail.info),
+    provider: detail.provider,
   });
   return true;
 }
