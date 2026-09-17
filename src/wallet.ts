@@ -444,7 +444,10 @@ export class DuskWallet {
     if (!registerDiscoveredProvider(this._providers, detail)) return false;
     const retained = this._providers.get(detail.info.uuid)!;
     if (retained.provider === this._provider && !this._state.providerInfo) {
-      this._patch({ providerInfo: cloneProviderInfo(retained.info) }, { notify: false });
+      this._patch(
+        { providerId: retained.info.uuid, providerInfo: cloneProviderInfo(retained.info) },
+        { notify: false }
+      );
     }
     this._syncAvailableProviders({ notify: false });
 

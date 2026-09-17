@@ -28,6 +28,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Filled `providerId` when a metadata-less explicit provider later announces its own metadata [#48].
 - Kept active provider selections unchanged when later discovery introduces additional product matches [#45].
 - Cleared the previous provider's chain snapshot before hydrating a replacement provider [#44].
 - Stopped replaying settled startup errors into contract writes and chain checks after recovery [#44].
@@ -101,6 +102,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed provider event normalization for profile and chain changes.
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
+[#48]: https://github.com/dusk-network/connect/pull/48
 [#45]: https://github.com/dusk-network/connect/issues/45
 [#44]: https://github.com/dusk-network/connect/issues/44
 [#46]: https://github.com/dusk-network/connect/issues/46

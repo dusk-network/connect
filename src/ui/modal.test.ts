@@ -158,6 +158,30 @@ describe("connect modal", () => {
     expect(impostor.request).not.toHaveBeenCalled();
   });
 
+  it("marks a metadata-less supplied provider selected when its own metadata arrives", async () => {
+    const provider = createMockProvider();
+    const info = createMockProviderInfo({ uuid: "supplied", name: "Supplied Wallet" });
+    const wallet = createDuskWallet({ provider, autoRefresh: false, rememberLastUsedProvider: false });
+    const modal = createDuskConnectModal(wallet);
+    onTestFinished(() => { modal.destroy(); wallet.destroy(); });
+    await wallet.ready();
+    modal.open();
+    expect(wallet.state.providerId).toBeNull();
+    expect(wallet.providerInfo).toBeNull();
+    const epoch = wallet.selectionEpoch;
+
+    window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider }));
+
+    expect(wallet.provider).toBe(provider);
+    expect(wallet.selectionEpoch).toBe(epoch);
+    expect(wallet.providerInfo).toEqual(info);
+    expect(wallet.state.providerId).toBe(info.uuid);
+    expect(document.querySelector("#dwcWallet")?.textContent).toBe(info.name);
+    const row = document.querySelector('[data-provider-id="supplied"]')!;
+    expect(row.getAttribute("data-selected")).toBe("true");
+    expect(row.querySelector(".dconnect-provider-tag")?.textContent).toBe("Selected");
+  });
+
   it("does not label a metadata-less chosen provider with a colliding object's metadata", async () => {
     const selected = createMockProvider({ accounts: ["chosen-account"], authorized: true });
     const info = createMockProviderInfo({ uuid: "collision", name: "Scam Wallet" });
