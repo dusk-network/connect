@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Added optional `DuskProfile.name`, a canonical `.dusk` name that the connect button and modal show in place of the shortened account [#56].
+- Added `expectedName` to `runWalletConformance` [#56].
 - Added read-only `wallet.initializing` to distinguish pending initialization from a settled success or failure [#44].
 - Added opt-in `pinnedNodeUrl` for app reads without changing the existing `nodeUrl` fallback semantics or the wallet's transaction network [#44].
 - Added configurable `providerReadTimeoutMs` (default 10 seconds) and `DuskWalletRequestTimeoutError` for non-interactive provider reads, including initial readiness [#44].
@@ -103,6 +105,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Fixed provider event normalization for profile and chain changes.
 - Fixed package contents so published artifacts include the built entrypoints and documentation needed by consumers.
 
+[#56]: https://github.com/dusk-network/connect/issues/56
 [#49]: https://github.com/dusk-network/connect/issues/49
 [#48]: https://github.com/dusk-network/connect/pull/48
 [#45]: https://github.com/dusk-network/connect/issues/45
