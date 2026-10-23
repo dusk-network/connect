@@ -85,6 +85,41 @@ describe("connect button", () => {
     expect(shadow.querySelector(".net")?.textContent).toBe("Mainnet");
   });
 
+  it("shows the profile's name in place of the short account, in full in its title", () => {
+    const account = "dusk1abcdefghijklmnop";
+    const wallet = createMockUiWallet({
+      installed: true,
+      authorized: true,
+      profiles: [{ profileId: "profile:0", account, name: "alice.dusk" }],
+    });
+    const el = createDuskConnectButton({
+      wallet: wallet as any,
+      modal: { open() {}, close() {}, destroy() {}, isOpen: () => false } as any,
+    });
+
+    document.body.appendChild(el);
+
+    const button = el.shadowRoot!.querySelector("button")!;
+    const label = el.shadowRoot!.querySelector<HTMLElement>(".label")!;
+    expect(label.textContent).toBe("alice.dusk");
+    expect(label.title).toBe("alice.dusk");
+    expect(button.textContent).toContain("alice.dusk"); // The accessible name comes from this content.
+    expect(button.hasAttribute("aria-label")).toBe(false);
+
+    const long = `${"a".repeat(63)}.dusk`; // Ellipsized by CSS, so kept whole in the DOM.
+    wallet.emit({ profiles: [{ profileId: "profile:0", account, name: long }] });
+    expect(label.textContent).toBe(long);
+    expect(label.title).toBe(long);
+
+    wallet.emit({ authorized: false, profiles: [] });
+    expect(label.textContent).toBe("Connect wallet");
+    expect(label.title).toBe("");
+
+    wallet.emit({ authorized: true, profiles: [{ profileId: "profile:0", account }] });
+    expect(label.textContent).toBe("dusk1a…mnop");
+    expect(label.title).toBe("");
+  });
+
   it("hides the network badge until the wallet is connected", () => {
     const wallet = createMockUiWallet({
       installed: true,

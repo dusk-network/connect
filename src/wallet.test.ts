@@ -15,6 +15,7 @@ import {
   DuskWalletProviderSelectionError,
   DuskWalletUnauthorizedError,
 } from "./errors.js";
+import type { DuskProfile } from "./types.js";
 import { DuskWallet, createDuskWallet } from "./wallet.js";
 import { createMockProvider, createMockProviderInfo, makeNodeChangedPayload } from "./test/mocks.js";
 
@@ -735,6 +736,27 @@ describe("wallet", () => {
       profileId: "profile:0",
       account: "dusk1public",
     });
+  });
+
+  it("keeps a profile name with its account through grants and profile changes", async () => {
+    const provider = createMockProvider({ accounts: ["dusk1first"], name: "first.dusk", shieldedAddress: "dusk1shielded" });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+
+    await wallet.connect();
+    await wallet.requestShieldedAddress();
+    expect(wallet.state.selectedProfile).toEqual({
+      profileId: "profile:0", account: "dusk1first", shieldedAddress: "dusk1shielded", name: "first.dusk",
+    });
+
+    provider.setProfiles([{ profileId: "profile:1", account: "dusk1second", name: "second.dusk" }]);
+    expect(wallet.state.selectedProfile).toEqual({ profileId: "profile:1", account: "dusk1second", name: "second.dusk" });
+
+    // The profile id carries over to an unchanged account; the name does not.
+    provider.emit("profilesChanged", [{ account: "dusk1second" } as DuskProfile]);
+    expect(wallet.state.selectedProfile).toEqual({ profileId: "profile:1", account: "dusk1second" });
+
+    provider.emit("profilesChanged", []);
+    expect(wallet.state.selectedProfile).toBeNull();
   });
 
   it("reacts to provider events and notifies subscribers", async () => {

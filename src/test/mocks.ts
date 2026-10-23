@@ -33,6 +33,7 @@ export function createMockProvider(
   opts: {
     accounts?: AccountId[];
     shieldedAddress?: Address;
+    name?: string;
     chainId?: ChainId | null;
     authorized?: boolean;
     capabilities?: Partial<DuskProviderCapabilities>;
@@ -41,6 +42,7 @@ export function createMockProvider(
 ): MockDuskProvider {
   let accounts = [...(opts.accounts ?? ["dusk1mockaccount"])];
   let shieldedAddress = opts.shieldedAddress ?? "dusk1mockshieldedreceiveaddress";
+  let name = opts.name;
   let profileId = "profile:0";
   let chainId = opts.chainId ?? "dusk:2";
   let authorized = opts.authorized ?? false;
@@ -88,6 +90,7 @@ export function createMockProvider(
         profileId,
         account: accounts[0],
         ...(includeShielded ? { shieldedAddress } : {}),
+        ...(name !== undefined ? { name } : {}),
       },
     ];
   };
@@ -193,6 +196,7 @@ export function createMockProvider(
       accounts = first?.account ? [first.account] : [];
       profileId = first?.profileId ?? "profile:0";
       shieldedAddress = first?.shieldedAddress ?? shieldedAddress;
+      name = first?.name;
       emit("profilesChanged", next.map((profile) => ({ ...profile })));
     },
     setChainId(next: ChainId | null) {

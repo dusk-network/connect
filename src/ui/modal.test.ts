@@ -414,6 +414,7 @@ describe("connect modal", () => {
 
     expect(copy.hidden).toBe(false);
     expect(primary.textContent).toBe("Disconnect");
+    expect(document.querySelector<HTMLElement>("#dwcName")?.hidden).toBe(true);
 
     copy.click();
     await Promise.resolve();
@@ -424,5 +425,34 @@ describe("connect modal", () => {
     await Promise.resolve();
 
     expect(wallet.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a provider's name over its own short account and still copies the account", async () => {
+    const first = "dusk1abcdefghijklmnopqrstuvwxyz";
+    const second = "dusk1zyxwvutsrqponmlkjihgfedcba";
+    const provider = createMockProvider({ authorized: true, accounts: [first], name: "alice.dusk" });
+    const wallet = createDuskWallet({ provider, waitForProvider: false, autoRefresh: false });
+    const modal = createDuskConnectModal(wallet, { closeOnConnect: false });
+    onTestFinished(() => { modal.destroy(); wallet.destroy(); });
+    modal.open();
+
+    const name = document.querySelector<HTMLElement>("#dwcName")!;
+    const account = document.querySelector<HTMLElement>("#dwcAccount")!;
+    expect([name.hidden, name.textContent, name.title]).toEqual([false, "alice.dusk", "alice.dusk"]);
+    expect(name.nextElementSibling).toBe(account);
+    expect(account.textContent).toBe("dusk1abcde…stuvwxyz");
+    document.querySelector<HTMLButtonElement>("#dwcCopy")!.click();
+    await Promise.resolve();
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(first);
+
+    // A new account never keeps the old name; one that Connect drops shows the account alone.
+    provider.setProfiles([{ profileId: "profile:1", account: second, name: "Bob.dusk" }]);
+    expect([name.hidden, name.textContent, account.textContent]).toEqual([true, "", "dusk1zyxwv…hgfedcba"]);
+
+    provider.setProfiles([{ profileId: "profile:1", account: second, name: "bob.dusk" }]);
+    expect([name.hidden, name.textContent, account.textContent]).toEqual([false, "bob.dusk", "dusk1zyxwv…hgfedcba"]);
+    document.querySelector<HTMLButtonElement>("#dwcCopy")!.click();
+    await Promise.resolve();
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(second);
   });
 });

@@ -4,7 +4,7 @@ import {
   getDuskWalletInstallTargets,
   type DuskWalletInstallTarget,
 } from "./installOptions.js";
-import { networkLabel, shortenMiddle, walletStatus, type WalletStatus } from "./shared.js";
+import { networkLabel, shortenMiddle, shownProfile, walletStatus, type WalletStatus } from "./shared.js";
 import { DCONNECT_UI_BASE_CSS } from "./styles.js";
 
 /** Options for the framework-agnostic Dusk connect modal. */
@@ -133,6 +133,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
   let $title: HTMLElement | null = null;
   let $status: HTMLElement | null = null;
   let $wallet: HTMLElement | null = null;
+  let $name: HTMLElement | null = null;
   let $account: HTMLElement | null = null;
   let $network: HTMLElement | null = null;
   let $copy: HTMLButtonElement | null = null;
@@ -347,6 +348,18 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
       text-overflow: ellipsis;
       white-space: nowrap;
       max-width: 260px;
+    }
+
+    /* A profile's name over its short account, which then shows smaller and muted. */
+    .dconnect-profile {
+      display: grid;
+      gap: 2px;
+      text-align: right;
+    }
+
+    .dconnect-profile-name:not([hidden]) + span {
+      font-size: 11px;
+      color: var(--dconnect-muted-foreground);
     }
 
     .dconnect-copy {
@@ -716,7 +729,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           <div class="dconnect-row dconnect-row-data"><div class="dconnect-lab">Wallet</div><div class="dconnect-val"><span id="dwcWallet">—</span></div></div>
           <div class="dconnect-row dconnect-row-data">
             <div class="dconnect-lab">Profile</div>
-            <div class="dconnect-val"><span id="dwcAccount">—</span><button class="dconnect-copy" id="dwcCopy" type="button" data-action="copy" hidden>Copy</button></div>
+            <div class="dconnect-val"><span class="dconnect-profile"><span class="dconnect-profile-name" id="dwcName" hidden></span><span id="dwcAccount">—</span></span><button class="dconnect-copy" id="dwcCopy" type="button" data-action="copy" hidden>Copy</button></div>
           </div>
           <div class="dconnect-row dconnect-row-data"><div class="dconnect-lab">Network</div><div class="dconnect-val" id="dwcNetwork">—</div></div>
           <div class="dconnect-section">
@@ -735,6 +748,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     $title = root.querySelector("#dconnectTitle");
     $status = root.querySelector("#dwcStatus");
     $wallet = root.querySelector("#dwcWallet");
+    $name = root.querySelector("#dwcName");
     $account = root.querySelector("#dwcAccount");
     $network = root.querySelector("#dwcNetwork");
     $copy = root.querySelector("#dwcCopy");
@@ -765,7 +779,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
       const status = walletStatus(st);
 
       if (action === "copy") {
-        const acct = st.selectedProfile?.account || st.profiles?.[0]?.account || "";
+        const acct = shownProfile(st)?.account || "";
         if (!acct) return;
         const ok = await copyToClipboard(acct);
         toast(ok ? "Copied" : "Copy failed");
@@ -822,7 +836,9 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
 
   const update = (st: DuskWalletState) => {
     const status = walletStatus(st);
-    const acct = st.selectedProfile?.account || st.profiles?.[0]?.account || "";
+    const profile = shownProfile(st);
+    const acct = profile?.account || "";
+    const name = profile?.name || "";
     const net = networkLabel(st);
     const needsSelection = st.availableProviders.length > 0 && !st.providerId && !wallet.provider;
 
@@ -842,6 +858,11 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     }
 
     if ($wallet) $wallet.textContent = st.providerInfo?.name || (wallet.provider ? "Selected wallet" : "Choose wallet");
+    if ($name) {
+      $name.textContent = name;
+      $name.title = name;
+      $name.hidden = !name;
+    }
     if ($account) $account.textContent = acct ? shortenMiddle(acct, 10, 8) : "—";
     if ($network) $network.textContent = net || "—";
     if ($copy) $copy.hidden = !acct;

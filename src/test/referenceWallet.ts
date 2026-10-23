@@ -84,6 +84,7 @@ export type ReferenceWalletProvider = DuskProvider & {
 export type InstallReferenceWalletOptions = {
   info?: Partial<DuskProviderInfo>;
   accounts?: AccountId[];
+  name?: string;
   chainId?: ChainId;
   nodeUrl?: string;
   networkName?: string;
@@ -129,6 +130,7 @@ export function installReferenceWallet(
   let accounts = [...(options.accounts ?? ["dusk1referenceaccount1111111111111111111111111111111"])];
   let profileId = "profile:0";
   let shieldedAddress = "dusk1referenceshieldedreceiveaddress111111111111111111111111";
+  let name = options.name;
   let authorized = false;
   let balance = { ...DEFAULT_BALANCE, ...(options.balance ?? {}) };
   let gas = { ...DEFAULT_GAS, ...(options.gas ?? {}) };
@@ -175,6 +177,7 @@ export function installReferenceWallet(
         profileId,
         account: accounts[0],
         ...(includeShielded ? { shieldedAddress } : {}),
+        ...(name !== undefined ? { name } : {}),
       },
     ];
   };
@@ -407,6 +410,7 @@ export function installReferenceWallet(
       accounts = first?.account ? [first.account] : [];
       profileId = first?.profileId ?? "profile:0";
       shieldedAddress = first?.shieldedAddress ?? shieldedAddress;
+      name = first?.name;
       emit("profilesChanged", next.map((profile) => ({ ...profile })));
     },
     setAuthorized(next: boolean) {
