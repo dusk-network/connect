@@ -55,6 +55,16 @@
   "publishConfig": {
     "access": "public"
   },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.18.0",
+      "onFail": "error"
+    }
+  },
+  "allowScripts": {
+    "fsevents": false
+  },
   "dependencies": {
     "@dusk/typed-data": "npm:@jsr/dusk__typed-data@0.1.0-rc.0"
   },
