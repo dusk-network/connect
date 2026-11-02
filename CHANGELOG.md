@@ -18,7 +18,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added `TxHandle.origin` and `DuskWalletProviderChangedError` [#24].
 - Added configurable `providerReadTimeoutMs` (default 10 seconds) and `DuskWalletRequestTimeoutError` for non-interactive provider reads, including initial readiness [#44].
 - Added read-only `wallet.networkSwitchEpoch`, a count of switches from one known chain or node to another [#53].
-- Added validated conversion between Base58 Moonlight accounts and `0x` public-key hex [#92].
+- Added validated conversion between Base58 Moonlight accounts and `0x` public-key hex [wallet#92].
 - Added `drcPrincipal()` to build a DRC principal from a Moonlight account or a contract id [#51].
 - Added opt-in `./typed-data` hashing exports backed by `@dusk/typed-data` [wallet#22].
 - Added opt-in `./bls` verification with a required chain/origin policy and structured result [wallet#22].
@@ -131,7 +131,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 [#26]: https://github.com/dusk-network/connect/issues/26
 [#24]: https://github.com/dusk-network/connect/issues/24
 [#18]: https://github.com/dusk-network/connect/issues/18
-[#92]: https://github.com/dusk-network/wallet/issues/92
+[wallet#92]: https://github.com/dusk-network/wallet/issues/92
 
 [Unreleased]: https://github.com/dusk-network/connect/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/dusk-network/connect/compare/v0.2.0...v0.3.0
