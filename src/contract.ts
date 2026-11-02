@@ -109,12 +109,6 @@ function buildDisplay(
   return { ...base, display: userDisplay };
 }
 
-// The chain and node the wallet reports; "" for one it hasn't reported yet.
-function walletNetwork(wallet: DuskWallet): { chainId: string; nodeUrl: string } {
-  const { chainId, node } = wallet.state;
-  return { chainId: chainId ?? "", nodeUrl: (node?.chainId === chainId && normalizeNodeUrl(node.nodeUrl)) || "" };
-}
-
 function createFnProxy<T extends Record<string, any>>(factory: (fnName: string) => any): T {
   return new Proxy(
     {},
@@ -223,12 +217,19 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
         assertSelection();
       }
 
-      if (chainTarget) {
-        await ensureChain(wallet, chainTarget, { selection });
-      }
+      const walletNodeUrl = () => {
+        const { chainId, node } = wallet.state;
+        return (node?.chainId === chainId && normalizeNodeUrl(node.nodeUrl)) || "";
+      };
+      const targetReached = () =>
+        (!chainTarget?.chainId ||
+          normalizeCaip2ChainId(chainTarget.chainId) === normalizeCaip2ChainId(wallet.state.chainId ?? "")) &&
+        (!chainTarget?.nodeUrl || normalizeNodeUrl(chainTarget.nodeUrl) === walletNodeUrl());
+      // A wallet can answer a switch before reporting it; then the report of the target is still due.
+      const targetDue = chainTarget ? (await ensureChain(wallet, chainTarget, { selection })) && !targetReached() : false;
 
       // Connecting and switching are done: the send needs this network and these profiles.
-      const network = walletNetwork(wallet);
+      const networkSwitchEpoch = wallet.networkSwitchEpoch;
       const profilesEpoch = wallet.profilesEpoch;
       const authorized = wallet.state.authorized;
 
@@ -236,13 +237,8 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
       const { autoConnect: _ac, chain: _chain, ...txOverrides } = (writeOpts ?? {}) as any;
       const txParams = await (tx as any)[fnName](args, txOverrides);
 
-      const walletNode = wallet.state.node;
-      const walletNodeUrl = walletNode?.chainId === wallet.state.chainId ? walletNode.nodeUrl : "";
-      const nodeUrl = normalizeNodeUrl(walletNodeUrl) ?? "";
-      const targetConfirmed =
-        (!chainTarget?.chainId ||
-          normalizeCaip2ChainId(chainTarget.chainId) === normalizeCaip2ChainId(wallet.state.chainId ?? "")) &&
-        (!chainTarget?.nodeUrl || normalizeNodeUrl(chainTarget.nodeUrl) === nodeUrl);
+      const nodeUrl = walletNodeUrl();
+      const targetConfirmed = targetReached();
       const origin: TxOrigin = Object.freeze({
         providerId: wallet.state.providerId ?? null,
         selectionEpoch: selection.epoch,
@@ -255,12 +251,9 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
       );
       const trackingNode = nodeMatchesOrigin ? opts.node?.pin?.(origin.nodeUrl) ?? opts.node : opts.node;
       // Encoding can take seconds: send nothing if the wallet changed in the meantime. Learning a
-      // chain or node the write didn't know isn't a switch, nor is a late report of its own target.
+      // chain or node isn't a switch, and neither is the one report of the target still due.
       assertSelection();
-      const now = walletNetwork(wallet);
-      const switched =
-        (network.chainId && now.chainId !== network.chainId) || (network.nodeUrl && now.nodeUrl !== network.nodeUrl);
-      if (switched && !(chainTarget && targetConfirmed)) {
+      if (wallet.networkSwitchEpoch - networkSwitchEpoch > (targetDue && targetConfirmed ? 1 : 0)) {
         throw new DuskSdkError("Wallet network changed before sending", { data: { reason: "network_changed" } });
       }
       if (

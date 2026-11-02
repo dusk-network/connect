@@ -12,6 +12,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added read-only `wallet.initializing` to distinguish pending initialization from a settled success or failure [#44].
 - Added opt-in `pinnedNodeUrl` for app reads without changing the existing `nodeUrl` fallback semantics or the wallet's transaction network [#44].
 - Added configurable `providerReadTimeoutMs` (default 10 seconds) and `DuskWalletRequestTimeoutError` for non-interactive provider reads, including initial readiness [#44].
+- Added read-only `wallet.networkSwitchEpoch`, a count of switches from one known chain or node to another [#53].
 - Added validated conversion between Base58 Moonlight accounts and `0x` public-key hex [#92].
 - Added opt-in `./typed-data` hashing exports backed by `@dusk/typed-data` [wallet#22].
 - Added opt-in `./bls` verification with a required chain/origin policy and structured result [wallet#22].

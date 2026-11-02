@@ -527,6 +527,32 @@ describe("sending after session or network changes", () => {
     }
   );
 
+  const node = (nodeUrl: string) => ({ chainId: "dusk:2", nodeUrl, networkName: "Custom" });
+  const switches: Array<[string, { hydrated: boolean; chainless?: boolean }, (provider: MockDuskProvider) => void]> = [
+    ["an unknown node to A to B", { hydrated: false }, provider => {
+      provider.emit("duskNodeChanged", node("https://a.example"));
+      provider.emit("duskNodeChanged", node("https://b.example"));
+    }],
+    ["an unknown chain to dusk:2 to dusk:3", { hydrated: false, chainless: true }, provider => {
+      provider.setChainId("dusk:2");
+      provider.setChainId("dusk:3");
+    }],
+    ["dusk:2 to dusk:3 and back", { hydrated: true }, provider => {
+      provider.setChainId("dusk:3");
+      provider.setChainId("dusk:2");
+    }],
+  ];
+  it.each(switches)("a contract write refuses a switch from %s while encoding", async (_label, setup, change) => {
+    const provider = createMockProvider({ authorized: true });
+    if (setup.chainless) provider.setChainId(null);
+    const { wallet, writing, finish } = await startWrite(provider, { hydrated: setup.hydrated });
+    try {
+      change(provider);
+      finish();
+      await expectSent(writing, provider, "network_changed");
+    } finally { finish(); wallet.destroy(); }
+  });
+
   it.each([["chain", "network_changed"], ["lock", "session_changed"]])(
     "wallet.sendTransaction sends nothing when the %s changes while it reads the call",
     async (change, reason) => {

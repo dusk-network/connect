@@ -198,6 +198,9 @@ export class DuskWallet {
   private _profilesEpoch = 0;
   private _connectionIntent = 0;
   private _networkEpoch = 0;
+  private _networkSwitchEpoch = 0;
+  private _knownChain = "";
+  private _knownNode = "";
   private _refreshing: {
     provider: DuskProvider;
     epoch: number;
@@ -700,6 +703,11 @@ export class DuskWallet {
   /** Monotonic generation of the authorization and the approved profiles. */
   get profilesEpoch(): number {
     return this._profilesEpoch;
+  }
+
+  /** Monotonic count of switches from one known chain or node to another; learning one isn't a switch. */
+  get networkSwitchEpoch(): number {
+    return this._networkSwitchEpoch;
   }
 
   /** Metadata for the currently selected provider, if any. */
@@ -1221,7 +1229,27 @@ export class DuskWallet {
       this._networkEpoch++;
     }
     this._state = { ...this._state, ...partial, lastUpdated: Date.now() };
+    this._countNetworkSwitch();
     if (opts.notify !== false) this._notify();
+  }
+
+  // A chain switch also forgets the node, so the new chain's first node report isn't a second switch.
+  private _countNetworkSwitch() {
+    const { chainId, node } = this._state;
+    const nodeUrl = node && node.chainId === chainId ? normalizeBaseUrl(node.nodeUrl) : "";
+    let switched = false;
+    if (chainId) {
+      if (this._knownChain && chainId !== this._knownChain) {
+        switched = true;
+        this._knownNode = "";
+      }
+      this._knownChain = chainId;
+    }
+    if (nodeUrl) {
+      if (this._knownNode && nodeUrl !== this._knownNode) switched = true;
+      this._knownNode = nodeUrl;
+    }
+    if (switched) this._networkSwitchEpoch++;
   }
 
   private _notify() {
