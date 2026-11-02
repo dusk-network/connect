@@ -15,7 +15,7 @@ import type { DuskDataDriver } from "./driver.js";
 import type { ContractCallOptions, DuskNodeClient } from "./node.js";
 
 import { bytesToHex } from "./bytes.js";
-import { DuskTxTrackingUnavailableError, DuskWalletProviderChangedError } from "./errors.js";
+import { DuskSdkError, DuskTxTrackingUnavailableError, DuskWalletProviderChangedError } from "./errors.js";
 import { ensureChain } from "./ensureChain.js";
 import { normalizeContractId0x } from "./internal/contractId.js";
 import { compact, normalizeNodeUrl, normalizeCaip2ChainId } from "./internal/normalize.js";
@@ -200,6 +200,7 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
         provider = wallet.provider;
       }
       const selection = { provider, epoch: wallet.selectionEpoch };
+      const sessionEpoch = wallet.sessionEpoch;
       const assertSelection = () => {
         if (wallet.provider !== selection.provider || wallet.selectionEpoch !== selection.epoch) {
           throw new DuskWalletProviderChangedError();
@@ -220,10 +221,14 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
         await ensureChain(wallet, chainTarget, { selection });
       }
 
+      // Connecting and switching are done: the send needs this network and these profiles.
+      const networkEpoch = wallet.networkEpoch;
+      const profilesEpoch = wallet.profilesEpoch;
+      const authorized = wallet.state.authorized;
+
       // `writeOpts` can include non-tx fields (autoConnect/chain). Strip them.
       const { autoConnect: _ac, chain: _chain, ...txOverrides } = (writeOpts ?? {}) as any;
       const txParams = await (tx as any)[fnName](args, txOverrides);
-      assertSelection();
 
       const walletNode = wallet.state.node;
       const walletNodeUrl = walletNode?.chainId === wallet.state.chainId ? walletNode.nodeUrl : "";
@@ -243,6 +248,18 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
         origin.nodeUrl && opts.node?.getBaseUrl?.() === origin.nodeUrl
       );
       const trackingNode = nodeMatchesOrigin ? opts.node?.pin?.(origin.nodeUrl) ?? opts.node : opts.node;
+      // Encoding can take seconds: send nothing if the wallet changed in the meantime.
+      // A wallet can report the switch to the write's own chain target late; that's not a change.
+      assertSelection();
+      if (wallet.networkEpoch !== networkEpoch && !(chainTarget && targetConfirmed)) {
+        throw new DuskSdkError("Wallet network changed before sending", { data: { reason: "network_changed" } });
+      }
+      if (
+        wallet.sessionEpoch !== sessionEpoch || wallet.profilesEpoch !== profilesEpoch ||
+        wallet.state.authorized !== authorized
+      ) {
+        throw new DuskSdkError("Wallet session changed before sending", { data: { reason: "session_changed" } });
+      }
       const submitted = await wallet.sendContractCall(txParams);
       const submissionContextChanged =
         wallet.provider !== selection.provider ||

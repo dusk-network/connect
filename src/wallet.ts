@@ -692,6 +692,16 @@ export class DuskWallet {
     return this._networkEpoch;
   }
 
+  /** Monotonic generation of the site session; it advances when the site disconnects or the wallet locks. */
+  get sessionEpoch(): number {
+    return this._sessionEpoch;
+  }
+
+  /** Monotonic generation of the authorization and the approved profiles. */
+  get profilesEpoch(): number {
+    return this._profilesEpoch;
+  }
+
   /** Metadata for the currently selected provider, if any. */
   get providerInfo(): DuskProviderInfo | null {
     return this._state.providerInfo ? cloneProviderInfo(this._state.providerInfo) : null;
@@ -1038,7 +1048,15 @@ export class DuskWallet {
 
   async sendTransaction(params: SendTransactionParams): Promise<TxResult> {
     const { provider, epoch } = this._captureSelection();
-    return await this._submitForSelection<TxResult>(provider, epoch, this._normalizeTransactionParams(params));
+    const { _sessionEpoch: sessionEpoch, _profilesEpoch: profilesEpoch, _networkEpoch: networkEpoch } = this;
+    const normalized = this._normalizeTransactionParams(params);
+    // Normalizing reads the caller's values; send only if the session, profiles
+    // (and so the authorization) and network are still the ones the call began with.
+    this._assertCurrentSelection(provider, epoch, sessionEpoch, profilesEpoch);
+    if (networkEpoch !== this._networkEpoch) {
+      throw new DuskSdkError("Wallet network changed before sending", { data: { reason: "network_changed" } });
+    }
+    return await this._submitForSelection<TxResult>(provider, epoch, normalized);
   }
 
   async sendTransfer(params: Omit<Extract<SendTransactionParams, { kind: "transfer" }>, "kind">): Promise<TxResult> {
