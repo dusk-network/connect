@@ -679,6 +679,11 @@ package through its public exports; it is included in `npm run ci`.
 
 The package is published as `@dusk/connect` on JSR.
 
+Pushing a `v*` tag publishes that version to JSR through
+`.github/workflows/publish.yml`: it checks the tag against `package.json` and
+`jsr.json`, runs the checks below and authenticates through GitHub, with no
+token stored.
+
 npm publishing is intentionally separate; do not assume npm availability unless
 a later npm release under an appropriate npm scope is announced.
 
