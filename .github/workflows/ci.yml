@@ -38,6 +38,8 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: 24
+          # Our steps pin npm themselves; auto-caching would run the runner's npm here first.
+          package-manager-cache: false
 
       - name: Validate package release ages
         shell: bash
