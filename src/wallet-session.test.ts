@@ -455,9 +455,10 @@ describe("sending after session or network changes", () => {
     provider.request.mock.calls.filter(([arg]) => arg.method === "dusk_sendTransaction");
 
   // Starts a write and returns once it waits on encoding.
-  async function startWrite(provider: MockDuskProvider, chain?: { chainId: string }) {
+  async function startWrite(provider: MockDuskProvider, { chain, hydrated = true }: { chain?: { chainId: string }; hydrated?: boolean } = {}) {
     const wallet = createDuskWallet({ provider, autoRefresh: false });
     await wallet.ready();
+    if (hydrated) await wallet.refresh(); // The write knows the wallet's node.
     const encoded = deferred<Uint8Array>();
     const encodeInputFn = vi.fn(() => encoded.promise);
     const contract = createDuskContract({
@@ -499,13 +500,30 @@ describe("sending after session or network changes", () => {
     async (reported, reason) => {
       // Like the Dusk wallet, answer the switch before reporting it.
       const provider = createMockProvider({ authorized: true, responses: { dusk_switchNetwork: null } });
-      const { wallet, writing, finish } = await startWrite(provider, { chainId: "dusk:3" });
+      const { wallet, writing, finish } = await startWrite(provider, { chain: { chainId: "dusk:3" } });
       try {
         expect(wallet.state.chainId).toBe("dusk:2");
         provider.setChainId(reported);
         finish();
         await expectSent(writing, provider, reason);
       } finally { finish(); wallet.destroy(); }
+    }
+  );
+
+  it.each([["only hydrates the node", null], ["hydrates the node, then the chain switches", "network_changed"]])(
+    "an auto-connect write sends when its connection %s while encoding, unless it switched",
+    async (_change, reason) => {
+      const caps = deferred<unknown>();
+      const provider = createMockProvider({ responses: { dusk_getCapabilities: () => caps.promise } });
+      const { wallet, writing, finish } = await startWrite(provider, { hydrated: false });
+      try {
+        expect(wallet.state).toMatchObject({ authorized: true, node: null });
+        caps.resolve({ chainId: "dusk:2", nodeUrl: "https://testnet.nodes.dusk.network", networkName: "Testnet" });
+        await vi.waitFor(() => expect(wallet.state.node).not.toBeNull());
+        if (reason) provider.setChainId("dusk:3");
+        finish();
+        await expectSent(writing, provider, reason);
+      } finally { caps.resolve({}); finish(); wallet.destroy(); }
     }
   );
 

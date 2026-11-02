@@ -109,6 +109,12 @@ function buildDisplay(
   return { ...base, display: userDisplay };
 }
 
+// The chain and node the wallet reports; "" for one it hasn't reported yet.
+function walletNetwork(wallet: DuskWallet): { chainId: string; nodeUrl: string } {
+  const { chainId, node } = wallet.state;
+  return { chainId: chainId ?? "", nodeUrl: (node?.chainId === chainId && normalizeNodeUrl(node.nodeUrl)) || "" };
+}
+
 function createFnProxy<T extends Record<string, any>>(factory: (fnName: string) => any): T {
   return new Proxy(
     {},
@@ -222,7 +228,7 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
       }
 
       // Connecting and switching are done: the send needs this network and these profiles.
-      const networkEpoch = wallet.networkEpoch;
+      const network = walletNetwork(wallet);
       const profilesEpoch = wallet.profilesEpoch;
       const authorized = wallet.state.authorized;
 
@@ -248,10 +254,13 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
         origin.nodeUrl && opts.node?.getBaseUrl?.() === origin.nodeUrl
       );
       const trackingNode = nodeMatchesOrigin ? opts.node?.pin?.(origin.nodeUrl) ?? opts.node : opts.node;
-      // Encoding can take seconds: send nothing if the wallet changed in the meantime.
-      // A wallet can report the switch to the write's own chain target late; that's not a change.
+      // Encoding can take seconds: send nothing if the wallet changed in the meantime. Learning a
+      // chain or node the write didn't know isn't a switch, nor is a late report of its own target.
       assertSelection();
-      if (wallet.networkEpoch !== networkEpoch && !(chainTarget && targetConfirmed)) {
+      const now = walletNetwork(wallet);
+      const switched =
+        (network.chainId && now.chainId !== network.chainId) || (network.nodeUrl && now.nodeUrl !== network.nodeUrl);
+      if (switched && !(chainTarget && targetConfirmed)) {
         throw new DuskSdkError("Wallet network changed before sending", { data: { reason: "network_changed" } });
       }
       if (
