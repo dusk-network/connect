@@ -175,7 +175,7 @@ import { hashTypedDataHex } from "@dusk/connect/typed-data";
 import { verifyTypedDataSignature } from "@dusk/connect/bls";
 ```
 
-The unreleased `./typed-data` and `./bls` entrypoints use
+The `./typed-data` and `./bls` entrypoints use
 [`@dusk/typed-data`](https://github.com/dusk-network/typed-data). The root entrypoint
 loads no cryptography. This integration pins the published JSR
 `@dusk/typed-data@0.1.0-rc.0` release through its npm compatibility registry;
