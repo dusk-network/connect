@@ -52,7 +52,7 @@ import {
 } from "./discovery.js";
 
 import { normalizeContractId0x } from "./internal/contractId.js";
-import { normalizeBaseUrl, normalizeNodeUrl } from "./internal/normalize.js";
+import { normalizeBaseUrl, normalizeDuskName, normalizeNodeUrl } from "./internal/normalize.js";
 import { bytesToHex, toBytes } from "./bytes.js";
 
 /** Provider discovery wait options used by {@link DuskWallet}. */
@@ -198,6 +198,9 @@ export class DuskWallet {
   private _profilesEpoch = 0;
   private _connectionIntent = 0;
   private _networkEpoch = 0;
+  private _networkSwitchEpoch = 0;
+  private _knownChain = "";
+  private _knownNode = "";
   private _refreshing: {
     provider: DuskProvider;
     epoch: number;
@@ -220,6 +223,8 @@ export class DuskWallet {
           typeof raw.shieldedAddress === "string" && raw.shieldedAddress.trim()
             ? raw.shieldedAddress.trim()
             : undefined;
+        // Unlike the profile id, a name never carries over from an earlier profile.
+        const name = normalizeDuskName(raw.name);
         const previous = this._state.profiles.find((profile) => profile.account === account);
         return {
           profileId:
@@ -228,6 +233,7 @@ export class DuskWallet {
               : (previous?.profileId ?? `profile:${index}`),
           account,
           ...(shieldedAddress ? { shieldedAddress } : {}),
+          ...(name ? { name } : {}),
         };
       })
       .filter(Boolean) as DuskProfile[];
@@ -501,6 +507,7 @@ export class DuskWallet {
       this._unbindProviderEvents();
       this._provider = nextProvider;
       this._selectionEpoch++;
+      this._knownChain = this._knownNode = ""; // A new provider's first reports aren't switches.
       if (this._provider) this._bindProviderEvents();
     }
 
@@ -690,6 +697,21 @@ export class DuskWallet {
   /** Monotonic generation of the selected chain or node. */
   get networkEpoch(): number {
     return this._networkEpoch;
+  }
+
+  /** Monotonic generation of the site session; it advances when the site disconnects or the wallet locks. */
+  get sessionEpoch(): number {
+    return this._sessionEpoch;
+  }
+
+  /** Monotonic generation of the authorization and the approved profiles. */
+  get profilesEpoch(): number {
+    return this._profilesEpoch;
+  }
+
+  /** Monotonic count of switches from one known chain or node to another; learning one isn't a switch. */
+  get networkSwitchEpoch(): number {
+    return this._networkSwitchEpoch;
   }
 
   /** Metadata for the currently selected provider, if any. */
@@ -1038,7 +1060,15 @@ export class DuskWallet {
 
   async sendTransaction(params: SendTransactionParams): Promise<TxResult> {
     const { provider, epoch } = this._captureSelection();
-    return await this._submitForSelection<TxResult>(provider, epoch, this._normalizeTransactionParams(params));
+    const { _sessionEpoch: sessionEpoch, _profilesEpoch: profilesEpoch, _networkEpoch: networkEpoch } = this;
+    const normalized = this._normalizeTransactionParams(params);
+    // Normalizing reads the caller's values; send only if the session, profiles
+    // (and so the authorization) and network are still the ones the call began with.
+    this._assertCurrentSelection(provider, epoch, sessionEpoch, profilesEpoch);
+    if (networkEpoch !== this._networkEpoch) {
+      throw new DuskSdkError("Wallet network changed before sending", { data: { reason: "network_changed" } });
+    }
+    return await this._submitForSelection<TxResult>(provider, epoch, normalized);
   }
 
   async sendTransfer(params: Omit<Extract<SendTransactionParams, { kind: "transfer" }>, "kind">): Promise<TxResult> {
@@ -1203,7 +1233,27 @@ export class DuskWallet {
       this._networkEpoch++;
     }
     this._state = { ...this._state, ...partial, lastUpdated: Date.now() };
+    this._countNetworkSwitch();
     if (opts.notify !== false) this._notify();
+  }
+
+  // A chain switch also forgets the node, so the new chain's first node report isn't a second switch.
+  private _countNetworkSwitch() {
+    const { chainId, node } = this._state;
+    const nodeUrl = node && node.chainId === chainId ? normalizeBaseUrl(node.nodeUrl) : "";
+    let switched = false;
+    if (chainId) {
+      if (this._knownChain && chainId !== this._knownChain) {
+        switched = true;
+        this._knownNode = "";
+      }
+      this._knownChain = chainId;
+    }
+    if (nodeUrl) {
+      if (this._knownNode && nodeUrl !== this._knownNode) switched = true;
+      this._knownNode = nodeUrl;
+    }
+    if (switched) this._networkSwitchEpoch++;
   }
 
   private _notify() {

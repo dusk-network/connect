@@ -1,4 +1,4 @@
-import type { DuskWalletState } from "../types.js";
+import type { DuskProfile, DuskWalletState } from "../types.js";
 
 /** Internal UI-only status model shared by connect button and modal. */
 export type WalletStatus = "missing" | "disconnected" | "locked" | "connected";
@@ -16,6 +16,11 @@ export function walletStatus(st: DuskWalletState | null | undefined): WalletStat
   if (!st.authorized) return "disconnected";
   if (!st.profiles?.length) return "locked";
   return "connected";
+}
+
+/** The profile the UI shows: the selected one, else the first. Show its name only with its account. */
+export function shownProfile(st: DuskWalletState | null | undefined): DuskProfile | null {
+  return (st?.selectedProfile?.account ? st.selectedProfile : st?.profiles?.[0]) ?? null;
 }
 
 /** Best-effort label for the current network/chain for UI display. */

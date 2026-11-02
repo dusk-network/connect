@@ -70,6 +70,9 @@ Wallet discovery is **event-based**, not singleton-based:
   public key. Use `accountToHex(account)` for contract-ready `0x` hex and
   `hexToAccount(publicKey)` for the reverse conversion; neither requires
   another wallet permission.
+- A profile's optional `name` is its account's `.dusk` name, which the Connect
+  UI shows in place of the shortened account. It is for display only: resolve
+  the name yourself before relying on it for anything.
 - `wallet.sendContractCall()` accepts the documented `ByteLike` inputs and
   normalizes `fnArgs` to `0x`-hex before crossing the extension provider
   boundary. Site-provided `display` metadata is unverified approval context;
@@ -294,6 +297,12 @@ over both `nodeUrl` and provider updates, but does not switch or pin the wallet'
 transaction network. Set/check the write `chain` separately. A transaction handle
 refuses automatic tracking when its wallet-reported submission node differs from
 the read node rather than silently following it.
+
+A write sends nothing if the wallet's session, profiles or network change while
+it is prepared, for example while the data-driver loads. Learning a chain or node
+it didn't know yet isn't a change, nor is the wallet's late report of the switch
+to the write's own `chain`. It rejects with a `DuskSdkError` whose `data.reason`
+is `"session_changed"` or `"network_changed"`; the app can retry.
 
 Node URLs must be absolute HTTPS, or HTTP on `localhost`, IPv4 loopback (127/8)
 or `[::1]`, without credentials, query or fragment. They are serialized with the

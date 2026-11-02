@@ -1,7 +1,7 @@
 import type { ConnectOptions, DuskWalletState } from "../types.js";
 import { createDuskWallet, type DuskWallet, type DuskWalletOptions } from "../wallet.js";
 import { createDuskConnectModal, type DuskConnectModal } from "./modal.js";
-import { networkLabel, shortenMiddle, walletStatus } from "./shared.js";
+import { networkLabel, shortenMiddle, shownProfile, walletStatus } from "./shared.js";
 import { DCONNECT_UI_BASE_CSS } from "./styles.js";
 
 /** Options for the `<dusk-connect-button>` custom element. */
@@ -338,9 +338,11 @@ export class DuskConnectButtonElement extends HTMLElement {
         color: var(--dconnect-primary-foreground);
       }
 
+      /* A block, not a flex container, so long names end in an ellipsis. Its line box
+         clears descenders yet stays shorter than the avatar, so the button keeps its height. */
       .label {
-        display: inline-flex;
-        align-items: center;
+        display: block;
+        line-height: 1.35;
         min-width: 0;
         max-width: 18ch;
         overflow: hidden;
@@ -533,6 +535,7 @@ export class DuskConnectButtonElement extends HTMLElement {
 
     const setDefault = (text: string) => {
       this._label!.textContent = text;
+      this._label!.title = "";
       this._avatar!.textContent = "";
       this._avatar!.style.background = "";
     };
@@ -543,8 +546,10 @@ export class DuskConnectButtonElement extends HTMLElement {
     }
 
     // connected
-    const acct = st?.selectedProfile?.account || st?.profiles?.[0]?.account || "";
-    this._label.textContent = acct ? shortenMiddle(acct, 6, 4) : "Connected";
+    const profile = shownProfile(st);
+    const acct = profile?.account || "";
+    this._label.textContent = profile?.name || (acct ? shortenMiddle(acct, 6, 4) : "Connected");
+    this._label.title = profile?.name ?? "";
     this._avatar.textContent = "";
     this._avatar.style.background = "";
   }

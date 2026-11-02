@@ -58,13 +58,15 @@ The announced provider should expose:
 - `isDusk === true`
 
 Profiles are the provider identity model. A profile contains the public account
-and may include the explicitly approved shareable shielded receive address:
+and may include the explicitly approved shareable shielded receive address and
+the account's `.dusk` name:
 
 ```ts
 type DuskProfile = {
   profileId: string;
   account: string;
   shieldedAddress?: string;
+  name?: string;
 };
 ```
 
@@ -72,6 +74,13 @@ type DuskProfile = {
 BLS public key. Connect exposes `accountToHex(account)` and
 `hexToAccount(publicKey)` for validated conversion without a second profile
 disclosure.
+
+Send `name` only after checking that the name's forward record
+(`moonlight_address`) points to the profile's `account`, and send its canonical
+lowercase spelling. Never send a name that points only to the profile's shielded
+address. Emit `profilesChanged` when a later check changes or removes the name.
+Connect drops a `name` that is not a canonical `.dusk` name and shows a kept one
+in place of the shortened account; dApps treat it as display only.
 
 ## RPC Method Summary
 
@@ -302,7 +311,8 @@ await runWalletConformance({
 ```
 
 The helper checks discovery, profile connection, passive profile reads,
-capabilities, chain switching, and basic provider events.
+capabilities, chain switching, and basic provider events. Pass `expectedName`
+to check that Connect keeps your first profile's `name`.
 
 The runnable browser example lives at `examples/reference-wallet/`. The matching
 repository integration test is `src/wallet-implementer.integration.test.ts`.
