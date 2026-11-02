@@ -100,19 +100,31 @@ describe("DRC20 helper against the standard's data-driver", () => {
     } finally { wallet.destroy(); }
   });
 
-  it("sends a large amount as a decimal string where JSON.rawJSON is missing", async () => {
-    const { rawJSON } = JSON as { rawJSON?: unknown };
-    const encodeInputFn = vi.fn((_fn: string, _json: string) => new Uint8Array([1]));
-    const drc20 = createDrc20({ contractId: "0x" + "33".repeat(32), driver: { encodeInputFn } as any,
-      defaultTx: { privacy: "public" } });
-    try {
-      Object.assign(JSON, { rawJSON: undefined });
-      await drc20.tx.transfer({ to: drcPrincipal(BOB), amount: 9_007_199_254_740_993n });
-      await drc20.tx.transfer({ to: drcPrincipal(BOB), amount: 9_007_199_254_740_991n });
-      expect(encodeInputFn.mock.calls.map(([, json]) => JSON.parse(json).amount))
-        .toEqual(["9007199254740993", 9007199254740991]);
-    } finally { Object.assign(JSON, { rawJSON }); }
-  });
+  it.each([["present", true], ["removed", false]])(
+    "encodes u64::MAX and 2^53 + 1 exactly with JSON.rawJSON %s",
+    async (_label, keepRawJson) => {
+      const driver = await standard;
+      const { rawJSON } = JSON as { rawJSON?: unknown };
+      const drc20 = createDrc20({ contractId: "0x" + "33".repeat(32), driver, defaultTx: { privacy: "public" } });
+      // decodeInputFn's JSON.parse rounds a u64, so read `amount` from the bytes: this driver's
+      // archived call structs start with it.
+      const decode = (fn: string, fnArgs: string) => {
+        const bytes = hexToBytes(fnArgs);
+        return { ...driver.decodeInputFn(fn, bytes), amount: new DataView(bytes.buffer).getBigUint64(0, true) };
+      };
+      try {
+        if (!keepRawJson) Object.assign(JSON, { rawJSON: undefined });
+        const approve = await drc20.tx.approve({ spender: { Contract: CONTRACT }, amount: 18446744073709551615n });
+        const transfer = await drc20.tx.transfer({ to: drcPrincipal(BOB), amount: 9_007_199_254_740_993n });
+        expect(hexToBytes(approve.fnArgs)).toEqual(driver.encodeInputFn("approve",
+          `{"spender":{"Contract":"${CONTRACT}"},"amount":18446744073709551615}`));
+        expect(hexToBytes(transfer.fnArgs)).toEqual(driver.encodeInputFn("transfer",
+          `{"to":{"Moonlight":"${BOB}"},"amount":9007199254740993}`));
+        expect(decode("approve", approve.fnArgs)).toEqual({ spender: { Contract: CONTRACT }, amount: 18446744073709551615n });
+        expect(decode("transfer", transfer.fnArgs)).toEqual({ to: { Moonlight: BOB }, amount: 9_007_199_254_740_993n });
+      } finally { Object.assign(JSON, { rawJSON }); }
+    }
+  );
 
   it("requires a driver when building a DRC20 contract", () => {
     expect(() =>

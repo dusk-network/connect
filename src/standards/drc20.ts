@@ -12,6 +12,7 @@ import { accountToHex } from "../account.js";
 import { createDuskContract } from "../contract.js";
 import { fetchWasmDataDriver } from "../driver.js";
 import { normalizeContractId0x } from "../internal/contractId.js";
+import { jsonWithIntegers } from "../internal/json.js";
 
 /** A DRC20 amount in the token's base units: a bigint or a decimal string. */
 export type Drc20Amount = bigint | LuxString;
@@ -47,7 +48,6 @@ export const DRC20_METHOD_SIGS: Record<string, string> = {
 };
 
 const U64_MAX = 18446744073709551615n;
-const json = JSON as typeof JSON & { rawJSON?: (text: string) => unknown };
 
 /**
  * Build a DRC principal from a Base58 Moonlight account or a 32-byte contract id
@@ -81,13 +81,6 @@ function u64(value: Drc20Amount): bigint {
   return amount;
 }
 
-// The standard's data-driver reads a u64 as a JSON integer. Write it exactly; where the
-// runtime can't write a large one, send a decimal string for drivers that read those.
-function u64Json(amount: bigint): unknown {
-  if (amount <= BigInt(Number.MAX_SAFE_INTEGER)) return Number(amount);
-  return json.rawJSON ? json.rawJSON(amount.toString()) : amount.toString();
-}
-
 function mergeDisplay(base: any, extra: unknown): unknown {
   if (extra && typeof extra === "object") return { ...base, ...(extra as any) };
   if (extra == null) return base;
@@ -96,7 +89,8 @@ function mergeDisplay(base: any, extra: unknown): unknown {
 
 type Drc20Op = "transfer" | "approve" | "transfer_from";
 
-// The standard's struct argument for `op`, and what the wallet shows for it.
+// The standard's struct argument for `op`, with `amount` as the bare JSON integer its
+// data-driver reads, and what the wallet shows for it.
 function drc20Call(op: Drc20Op, args: any): { input: unknown; display: unknown } {
   const amount = u64(args?.amount);
   const parties =
@@ -104,7 +98,7 @@ function drc20Call(op: Drc20Op, args: any): { input: unknown; display: unknown }
       : op === "approve" ? { spender: principal(args?.spender) }
         : { owner: principal(args?.owner), to: principal(args?.to) };
   return {
-    input: { ...parties, amount: u64Json(amount) },
+    input: jsonWithIntegers({ ...parties, amount }),
     display: {
       standard: "DRC20",
       op,
