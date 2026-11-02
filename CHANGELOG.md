@@ -7,15 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-02
+
 ### Added
 
 - Added optional `DuskProfile.name`, a canonical `.dusk` name that the connect button and modal show in place of the shortened account [#56].
 - Added `expectedName` to `runWalletConformance` [#56].
 - Added read-only `wallet.initializing` to distinguish pending initialization from a settled success or failure [#44].
 - Added opt-in `pinnedNodeUrl` for app reads without changing the existing `nodeUrl` fallback semantics or the wallet's transaction network [#44].
+- Added `TxHandle.origin` and `DuskWalletProviderChangedError` [#24].
 - Added configurable `providerReadTimeoutMs` (default 10 seconds) and `DuskWalletRequestTimeoutError` for non-interactive provider reads, including initial readiness [#44].
 - Added read-only `wallet.networkSwitchEpoch`, a count of switches from one known chain or node to another [#53].
-- Added validated conversion between Base58 Moonlight accounts and `0x` public-key hex [#92].
+- Added validated conversion between Base58 Moonlight accounts and `0x` public-key hex [wallet#92].
 - Added `drcPrincipal()` to build a DRC principal from a Moonlight account or a contract id [#51].
 - Added opt-in `./typed-data` hashing exports backed by `@dusk/typed-data` [wallet#22].
 - Added opt-in `./bls` verification with a required chain/origin policy and structured result [wallet#22].
@@ -27,9 +30,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Made discovery first-wins per UUID, ignoring later objects and metadata without disabling the retained entry [#45].
 - Deprecated `DuskProviderInfo.conflicted`, which discovery no longer emits [#45].
 - Pinned the shared typed-data RC through JSR's npm compatibility registry for reproducible installs [wallet#22].
-- **Breaking:** Removed signer resource limits from `./typed-data`; use `@dusk/typed-data/policy` instead [typed-data#2].
-- Required explicit choice for unmatched saved preferences or `preferredProviderId` [#42].
-- Made `TxWaitReceipt.ok` nullable for unrecognized execution payloads [#26].
+- **Breaking:** Required explicit choice for unmatched saved preferences or `preferredProviderId` [#42].
+- **Breaking:** Made `TxWaitReceipt.ok` nullable for unrecognized execution payloads [#26].
+- **Breaking:** Made `tx.wait()` reject with `DuskTxTrackingUnavailableError` when the transaction's submission node is unknown or isn't the read node [#24].
 - Separated per-page discovery UUIDs from saved product preferences, with legacy-ID compatibility [#42].
 
 ### Fixed
@@ -39,8 +42,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Filled `providerId` when a metadata-less explicit provider later announces its own metadata [#48].
 - Kept active provider selections unchanged when later discovery introduces additional product matches [#45].
 - Cleared the previous provider's chain snapshot before hydrating a replacement provider [#44].
+- Filled `wallet.state.node` from the wallet's capabilities on refresh [#18].
 - Stopped replaying settled startup errors into contract writes and chain checks after recovery [#44].
-- Validated node URLs at every wallet state ingress and before node I/O: HTTPS or HTTP on loopback, without credentials, queries or fragments. Invalid provider URLs clear the node snapshot; invalid app URLs throw [#44].
+- **Breaking:** Validated node URLs at every wallet state ingress and before node I/O: HTTPS or HTTP on loopback, without credentials, queries or fragments. Invalid provider URLs clear the node snapshot; invalid app URLs throw [#44].
 - Guarded chain ID types across provider properties, RPCs and events; made `connect` reread provider state instead of trusting its payload as permission [#44].
 - Documented that typed-data capability flags are unvalidated declarations, not enforced signing gates [#44].
 - Stopped assigning SDK-owned wallet branding from self-reported discovery metadata; kept curated installation choices separate [#46].
@@ -120,15 +124,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 [#46]: https://github.com/dusk-network/connect/issues/46
 [#38]: https://github.com/dusk-network/connect/issues/38
 [#37]: https://github.com/dusk-network/connect/issues/37
-[typed-data#2]: https://github.com/dusk-network/typed-data/issues/2
 [wallet#22]: https://github.com/dusk-network/wallet/issues/22
 [#42]: https://github.com/dusk-network/connect/issues/42
 [#28]: https://github.com/dusk-network/connect/issues/28
 [#27]: https://github.com/dusk-network/connect/issues/27
 [#26]: https://github.com/dusk-network/connect/issues/26
 [#24]: https://github.com/dusk-network/connect/issues/24
-[#92]: https://github.com/dusk-network/wallet/issues/92
+[#18]: https://github.com/dusk-network/connect/issues/18
+[wallet#92]: https://github.com/dusk-network/wallet/issues/92
 
-[Unreleased]: https://github.com/dusk-network/connect/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/dusk-network/connect/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/dusk-network/connect/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dusk-network/connect/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dusk-network/connect/releases/tag/v0.1.0
