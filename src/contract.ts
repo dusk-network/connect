@@ -230,6 +230,8 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
 
       // Connecting and switching are done: the send needs this network and these profiles.
       const networkSwitchEpoch = wallet.networkSwitchEpoch;
+      const knownChain = wallet.state.chainId ?? "";
+      const knownNode = walletNodeUrl();
       const profilesEpoch = wallet.profilesEpoch;
       const authorized = wallet.state.authorized;
 
@@ -250,10 +252,12 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
         origin.nodeUrl && opts.node?.getBaseUrl?.() === origin.nodeUrl
       );
       const trackingNode = nodeMatchesOrigin ? opts.node?.pin?.(origin.nodeUrl) ?? opts.node : opts.node;
-      // Encoding can take seconds: send nothing if the wallet changed in the meantime. Learning a
-      // chain or node isn't a switch, and neither is the one report of the target still due.
+      // Encoding can take seconds: send nothing if the wallet switched, or lost the chain or node it
+      // knew, in the meantime. Learning one isn't a change, nor is the one report of the target still due.
       assertSelection();
-      if (wallet.networkSwitchEpoch - networkSwitchEpoch > (targetDue && targetConfirmed ? 1 : 0)) {
+      const chainNow = wallet.state.chainId ?? "";
+      const lost = (knownChain && !chainNow) || (knownNode && !nodeUrl && chainNow === knownChain);
+      if (lost || wallet.networkSwitchEpoch - networkSwitchEpoch > (targetDue && targetConfirmed ? 1 : 0)) {
         throw new DuskSdkError("Wallet network changed before sending", { data: { reason: "network_changed" } });
       }
       if (

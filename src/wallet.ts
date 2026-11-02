@@ -504,6 +504,7 @@ export class DuskWallet {
       this._unbindProviderEvents();
       this._provider = nextProvider;
       this._selectionEpoch++;
+      this._knownChain = this._knownNode = ""; // A new provider's first reports aren't switches.
       if (this._provider) this._bindProviderEvents();
     }
 
