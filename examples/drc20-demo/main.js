@@ -1,5 +1,5 @@
 import { defineDuskConnectButton } from "../../dist/ui.js";
-import { asDrc20, createDuskApp, DRC20_METHOD_SIGS, DUSK_CHAIN_PRESETS } from "../../dist/index.js";
+import { asDrc20, createDuskApp, DRC20_METHOD_SIGS, drcPrincipal, DUSK_CHAIN_PRESETS } from "../../dist/index.js";
 
 defineDuskConnectButton();
 
@@ -24,13 +24,6 @@ function normalizeContractIdInput(s) {
   if (/^0x[0-9a-f]{64}$/i.test(raw)) return raw.toLowerCase();
   if (/^[0-9a-f]{64}$/i.test(raw)) return `0x${raw.toLowerCase()}`;
   throw new Error("Invalid contractId (expected 32-byte hex)");
-}
-
-function parseDrcAccount(s) {
-  const raw = String(s ?? "").trim();
-  if (!raw) throw new Error("Missing account");
-  if (/^0x[0-9a-f]{64}$/i.test(raw)) return { Contract: raw.toLowerCase() };
-  return { External: raw };
 }
 
 function parseU64(s, { name = "value" } = {}) {
@@ -156,10 +149,10 @@ $("btnTransfer")?.addEventListener("click", async () => {
   try {
     await loadToken();
     const t = requireToken();
-    const to = parseDrcAccount($("to")?.value);
-    const value = parseU64($("amount")?.value, { name: "amount" });
+    const to = drcPrincipal($("to")?.value);
+    const amount = parseU64($("amount")?.value, { name: "amount" });
 
-    const tx = await t.write.transfer({ to, value });
+    const tx = await t.write.transfer({ to, amount });
     log(`transfer submitted: ${tx.hash}`);
 
     // Best-effort wait helper (doesn't throw on timeout).
@@ -177,10 +170,10 @@ $("btnApprove")?.addEventListener("click", async () => {
   try {
     await loadToken();
     const t = requireToken();
-    const spender = parseDrcAccount($("spender")?.value);
-    const value = parseU64($("approveAmount")?.value, { name: "allowance" });
+    const spender = drcPrincipal($("spender")?.value);
+    const amount = parseU64($("approveAmount")?.value, { name: "allowance" });
 
-    const tx = await t.write.approve({ spender, value });
+    const tx = await t.write.approve({ spender, amount });
     log(`approve submitted: ${tx.hash}`);
   } catch (e) {
     log(`Error: ${e?.message ?? String(e)}`);
@@ -191,10 +184,8 @@ $("btnApproveMax")?.addEventListener("click", async () => {
   try {
     await loadToken();
     const t = requireToken();
-    const spender = parseDrcAccount($("spender")?.value);
-    const value = "18446744073709551615";
-
-    const tx = await t.write.approve({ spender, value });
+    const spender = drcPrincipal($("spender")?.value);
+    const tx = await t.write.approve({ spender, amount: "18446744073709551615" });
     log(`approve MAX submitted: ${tx.hash}`);
   } catch (e) {
     log(`Error: ${e?.message ?? String(e)}`);

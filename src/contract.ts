@@ -18,6 +18,7 @@ import { bytesToHex } from "./bytes.js";
 import { DuskTxTrackingUnavailableError, DuskWalletProviderChangedError } from "./errors.js";
 import { ensureChain } from "./ensureChain.js";
 import { normalizeContractId0x } from "./internal/contractId.js";
+import { JsonText } from "./internal/json.js";
 import { compact, normalizeNodeUrl, normalizeCaip2ChainId } from "./internal/normalize.js";
 import { waitForTxReceipt } from "./internal/tx.js";
 
@@ -134,7 +135,7 @@ export function createDuskContract(opts: CreateDuskContractOptions): DuskContrac
 
   const encode = async (fnName: string, args?: unknown): Promise<Uint8Array> => {
     const driver = await driverPromise;
-    const json = args === undefined || args === null ? "null" : jsonWithBigInts(args);
+    const json = args instanceof JsonText ? args.text : args === undefined || args === null ? "null" : jsonWithBigInts(args);
     return driver.encodeInputFn(String(fnName), json);
   };
 

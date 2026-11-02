@@ -15,11 +15,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added opt-in `pinnedNodeUrl` for app reads without changing the existing `nodeUrl` fallback semantics or the wallet's transaction network [#44].
 - Added configurable `providerReadTimeoutMs` (default 10 seconds) and `DuskWalletRequestTimeoutError` for non-interactive provider reads, including initial readiness [#44].
 - Added validated conversion between Base58 Moonlight accounts and `0x` public-key hex [#92].
+- Added `drcPrincipal()` to build a DRC principal from a Moonlight account or a contract id [#51].
 - Added opt-in `./typed-data` hashing exports backed by `@dusk/typed-data` [wallet#22].
 - Added opt-in `./bls` verification with a required chain/origin policy and structured result [wallet#22].
 
 ### Changed
 
+- **Breaking:** Made the DRC20 helper follow the DRC20 standard in dusk-network/contracts: `DrcPrincipal` accounts, `amount` instead of `value`, the standard's struct arguments and `DRC20_METHOD_SIGS` [#51].
 - Made discovery first-wins per UUID, ignoring later objects and metadata without disabling the retained entry [#45].
 - Deprecated `DuskProviderInfo.conflicted`, which discovery no longer emits [#45].
 - Pinned the shared typed-data RC through JSR's npm compatibility registry for reproducible installs [wallet#22].
@@ -108,6 +110,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 [#56]: https://github.com/dusk-network/connect/issues/56
 [#49]: https://github.com/dusk-network/connect/issues/49
 [#48]: https://github.com/dusk-network/connect/pull/48
+[#51]: https://github.com/dusk-network/connect/issues/51
 [#45]: https://github.com/dusk-network/connect/issues/45
 [#44]: https://github.com/dusk-network/connect/issues/44
 [#46]: https://github.com/dusk-network/connect/issues/46
