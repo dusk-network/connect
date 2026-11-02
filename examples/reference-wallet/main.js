@@ -34,6 +34,8 @@ function createReferenceWallet() {
     "dusk1referenceaccount1111111111111111111111111111111",
     "dusk1secondreferenceaccount11111111111111111111111111",
   ];
+  // Send a name only after checking that its forward record points to the account.
+  const names = ["reference.dusk"];
 
   let authorized = false;
   let accountIndex = 0;
@@ -79,6 +81,7 @@ function createReferenceWallet() {
           {
             profileId: `profile:${accountIndex}`,
             account: accounts[accountIndex],
+            ...(names[accountIndex] ? { name: names[accountIndex] } : {}),
             ...(includeShielded
               ? { shieldedAddress: "dusk1referenceshieldedreceiveaddress111111111111111111111111" }
               : {}),
@@ -308,6 +311,7 @@ const elWalletChain = $("walletChain");
 const elSdkStatus = $("sdkStatus");
 const elSdkProvider = $("sdkProvider");
 const elSdkAccount = $("sdkAccount");
+const elSdkName = $("sdkName");
 const elSdkChain = $("sdkChain");
 const elSdkBalance = $("sdkBalance");
 const elProviderSummary = $("providerSummary");
@@ -355,7 +359,9 @@ function renderSdkPanel(state) {
         ? "Discovered"
         : "Choose provider";
   elSdkProvider.textContent = state.providerId ?? "-";
-  elSdkAccount.textContent = state.selectedProfile?.account ?? state.profiles[0]?.account ?? "-";
+  const profile = state.selectedProfile ?? state.profiles[0];
+  elSdkAccount.textContent = profile?.account ?? "-";
+  elSdkName.textContent = profile?.name ?? "-"; // For display only.
   elSdkChain.textContent = state.chainId ?? "-";
   elProviderSummary.textContent = state.availableProviders.length
     ? `${state.availableProviders[0].name} | ${state.availableProviders[0].uuid} | ${state.availableProviders[0].rdns}`

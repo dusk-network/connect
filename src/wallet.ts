@@ -52,7 +52,7 @@ import {
 } from "./discovery.js";
 
 import { normalizeContractId0x } from "./internal/contractId.js";
-import { normalizeBaseUrl, normalizeNodeUrl } from "./internal/normalize.js";
+import { normalizeBaseUrl, normalizeDuskName, normalizeNodeUrl } from "./internal/normalize.js";
 import { bytesToHex, toBytes } from "./bytes.js";
 
 /** Provider discovery wait options used by {@link DuskWallet}. */
@@ -220,6 +220,8 @@ export class DuskWallet {
           typeof raw.shieldedAddress === "string" && raw.shieldedAddress.trim()
             ? raw.shieldedAddress.trim()
             : undefined;
+        // Unlike the profile id, a name never carries over from an earlier profile.
+        const name = normalizeDuskName(raw.name);
         const previous = this._state.profiles.find((profile) => profile.account === account);
         return {
           profileId:
@@ -228,6 +230,7 @@ export class DuskWallet {
               : (previous?.profileId ?? `profile:${index}`),
           account,
           ...(shieldedAddress ? { shieldedAddress } : {}),
+          ...(name ? { name } : {}),
         };
       })
       .filter(Boolean) as DuskProfile[];
