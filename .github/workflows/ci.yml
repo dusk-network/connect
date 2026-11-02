@@ -39,9 +39,22 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install dependencies
+      - name: Validate package release ages
         shell: bash
-        run: npm ci
+        run: node scripts/verify-package-release-ages.js --days 0.5
+
+      - name: Pin npm
+        shell: bash
+        run: npm install --global npm@11.18.0 --ignore-scripts
+        working-directory: ${{ runner.temp }}
+
+      - name: Install dependencies without lifecycle scripts
+        shell: bash
+        run: npm ci --ignore-scripts
+
+      - name: Verify registry signatures
+        shell: bash
+        run: npm audit signatures
 
       - name: Run CI checks
         shell: bash
@@ -49,4 +62,4 @@ jobs:
 
       - name: Validate published package
         shell: bash
-        run: npm pack --dry-run
+        run: npm pack --dry-run --allow-directory=all

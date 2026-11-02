@@ -4,11 +4,6 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
     environment: "node",
-    environmentMatchGlobs: [
-      ["src/wallet.test.ts", "jsdom"],
-      ["src/testing.test.ts", "jsdom"],
-      ["src/ui/**/*.test.ts", "jsdom"],
-    ],
     clearMocks: true,
     restoreMocks: true,
     unstubGlobals: true,

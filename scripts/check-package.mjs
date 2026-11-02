@@ -6,7 +6,8 @@ import { registerHooks } from "node:module";
 
 const root = new URL("../", import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL("package.json", root), "utf8"));
-const [pack] = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--ignore-scripts", "--json"], {
+// npm counts this folder as a directory package, which .npmrc refuses elsewhere.
+const [pack] = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--ignore-scripts", "--json", "--allow-directory=all"], {
   cwd: root, encoding: "utf8",
 }));
 const files = new Set(pack.files.map(({ path }) => path));

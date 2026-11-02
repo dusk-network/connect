@@ -680,6 +680,6 @@ Before publishing a release:
 
 ```bash
 npm run ci
-npm pack --dry-run
+npm pack --dry-run --allow-directory=all
 npx jsr publish --dry-run
 ```
