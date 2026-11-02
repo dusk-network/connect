@@ -1,0 +1,83 @@
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+  # To publish an existing tag, run this on the tag ("Use workflow from": the
+  # tag), so that provenance names the tagged commit.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    # GitHub-hosted, like app-core's publish job: the registry trusts this
+    # repository's GitHub OIDC token, so no token is stored anywhere.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # JSR authenticates this repository through OIDC
+    steps:
+      - name: Run only on a release tag
+        if: github.ref_type != 'tag'
+        run: |
+          echo "Run this on a release tag, not ${GITHUB_REF}"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: "24"
+          # Our steps pin npm themselves; auto-caching would run the runner's npm here first.
+          package-manager-cache: false
+
+      - name: Validate package release ages
+        run: node scripts/verify-package-release-ages.js --days 0.5
+
+      - name: Pin npm
+        run: npm install --global npm@11.18.0 --ignore-scripts
+        working-directory: ${{ runner.temp }}
+
+      - name: Check the tag matches package.json and jsr.json
+        run: |
+          node -e '
+            const tag = process.argv[1].replace(/^v/, "");
+            const fs = require("node:fs");
+            for (const file of ["package.json", "jsr.json"]) {
+              const { version } = JSON.parse(fs.readFileSync(file, "utf8"));
+              if (version !== tag) {
+                console.error(`${file} has ${version}, the tag says ${tag}`);
+                process.exit(1);
+              }
+            }
+          ' "$GITHUB_REF_NAME"
+
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Verify registry signatures
+        run: npm audit signatures
+
+      - name: Test
+        run: npm run ci
+
+      # Skipped when JSR already has the version, so a failed run can be run again.
+      - name: Publish @dusk/connect to JSR
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if curl -sfo /dev/null "https://jsr.io/@dusk/connect/${version}_meta.json"; then
+            echo "JSR already has @dusk/connect@${version}"
+          else
+            npx --yes jsr@0.14.3 publish
+          fi
