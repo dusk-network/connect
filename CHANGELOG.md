@@ -14,10 +14,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added read-only `wallet.initializing` to distinguish pending initialization from a settled success or failure [#44].
 - Added opt-in `pinnedNodeUrl` for app reads without changing the existing `nodeUrl` fallback semantics or the wallet's transaction network [#44].
 - Added configurable `providerReadTimeoutMs` (default 10 seconds) and `DuskWalletRequestTimeoutError` for non-interactive provider reads, including initial readiness [#44].
+- Added read-only `wallet.networkSwitchEpoch`, a count of switches from one known chain or node to another [#53].
 - Added validated conversion between Base58 Moonlight accounts and `0x` public-key hex [#92].
 - Added `drcPrincipal()` to build a DRC principal from a Moonlight account or a contract id [#51].
 - Added opt-in `./typed-data` hashing exports backed by `@dusk/typed-data` [wallet#22].
 - Added opt-in `./bls` verification with a required chain/origin policy and structured result [wallet#22].
+- Added read-only `wallet.sessionEpoch` and `wallet.profilesEpoch` [#53].
 
 ### Changed
 
@@ -32,6 +34,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Stopped contract writes and `sendTransaction` from sending after the network, session or profiles change while the call is prepared [#53].
 - Stopped the wallet picker from fetching announcement-controlled icon URLs by rendering only image data URIs or fallback initials [#49].
 - Filled `providerId` when a metadata-less explicit provider later announces its own metadata [#48].
 - Kept active provider selections unchanged when later discovery introduces additional product matches [#45].
@@ -109,6 +112,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 [#56]: https://github.com/dusk-network/connect/issues/56
 [#49]: https://github.com/dusk-network/connect/issues/49
+[#53]: https://github.com/dusk-network/connect/issues/53
 [#48]: https://github.com/dusk-network/connect/pull/48
 [#51]: https://github.com/dusk-network/connect/issues/51
 [#45]: https://github.com/dusk-network/connect/issues/45

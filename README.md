@@ -298,6 +298,12 @@ transaction network. Set/check the write `chain` separately. A transaction handl
 refuses automatic tracking when its wallet-reported submission node differs from
 the read node rather than silently following it.
 
+A write sends nothing if the wallet's session, profiles or network change while
+it is prepared, for example while the data-driver loads. Learning a chain or node
+it didn't know yet isn't a change, nor is the wallet's late report of the switch
+to the write's own `chain`. It rejects with a `DuskSdkError` whose `data.reason`
+is `"session_changed"` or `"network_changed"`; the app can retry.
+
 Node URLs must be absolute HTTPS, or HTTP on `localhost`, IPv4 loopback (127/8)
 or `[::1]`, without credentials, query or fragment. They are serialized with the
 native URL parser and stripped of trailing slashes before use, so scheme-like

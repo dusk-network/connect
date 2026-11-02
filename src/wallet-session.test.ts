@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
-import { createDuskWallet } from "./wallet.js";
-import { createMockProvider } from "./test/mocks.js";
+import { describe, expect, it, vi } from "vitest";
+import { createDuskContract } from "./contract.js";
+import { makeDuskAnnounceProviderEvent } from "./discovery.js";
+import { createDuskWallet, type DuskWallet } from "./wallet.js";
+import { createMockProvider, createMockProviderInfo, type MockDuskProvider } from "./test/mocks.js";
 import { ERROR_CODES } from "./errors.js";
-import type { ConnectOptions, DuskProfile } from "./types.js";
+import type { ConnectOptions, DuskProfile, SendTransactionParams } from "./types.js";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -436,4 +438,184 @@ describe("same-provider session and network changes", () => {
       expect(wallet.state).toMatchObject({ authorized: false, profiles: [], accounts: [] });
     } finally { wallet.destroy(); }
   });
+});
+
+describe("sending after session or network changes", () => {
+  const changes: Record<string, (provider: MockDuskProvider) => void> = {
+    chain: provider => provider.setChainId("dusk:3"),
+    node: provider => provider.emit("duskNodeChanged", { chainId: "dusk:2", nodeUrl: "https://other.example", networkName: "Other" }),
+    lock: provider => provider.setProfiles([]),
+    disconnect: provider => {
+      provider.setAuthorized(false);
+      provider.emit("disconnect", { code: ERROR_CODES.DISCONNECTED, message: "Disconnected" });
+      provider.emit("profilesChanged", []);
+    },
+    profiles: provider => provider.setProfiles([{ profileId: "profile:1", account: "other-account" }]),
+  };
+  const sends = (provider: MockDuskProvider) =>
+    provider.request.mock.calls.filter(([arg]) => arg.method === "dusk_sendTransaction");
+
+  // Starts a write and returns once it waits on encoding.
+  async function startWrite(provider: MockDuskProvider, { chain, hydrated = true }: { chain?: { chainId: string }; hydrated?: boolean } = {}) {
+    const wallet = createDuskWallet({ provider, autoRefresh: false });
+    await wallet.ready();
+    if (hydrated) await wallet.refresh(); // The write knows the wallet's node.
+    const encoded = deferred<Uint8Array>();
+    const encodeInputFn = vi.fn(() => encoded.promise);
+    const contract = createDuskContract({
+      contractId: "0x" + "11".repeat(32), wallet, driver: { encodeInputFn } as any,
+      defaultTx: { privacy: "public" }, ...(chain ? { chain } : {}),
+    });
+    const writing = contract.write["ping"]!();
+    await vi.waitFor(() => expect(encodeInputFn).toHaveBeenCalled());
+    return { wallet, writing, finish: () => encoded.resolve(new Uint8Array([1])) };
+  }
+
+  async function expectSent(writing: Promise<unknown>, provider: MockDuskProvider, reason: string | null) {
+    if (reason) {
+      await expect(writing).rejects.toMatchObject({ name: "DuskSdkError", data: { reason } });
+      expect(sends(provider)).toEqual([]);
+    } else {
+      await expect(writing).resolves.toMatchObject({ hash: "0xtxhash" });
+      expect(sends(provider)).toEqual([[expect.objectContaining({
+        params: expect.objectContaining({ kind: "contract_call", fnName: "ping", fnArgs: "0x01" }),
+      })]]);
+    }
+  }
+
+  it.each([
+    ["nothing", null], ["chain", "network_changed"], ["node", "network_changed"],
+    ["lock", "session_changed"], ["disconnect", "session_changed"], ["profiles", "session_changed"],
+  ])("a contract write rechecks the wallet after encoding when %s changes", async (change, reason) => {
+    const provider = createMockProvider({ authorized: true });
+    const { wallet, writing, finish } = await startWrite(provider);
+    try {
+      changes[change]?.(provider);
+      finish();
+      await expectSent(writing, provider, reason);
+    } finally { finish(); wallet.destroy(); }
+  });
+
+  it.each([["dusk:3", null], ["dusk:1", "network_changed"]])(
+    "a write to dusk:3 checks the network the wallet reports late: %s",
+    async (reported, reason) => {
+      // Like the Dusk wallet, answer the switch before reporting it.
+      const provider = createMockProvider({ authorized: true, responses: { dusk_switchNetwork: null } });
+      const { wallet, writing, finish } = await startWrite(provider, { chain: { chainId: "dusk:3" } });
+      try {
+        expect(wallet.state.chainId).toBe("dusk:2");
+        provider.setChainId(reported);
+        finish();
+        await expectSent(writing, provider, reason);
+      } finally { finish(); wallet.destroy(); }
+    }
+  );
+
+  it.each([["only hydrates the node", null], ["hydrates the node, then the chain switches", "network_changed"]])(
+    "an auto-connect write sends when its connection %s while encoding, unless it switched",
+    async (_change, reason) => {
+      const caps = deferred<unknown>();
+      const provider = createMockProvider({ responses: { dusk_getCapabilities: () => caps.promise } });
+      const { wallet, writing, finish } = await startWrite(provider, { hydrated: false });
+      try {
+        expect(wallet.state).toMatchObject({ authorized: true, node: null });
+        caps.resolve({ chainId: "dusk:2", nodeUrl: "https://testnet.nodes.dusk.network", networkName: "Testnet" });
+        await vi.waitFor(() => expect(wallet.state.node).not.toBeNull());
+        if (reason) provider.setChainId("dusk:3");
+        finish();
+        await expectSent(writing, provider, reason);
+      } finally { caps.resolve({}); finish(); wallet.destroy(); }
+    }
+  );
+
+  const node = (nodeUrl: string) => ({ chainId: "dusk:2", nodeUrl, networkName: "Custom" });
+  const switches: Array<[string, { hydrated: boolean; chainless?: boolean }, (provider: MockDuskProvider) => void]> = [
+    ["an unknown node to A to B", { hydrated: false }, provider => {
+      provider.emit("duskNodeChanged", node("https://a.example"));
+      provider.emit("duskNodeChanged", node("https://b.example"));
+    }],
+    ["an unknown chain to dusk:2 to dusk:3", { hydrated: false, chainless: true }, provider => {
+      provider.setChainId("dusk:2");
+      provider.setChainId("dusk:3");
+    }],
+    ["dusk:2 to dusk:3 and back", { hydrated: true }, provider => {
+      provider.setChainId("dusk:3");
+      provider.setChainId("dusk:2");
+    }],
+  ];
+  it.each(switches)("a contract write refuses a switch from %s while encoding", async (_label, setup, change) => {
+    const provider = createMockProvider({ authorized: true });
+    if (setup.chainless) provider.setChainId(null);
+    const { wallet, writing, finish } = await startWrite(provider, { hydrated: setup.hydrated });
+    try {
+      change(provider);
+      finish();
+      await expectSent(writing, provider, "network_changed");
+    } finally { finish(); wallet.destroy(); }
+  });
+
+  const unsupported = () => { throw Object.assign(new Error("Unsupported"), { code: ERROR_CODES.UNSUPPORTED }); };
+  it.each([
+    ["chain", (provider: MockDuskProvider, wallet: DuskWallet) => {
+      provider.setResponse("dusk_getCapabilities", unsupported);
+      provider.setChainId(null);
+      return wallet.refresh();
+    }],
+    ["node", (provider: MockDuskProvider) => provider.emit("duskNodeChanged", node("file:///node"))],
+  ])("a contract write refuses when the wallet loses the %s it knew while encoding", async (_label, lose) => {
+    const provider = createMockProvider({ authorized: true });
+    const { wallet, writing, finish } = await startWrite(provider);
+    try {
+      await lose(provider, wallet);
+      expect(wallet.state.chainId === null || wallet.state.node === null).toBe(true);
+      finish();
+      await expectSent(writing, provider, "network_changed");
+    } finally { finish(); wallet.destroy(); }
+  });
+
+  it.each([["sends on its first node report", null], ["refuses a switch after it", "network_changed"]])(
+    "a write after replacing the provider on the same chain %s",
+    async (_label, reason) => {
+      const first = createMockProvider({ authorized: true });
+      const next = createMockProvider({ authorized: true, responses: { dusk_getCapabilities: unsupported } });
+      const wallet = createDuskWallet({ provider: first, autoRefresh: false });
+      const encoded = deferred<Uint8Array>();
+      const encodeInputFn = vi.fn(() => encoded.promise);
+      try {
+        await wallet.ready();
+        await wallet.refresh();
+        expect(wallet.state.node).not.toBeNull();
+        const info = createMockProviderInfo({ uuid: "next", rdns: "example.next" });
+        window.dispatchEvent(makeDuskAnnounceProviderEvent({ info, provider: next }));
+        await wallet.selectProvider(info.uuid);
+        expect(wallet.state).toMatchObject({ chainId: "dusk:2", node: null });
+        const contract = createDuskContract({
+          contractId: "0x" + "11".repeat(32), wallet, driver: { encodeInputFn } as any, defaultTx: { privacy: "public" },
+        });
+        const writing = contract.write["ping"]!();
+        await vi.waitFor(() => expect(encodeInputFn).toHaveBeenCalled());
+        next.emit("duskNodeChanged", node("https://next.example"));
+        if (reason) next.emit("duskNodeChanged", node("https://other.example"));
+        encoded.resolve(new Uint8Array([1]));
+        await expectSent(writing, next, reason);
+      } finally { encoded.resolve(new Uint8Array([1])); wallet.destroy(); window.localStorage.clear(); }
+    }
+  );
+
+  it.each([["chain", "network_changed"], ["lock", "session_changed"]])(
+    "wallet.sendTransaction sends nothing when the %s changes while it reads the call",
+    async (change, reason) => {
+      const provider = createMockProvider({ authorized: true });
+      const wallet = createDuskWallet({ provider, autoRefresh: false });
+      await wallet.ready();
+      const params = {
+        kind: "contract_call", contractId: "0x" + "11".repeat(32), fnArgs: "0x01", privacy: "public",
+        get fnName() { changes[change]!(provider); return "ping"; },
+      } as SendTransactionParams;
+      try {
+        await expect(wallet.sendTransaction(params)).rejects.toMatchObject({ name: "DuskSdkError", data: { reason } });
+        expect(sends(provider)).toEqual([]);
+      } finally { wallet.destroy(); }
+    }
+  );
 });
