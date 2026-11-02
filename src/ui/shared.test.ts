@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { networkLabel, shortenMiddle, walletStatus } from "./shared.js";
+import { networkLabel, shortenMiddle, shownProfile, walletStatus } from "./shared.js";
 
 describe("ui shared helpers", () => {
   it("computes wallet status from wallet state", () => {
@@ -13,6 +13,15 @@ describe("ui shared helpers", () => {
     expect(walletStatus({ installed: true, authorized: true, profiles: [{ profileId: "profile:0", account: "dusk1" }] } as any)).toBe(
       "connected"
     );
+  });
+
+  it("picks one profile record to show", () => {
+    const first = { profileId: "profile:0", account: "dusk1first", name: "first.dusk" };
+    const second = { profileId: "profile:1", account: "dusk1second" };
+    expect(shownProfile({ selectedProfile: second, profiles: [first, second] } as any)).toBe(second);
+    expect(shownProfile({ selectedProfile: { profileId: "x", account: "" }, profiles: [first] } as any)).toBe(first);
+    expect(shownProfile({ selectedProfile: null, profiles: [] } as any)).toBeNull();
+    expect(shownProfile(null)).toBeNull();
   });
 
   it("picks a display label for the active network", () => {

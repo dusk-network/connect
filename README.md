@@ -70,6 +70,9 @@ Wallet discovery is **event-based**, not singleton-based:
   public key. Use `accountToHex(account)` for contract-ready `0x` hex and
   `hexToAccount(publicKey)` for the reverse conversion; neither requires
   another wallet permission.
+- A profile's optional `name` is its account's `.dusk` name, which the Connect
+  UI shows in place of the shortened account. It is for display only: resolve
+  the name yourself before relying on it for anything.
 - `wallet.sendContractCall()` accepts the documented `ByteLike` inputs and
   normalizes `fnArgs` to `0x`-hex before crossing the extension provider
   boundary. Site-provided `display` metadata is unverified approval context;

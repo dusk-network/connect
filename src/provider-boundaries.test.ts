@@ -21,11 +21,31 @@ const unsafeUrls = [
   "https://node.example/?query=yes", "https://node.example/?", "https://node.example/#", "", 42, null,
 ];
 const reads = ["dusk_getCapabilities", "dusk_chainId", "dusk_profiles"];
+const longestName = Array(4).fill("a".repeat(63)).join(".") + ".dusk"; // 260 characters
+const validNames = [["alice.dusk", "alice.dusk"], [" pay.alice-2.dusk\n", "pay.alice-2.dusk"], ["0.dusk", "0.dusk"], [longestName, longestName]];
+const invalidNames = [
+  undefined, null, 42, true, { name: "alice.dusk" }, ["alice.dusk"], // missing or not a string
+  "", " ", "dusk", ".dusk", "alice..dusk", "alice", "alice.eth", "alice.dusk.eth", "alice.dusk.", // empty label or suffix
+  `${"a".repeat(64)}.dusk`, "a.b.c.d.e.dusk", // label or depth past the 260-character bound
+  "Alice.dusk", "alice.DUSK", "-alice.dusk", "alice-.dusk", "al_ice.dusk", "al ice.dusk", // not canonical
+  "álice.dusk", "аlice.dusk", "ali​ce.dusk", "Kelvin.dusk", // not ASCII; never case-folded
+].map((name) => [name]);
 
 function walletFor(provider: ReturnType<typeof createMockProvider>, opts: Partial<DuskWalletOptions> = {}) {
   const wallet = createDuskWallet({ provider, waitForProvider: false, ...opts });
   onTestFinished(() => wallet.destroy());
   return wallet;
+}
+
+// The profiles a provider-sent name yields through the property, reads, events and approvals.
+async function profilesAtEveryIngress(name: unknown) {
+  const raw = { profileId: "profile:0", account: "dusk1named", name: name as string };
+  const provider = createMockProvider({ authorized: true, accounts: [raw.account], name: raw.name });
+  const wallet = walletFor(provider, { autoRefresh: false });
+  const seen = [wallet.state.profiles, await wallet.getProfiles()];
+  provider.emit("profilesChanged", []);
+  provider.emit("profilesChanged", [raw]);
+  return [...seen, wallet.state.profiles, await wallet.connect()];
 }
 
 function deferred<T>() {
@@ -154,6 +174,18 @@ describe("provider value boundaries", () => {
     await wallet.refresh();
     expect(provider.request.mock.calls.map(([arg]) => arg.method)).toEqual(reads);
     expect(wallet.state).toMatchObject({ authorized: false, chainId: "dusk:2", profiles: [] });
+  });
+
+  it.each(validNames)("keeps a canonical .dusk profile name at every ingress: %j", async (name, expected) => {
+    for (const profiles of await profilesAtEveryIngress(name)) {
+      expect(profiles).toEqual([{ profileId: "profile:0", account: "dusk1named", name: expected }]);
+    }
+  });
+
+  it.each(invalidNames)("drops any other profile name at every ingress: %j", async (name) => {
+    for (const profiles of await profilesAtEveryIngress(name)) {
+      expect(profiles).toEqual([{ profileId: "profile:0", account: "dusk1named" }]);
+    }
   });
 });
 

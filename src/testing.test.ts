@@ -146,6 +146,16 @@ describe("testing helpers", () => {
     ]);
   });
 
+  it("checks the first profile's name as Connect keeps it", async () => {
+    const run = (name: string) =>
+      runWalletConformance({ installWallet: () => installReferenceWallet({ name }), expectedName: "example.dusk" });
+
+    await expect(run("example.dusk")).resolves.toMatchObject({ connectedProfiles: [{ name: "example.dusk" }] });
+    await expect(run("Example.dusk")).rejects.toThrow(
+      'Wallet conformance failed: expected first profile name "example.dusk" but found "none"'
+    );
+  });
+
   it("surfaces a user rejection during connect", async () => {
     await expect(
       runWalletConformance({

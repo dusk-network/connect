@@ -53,6 +53,7 @@ export type WalletConformanceOptions = {
   preferredProviderId?: string | null;
   expectedProvider?: Partial<Pick<DuskProviderInfo, "uuid" | "name" | "rdns">>;
   expectedAccount?: AccountId;
+  expectedName?: string;
   expectedChainId?: ChainId;
   requestBalance?: boolean;
   switchChain?: WalletConformanceSwitchExpectation;
@@ -222,6 +223,13 @@ export async function runWalletConformance(
       assert(
         connectedProfiles[0]?.account === options.expectedAccount,
         `expected first account "${options.expectedAccount}" but found "${connectedProfiles[0]?.account ?? "none"}"`
+      );
+    }
+
+    if (options.expectedName) {
+      assert(
+        connectedProfiles[0]?.name === options.expectedName,
+        `expected first profile name "${options.expectedName}" but found "${connectedProfiles[0]?.name ?? "none"}"`
       );
     }
 

@@ -26,6 +26,17 @@ export function normalizeNodeUrl(value: unknown): string | null {
   }
 }
 
+// Dusk Domains' canonical spelling: a root and up to three subname labels before `.dusk`, each
+// 1 to 63 lowercase ASCII letters, digits or inner hyphens, so at most 260 characters.
+const DUSK_NAME = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.){1,4}dusk$/;
+
+/** Trim a canonical `.dusk` name, or return null for anything else, including other casings. */
+export function normalizeDuskName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value.trim();
+  return DUSK_NAME.test(name) ? name : null;
+}
+
 /**
  * Normalize a CAIP-2 chain id, returning canonical `dusk:<id>` or "".
  *

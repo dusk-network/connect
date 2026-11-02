@@ -232,6 +232,11 @@ export type DuskProfile = {
   account: AccountId;
   /** Shareable shielded receive address, only present when explicitly approved. */
   shieldedAddress?: Address;
+  /**
+   * The account's `.dusk` name, sent only after the wallet checked that it points to `account`.
+   * Display only: resolve the name yourself before relying on it.
+   */
+  name?: string;
 };
 
 /** Options for requesting profile access from the wallet. */
