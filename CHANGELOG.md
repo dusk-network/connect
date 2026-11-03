@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Made the connect modal's Copy button say Copied for 1.5 s, in place of the hint below it.
+
 ## [0.3.0] - 2026-11-02
 
 ### Added

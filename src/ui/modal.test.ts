@@ -427,6 +427,45 @@ describe("connect modal", () => {
     expect(wallet.disconnect).toHaveBeenCalledTimes(1);
   });
 
+  it("says Copied on the Copy button for 1.5 s, heard once, with no hint; a copy that fails says so in the hint", async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const wallet = createMockUiWallet({
+      installed: true,
+      authorized: true,
+      accounts: ["dusk1abcdefghijklmnop"],
+      selectedAddress: "dusk1abcdefghijklmnop",
+      node: { chainId: "dusk:2", nodeUrl: "https://testnet.nodes.dusk.network", networkName: "Testnet" },
+    });
+    const modal = createDuskConnectModal(wallet as any);
+    onTestFinished(() => modal.destroy());
+    modal.open();
+
+    const copy = document.querySelector<HTMLButtonElement>("#dwcCopy")!;
+    const hint = document.querySelector<HTMLElement>("#dwcHint")!;
+    const said = document.querySelector<HTMLElement>('.dconnect-modal [role="status"][aria-live="polite"]')!;
+    // What it shows and says: Copied on the button, or Copy; screen readers; the hint.
+    const shown = () => [copy.hasAttribute("data-copied"), copy.getAttribute("aria-label"), said.textContent, hint.textContent];
+    expect([...copy.querySelectorAll(".dconnect-copy-swap > span")].map((face) => face.textContent)).toEqual(["Copy", "Copied"]);
+    expect(shown()).toEqual([false, "Copy", "", ""]);
+
+    copy.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("dusk1abcdefghijklmnop");
+    expect(shown()).toEqual([true, "Copied", "Copied", ""]);
+    await vi.advanceTimersByTimeAsync(1499);
+    expect(copy.hasAttribute("data-copied")).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(shown()).toEqual([false, "Copy", "", ""]);
+
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error("denied"));
+    copy.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(shown()).toEqual([false, "Copy", "", "Copy failed"]);
+  });
+
   it("shows a provider's name over its own short account and still copies the account", async () => {
     const first = "dusk1abcdefghijklmnopqrstuvwxyz";
     const second = "dusk1zyxwvutsrqponmlkjihgfedcba";
