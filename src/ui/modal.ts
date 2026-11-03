@@ -43,6 +43,9 @@ const PRIMARY_TEXT: Record<Status, string> = {
   connected: "Disconnect",
 };
 
+/** How long Copy says Copied, in ms. */
+const COPIED_MS = 1500;
+
 async function copyToClipboard(text: string): Promise<boolean> {
   try {
     await navigator.clipboard?.writeText?.(text);
@@ -141,6 +144,8 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
   let $providers: HTMLElement | null = null;
   let $primary: HTMLButtonElement | null = null;
   let $hint: HTMLElement | null = null;
+  let $said: HTMLElement | null = null;
+  let copiedTimer: number | null = null;
 
   const css = `
     ${DCONNECT_UI_BASE_CSS}
@@ -394,6 +399,37 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     .dconnect-copy:focus-visible {
       outline: none;
       box-shadow: var(--dconnect-shadow-focus);
+    }
+
+    /* Copy says it copied on itself: its words say Copied for 1.5 s, crossfading. */
+    .dconnect-copy-swap {
+      display: inline-grid;
+    }
+
+    .dconnect-copy-swap > span {
+      grid-area: 1 / 1;
+      transition: opacity var(--dconnect-dur-fast) var(--dconnect-ease);
+    }
+
+    .dconnect-copy-to,
+    .dconnect-copy[data-copied] .dconnect-copy-from {
+      opacity: 0;
+    }
+
+    .dconnect-copy[data-copied] .dconnect-copy-to {
+      opacity: 1;
+    }
+
+    .dconnect-sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     .dconnect-section {
@@ -729,7 +765,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
           <div class="dconnect-row dconnect-row-data"><div class="dconnect-lab">Wallet</div><div class="dconnect-val"><span id="dwcWallet">—</span></div></div>
           <div class="dconnect-row dconnect-row-data">
             <div class="dconnect-lab">Profile</div>
-            <div class="dconnect-val"><span class="dconnect-profile"><span class="dconnect-profile-name" id="dwcName" hidden></span><span id="dwcAccount">—</span></span><button class="dconnect-copy" id="dwcCopy" type="button" data-action="copy" hidden>Copy</button></div>
+            <div class="dconnect-val"><span class="dconnect-profile"><span class="dconnect-profile-name" id="dwcName" hidden></span><span id="dwcAccount">—</span></span><button class="dconnect-copy" id="dwcCopy" type="button" data-action="copy" aria-label="Copy" hidden><span class="dconnect-copy-swap" aria-hidden="true"><span class="dconnect-copy-from">Copy</span><span class="dconnect-copy-to">Copied</span></span></button></div>
           </div>
           <div class="dconnect-row dconnect-row-data"><div class="dconnect-lab">Network</div><div class="dconnect-val" id="dwcNetwork">—</div></div>
           <div class="dconnect-section">
@@ -741,6 +777,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
             <button class="dconnect-btn dconnect-btn-primary" id="dwcPrimary" type="button" data-action="primary">—</button>
           </div>
           <div class="dconnect-hint" id="dwcHint"></div>
+          <div class="dconnect-sr" id="dwcSaid" role="status" aria-live="polite"></div>
         </div>
       </div>
     `;
@@ -756,6 +793,7 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
     $providers = root.querySelector("#dwcProviders");
     $primary = root.querySelector("#dwcPrimary");
     $hint = root.querySelector("#dwcHint");
+    $said = root.querySelector("#dwcSaid");
 
     root.addEventListener("click", async (e) => {
       const target = e.target as HTMLElement | null;
@@ -781,8 +819,8 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
       if (action === "copy") {
         const acct = shownProfile(st)?.account || "";
         if (!acct) return;
-        const ok = await copyToClipboard(acct);
-        toast(ok ? "Copied" : "Copy failed");
+        if (await copyToClipboard(acct)) showCopied();
+        else toast("Copy failed");
         return;
       }
 
@@ -824,6 +862,21 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") close();
+  };
+
+  // Copy says Copied on itself for COPIED_MS, and screen readers hear it once.
+  const showCopied = () => {
+    if (!$copy) return;
+    if (copiedTimer !== null) window.clearTimeout(copiedTimer);
+    $copy.setAttribute("data-copied", "");
+    $copy.setAttribute("aria-label", "Copied");
+    if ($said) $said.textContent = "Copied";
+    copiedTimer = window.setTimeout(() => {
+      copiedTimer = null;
+      $copy?.removeAttribute("data-copied");
+      $copy?.setAttribute("aria-label", "Copy");
+      if ($said) $said.textContent = "";
+    }, COPIED_MS);
   };
 
   const toast = (msg: string) => {
@@ -943,8 +996,10 @@ export function createDuskConnectModal(wallet: DuskWallet, options: DuskConnectM
       // ignore
     }
     unsub = null;
+    if (copiedTimer !== null) window.clearTimeout(copiedTimer);
+    copiedTimer = null;
     root = null;
-    $title = $status = $wallet = $account = $network = $hint = null;
+    $title = $status = $wallet = $account = $network = $hint = $said = null;
     $copy = $primary = null;
     $sectionLabel = $providers = null;
   };
